@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "N2wgXDHLaBE=",
+  "success": true,
+  "projectFilePath": "C:\\projects\\merder\\merder.DesktopGL\\merder.DesktopGL.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\tymon.anderson\\.nuget\\packages\\monogame.content.builder.task\\3.8.5.1\\monogame.content.builder.task.3.8.5.1.nupkg.sha512",
+    "C:\\Users\\tymon.anderson\\.nuget\\packages\\monogame.framework.desktopgl\\3.8.5.1\\monogame.framework.desktopgl.3.8.5.1.nupkg.sha512",
+    "C:\\Users\\tymon.anderson\\.nuget\\packages\\monogame.library.openal\\1.24.3.4\\monogame.library.openal.1.24.3.4.nupkg.sha512",
+    "C:\\Users\\tymon.anderson\\.nuget\\packages\\monogame.library.sdl\\2.32.10.2\\monogame.library.sdl.2.32.10.2.nupkg.sha512",
+    "C:\\Users\\tymon.anderson\\.nuget\\packages\\nvorbis\\0.10.4\\nvorbis.0.10.4.nupkg.sha512"
+  ],
+  "logs": []
+}

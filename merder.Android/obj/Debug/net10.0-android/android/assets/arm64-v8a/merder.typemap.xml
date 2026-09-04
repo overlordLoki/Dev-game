@@ -1,0 +1,8 @@
+<api type="debug" assembly-name="merder" mvid="4411a59ba0e44c00a4b2c1d4d123e341">
+  <java-to-managed>
+    <entry java-name="crc642653df58fc6d6513/MainActivity" managed-name="merder.Android.MainActivity, merder" managed-type-token-id="33554434" />
+  </java-to-managed>
+  <managed-to-java>
+    <entry java-name="crc642653df58fc6d6513/MainActivity" managed-name="merder.Android.MainActivity, merder" managed-type-token-id="33554434" />
+  </managed-to-java>
+</api>

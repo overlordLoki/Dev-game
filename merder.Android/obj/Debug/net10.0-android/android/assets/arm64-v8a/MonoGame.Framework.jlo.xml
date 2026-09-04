@@ -1,0 +1,86 @@
+<api>
+  <jcw-types>
+    <type name="Accelerometer_SensorListener" package="crc648543e982a7f79970" application_java_class="android.app.Application" mono_runtime_initialization="mono.MonoPackageManager.LoadApplication (context);" extends_type="java.lang.Object" partial_assembly_qualified_name="MonoGame.Framework.Devices.Sensors.Accelerometer+SensorListener, MonoGame.Framework">
+      <implemented_interfaces>
+        <interface name="android.hardware.SensorEventListener" />
+      </implemented_interfaces>
+      <constructors>
+        <constructor name="Accelerometer_SensorListener" method="n_.ctor:()V:" jni_signature="()V" managed_parameters="" retval="void" is_dynamically_registered="True" />
+      </constructors>
+      <methods>
+        <method name="onAccuracyChanged" method="n_onAccuracyChanged:(Landroid/hardware/Sensor;I)V:GetOnAccuracyChanged_Landroid_hardware_Sensor_IHandler:Android.Hardware.ISensorEventListenerInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/hardware/Sensor;I)V" params="android.hardware.Sensor p0, int p1" retval="void" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+        <method name="onSensorChanged" method="n_onSensorChanged:(Landroid/hardware/SensorEvent;)V:GetOnSensorChanged_Landroid_hardware_SensorEvent_Handler:Android.Hardware.ISensorEventListenerInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/hardware/SensorEvent;)V" params="android.hardware.SensorEvent p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+      </methods>
+    </type>
+    <type name="Compass_SensorListener" package="crc648543e982a7f79970" application_java_class="android.app.Application" mono_runtime_initialization="mono.MonoPackageManager.LoadApplication (context);" extends_type="java.lang.Object" partial_assembly_qualified_name="MonoGame.Framework.Devices.Sensors.Compass+SensorListener, MonoGame.Framework">
+      <implemented_interfaces>
+        <interface name="android.hardware.SensorEventListener" />
+      </implemented_interfaces>
+      <constructors>
+        <constructor name="Compass_SensorListener" method="n_.ctor:()V:" jni_signature="()V" managed_parameters="" retval="void" is_dynamically_registered="True" />
+      </constructors>
+      <methods>
+        <method name="onAccuracyChanged" method="n_onAccuracyChanged:(Landroid/hardware/Sensor;I)V:GetOnAccuracyChanged_Landroid_hardware_Sensor_IHandler:Android.Hardware.ISensorEventListenerInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/hardware/Sensor;I)V" params="android.hardware.Sensor p0, int p1" retval="void" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+        <method name="onSensorChanged" method="n_onSensorChanged:(Landroid/hardware/SensorEvent;)V:GetOnSensorChanged_Landroid_hardware_SensorEvent_Handler:Android.Hardware.ISensorEventListenerInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/hardware/SensorEvent;)V" params="android.hardware.SensorEvent p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+      </methods>
+    </type>
+    <type name="AndroidGameActivity" package="crc64493ac3851fab1842" application_java_class="android.app.Application" mono_runtime_initialization="mono.MonoPackageManager.LoadApplication (context);" extends_type="android.app.Activity" partial_assembly_qualified_name="Microsoft.Xna.Framework.AndroidGameActivity, MonoGame.Framework">
+      <constructors>
+        <constructor name="AndroidGameActivity" method="n_.ctor:()V:" jni_signature="()V" managed_parameters="" retval="void" is_dynamically_registered="True" />
+      </constructors>
+      <methods>
+        <method name="onCreate" method="n_onCreate:(Landroid/os/Bundle;)V:GetOnCreate_Landroid_os_Bundle_Handler" jni_signature="(Landroid/os/Bundle;)V" params="android.os.Bundle p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+        <method name="onConfigurationChanged" method="n_onConfigurationChanged:(Landroid/content/res/Configuration;)V:GetOnConfigurationChanged_Landroid_content_res_Configuration_Handler" jni_signature="(Landroid/content/res/Configuration;)V" params="android.content.res.Configuration p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+        <method name="onPause" method="n_onPause:()V:GetOnPauseHandler" jni_signature="()V" retval="void" is_dynamically_registered="True" />
+        <method name="onResume" method="n_onResume:()V:GetOnResumeHandler" jni_signature="()V" retval="void" is_dynamically_registered="True" />
+        <method name="onDestroy" method="n_onDestroy:()V:GetOnDestroyHandler" jni_signature="()V" retval="void" is_dynamically_registered="True" />
+      </methods>
+    </type>
+    <type name="MonoGameAndroidGameView" package="crc64493ac3851fab1842" application_java_class="android.app.Application" mono_runtime_initialization="mono.MonoPackageManager.LoadApplication (context);" extends_type="android.view.SurfaceView" partial_assembly_qualified_name="Microsoft.Xna.Framework.MonoGameAndroidGameView, MonoGame.Framework">
+      <implemented_interfaces>
+        <interface name="android.view.SurfaceHolder.Callback" />
+        <interface name="android.view.View.OnTouchListener" />
+      </implemented_interfaces>
+      <constructors>
+        <constructor name="MonoGameAndroidGameView" method="n_.ctor:(Landroid/content/Context;Landroid/util/AttributeSet;II)V:" jni_signature="(Landroid/content/Context;Landroid/util/AttributeSet;II)V" managed_parameters="Android.Content.Context, Mono.Android:Android.Util.IAttributeSet, Mono.Android:System.Int32, System.Private.CoreLib:System.Int32, System.Private.CoreLib" params="android.content.Context p0, android.util.AttributeSet p1, int p2, int p3" retval="void" is_dynamically_registered="True" super_call="p0, p1, p2, p3" activate_call="p0, p1, p2, p3" />
+        <constructor name="MonoGameAndroidGameView" method="n_.ctor:(Landroid/content/Context;Landroid/util/AttributeSet;I)V:" jni_signature="(Landroid/content/Context;Landroid/util/AttributeSet;I)V" managed_parameters="Android.Content.Context, Mono.Android:Android.Util.IAttributeSet, Mono.Android:System.Int32, System.Private.CoreLib" params="android.content.Context p0, android.util.AttributeSet p1, int p2" retval="void" is_dynamically_registered="True" super_call="p0, p1, p2" activate_call="p0, p1, p2" />
+        <constructor name="MonoGameAndroidGameView" method="n_.ctor:(Landroid/content/Context;Landroid/util/AttributeSet;)V:" jni_signature="(Landroid/content/Context;Landroid/util/AttributeSet;)V" managed_parameters="Android.Content.Context, Mono.Android:Android.Util.IAttributeSet, Mono.Android" params="android.content.Context p0, android.util.AttributeSet p1" retval="void" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+        <constructor name="MonoGameAndroidGameView" method="n_.ctor:(Landroid/content/Context;)V:" jni_signature="(Landroid/content/Context;)V" managed_parameters="Android.Content.Context, Mono.Android" params="android.content.Context p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+      </constructors>
+      <methods>
+        <method name="onKeyDown" method="n_onKeyDown:(ILandroid/view/KeyEvent;)Z:GetOnKeyDown_ILandroid_view_KeyEvent_Handler" jni_signature="(ILandroid/view/KeyEvent;)Z" params="int p0, android.view.KeyEvent p1" retval="boolean" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+        <method name="onKeyUp" method="n_onKeyUp:(ILandroid/view/KeyEvent;)Z:GetOnKeyUp_ILandroid_view_KeyEvent_Handler" jni_signature="(ILandroid/view/KeyEvent;)Z" params="int p0, android.view.KeyEvent p1" retval="boolean" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+        <method name="onGenericMotionEvent" method="n_onGenericMotionEvent:(Landroid/view/MotionEvent;)Z:GetOnGenericMotionEvent_Landroid_view_MotionEvent_Handler" jni_signature="(Landroid/view/MotionEvent;)Z" params="android.view.MotionEvent p0" retval="boolean" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+        <method name="surfaceChanged" method="n_surfaceChanged:(Landroid/view/SurfaceHolder;III)V:GetSurfaceChanged_Landroid_view_SurfaceHolder_IIIHandler:Android.Views.ISurfaceHolderCallbackInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/view/SurfaceHolder;III)V" params="android.view.SurfaceHolder p0, int p1, int p2, int p3" retval="void" is_dynamically_registered="True" super_call="p0, p1, p2, p3" activate_call="p0, p1, p2, p3" />
+        <method name="surfaceCreated" method="n_surfaceCreated:(Landroid/view/SurfaceHolder;)V:GetSurfaceCreated_Landroid_view_SurfaceHolder_Handler:Android.Views.ISurfaceHolderCallbackInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/view/SurfaceHolder;)V" params="android.view.SurfaceHolder p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+        <method name="surfaceDestroyed" method="n_surfaceDestroyed:(Landroid/view/SurfaceHolder;)V:GetSurfaceDestroyed_Landroid_view_SurfaceHolder_Handler:Android.Views.ISurfaceHolderCallbackInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/view/SurfaceHolder;)V" params="android.view.SurfaceHolder p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+        <method name="onTouch" method="n_onTouch:(Landroid/view/View;Landroid/view/MotionEvent;)Z:GetOnTouch_Landroid_view_View_Landroid_view_MotionEvent_Handler:Android.Views.View+IOnTouchListenerInvoker, Mono.Android, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" jni_signature="(Landroid/view/View;Landroid/view/MotionEvent;)Z" params="android.view.View p0, android.view.MotionEvent p1" retval="boolean" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+      </methods>
+    </type>
+    <type name="OrientationListener" package="crc64493ac3851fab1842" application_java_class="android.app.Application" mono_runtime_initialization="mono.MonoPackageManager.LoadApplication (context);" extends_type="android.view.OrientationEventListener" partial_assembly_qualified_name="Microsoft.Xna.Framework.OrientationListener, MonoGame.Framework">
+      <constructors>
+        <constructor name="OrientationListener" method="n_.ctor:(Landroid/content/Context;I)V:" jni_signature="(Landroid/content/Context;I)V" managed_parameters="Android.Content.Context, Mono.Android:Android.Hardware.SensorDelay, Mono.Android" params="android.content.Context p0, int p1" retval="void" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+        <constructor name="OrientationListener" method="n_.ctor:(Landroid/content/Context;)V:" jni_signature="(Landroid/content/Context;)V" managed_parameters="Android.Content.Context, Mono.Android" params="android.content.Context p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+      </constructors>
+      <methods>
+        <method name="onOrientationChanged" method="n_onOrientationChanged:(I)V:GetOnOrientationChanged_IHandler" jni_signature="(I)V" params="int p0" retval="void" is_dynamically_registered="True" super_call="p0" activate_call="p0" />
+      </methods>
+    </type>
+    <type name="ScreenReceiver" package="crc64493ac3851fab1842" application_java_class="android.app.Application" mono_runtime_initialization="mono.MonoPackageManager.LoadApplication (context);" extends_type="android.content.BroadcastReceiver" partial_assembly_qualified_name="Microsoft.Xna.Framework.ScreenReceiver, MonoGame.Framework">
+      <constructors>
+        <constructor name="ScreenReceiver" method="n_.ctor:()V:" jni_signature="()V" managed_parameters="" retval="void" is_dynamically_registered="True" />
+      </constructors>
+      <methods>
+        <method name="onReceive" method="n_onReceive:(Landroid/content/Context;Landroid/content/Intent;)V:GetOnReceive_Landroid_content_Context_Landroid_content_Intent_Handler" jni_signature="(Landroid/content/Context;Landroid/content/Intent;)V" params="android.content.Context p0, android.content.Intent p1" retval="void" is_dynamically_registered="True" super_call="p0, p1" activate_call="p0, p1" />
+      </methods>
+    </type>
+  </jcw-types>
+  <acw-types partial-assembly-name="MonoGame.Framework" module-name="MonoGame.Framework.dll">
+    <type assembly-qualified-name="MonoGame.Framework.Devices.Sensors.Accelerometer+SensorListener, MonoGame.Framework, Version=3.8.5.1, Culture=neutral, PublicKeyToken=null" compat-jni-name="monogame.framework.devices.sensors.Accelerometer_SensorListener" java-key="crc648543e982a7f79970.Accelerometer_SensorListener" managed-key="MonoGame.Framework.Devices.Sensors.Accelerometer.SensorListener" partial-assembly-qualified-name="MonoGame.Framework.Devices.Sensors.Accelerometer+SensorListener, MonoGame.Framework" />
+    <type assembly-qualified-name="MonoGame.Framework.Devices.Sensors.Compass+SensorListener, MonoGame.Framework, Version=3.8.5.1, Culture=neutral, PublicKeyToken=null" compat-jni-name="monogame.framework.devices.sensors.Compass_SensorListener" java-key="crc648543e982a7f79970.Compass_SensorListener" managed-key="MonoGame.Framework.Devices.Sensors.Compass.SensorListener" partial-assembly-qualified-name="MonoGame.Framework.Devices.Sensors.Compass+SensorListener, MonoGame.Framework" />
+    <type assembly-qualified-name="Microsoft.Xna.Framework.AndroidGameActivity, MonoGame.Framework, Version=3.8.5.1, Culture=neutral, PublicKeyToken=null" compat-jni-name="microsoft.xna.framework.AndroidGameActivity" java-key="crc64493ac3851fab1842.AndroidGameActivity" managed-key="Microsoft.Xna.Framework.AndroidGameActivity" partial-assembly-qualified-name="Microsoft.Xna.Framework.AndroidGameActivity, MonoGame.Framework" />
+    <type assembly-qualified-name="Microsoft.Xna.Framework.MonoGameAndroidGameView, MonoGame.Framework, Version=3.8.5.1, Culture=neutral, PublicKeyToken=null" compat-jni-name="microsoft.xna.framework.MonoGameAndroidGameView" java-key="crc64493ac3851fab1842.MonoGameAndroidGameView" managed-key="Microsoft.Xna.Framework.MonoGameAndroidGameView" partial-assembly-qualified-name="Microsoft.Xna.Framework.MonoGameAndroidGameView, MonoGame.Framework" />
+    <type assembly-qualified-name="Microsoft.Xna.Framework.OrientationListener, MonoGame.Framework, Version=3.8.5.1, Culture=neutral, PublicKeyToken=null" compat-jni-name="microsoft.xna.framework.OrientationListener" java-key="crc64493ac3851fab1842.OrientationListener" managed-key="Microsoft.Xna.Framework.OrientationListener" partial-assembly-qualified-name="Microsoft.Xna.Framework.OrientationListener, MonoGame.Framework" />
+    <type assembly-qualified-name="Microsoft.Xna.Framework.ScreenReceiver, MonoGame.Framework, Version=3.8.5.1, Culture=neutral, PublicKeyToken=null" compat-jni-name="microsoft.xna.framework.ScreenReceiver" java-key="crc64493ac3851fab1842.ScreenReceiver" managed-key="Microsoft.Xna.Framework.ScreenReceiver" partial-assembly-qualified-name="Microsoft.Xna.Framework.ScreenReceiver, MonoGame.Framework" />
+  </acw-types>
+</api>

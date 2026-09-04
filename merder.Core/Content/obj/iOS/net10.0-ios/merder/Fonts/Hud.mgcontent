@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PipelineBuildEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <SourceFile>C:/projects/merder/merder.Core/Content/Fonts/Hud.spritefont</SourceFile>
+  <SourceTime>2026-06-05T09:11:36.2333554+12:00</SourceTime>
+  <DestFile>C:/projects/merder/merder.Core/Content/bin/iOS/merder/Fonts/Hud.xnb</DestFile>
+  <DestTime>2026-06-05T09:22:04.7617948+12:00</DestTime>
+  <Importer>FontDescriptionImporter</Importer>
+  <ImporterTime>2025-10-21T03:25:32+13:00</ImporterTime>
+  <Processor>FontDescriptionProcessor</Processor>
+  <ProcessorTime>2025-10-21T03:25:32+13:00</ProcessorTime>
+  <Parameters>
+    <Key>PremultiplyAlpha</Key>
+    <Value>True</Value>
+  </Parameters>
+  <Parameters>
+    <Key>TextureFormat</Key>
+    <Value>Compressed</Value>
+  </Parameters>
+  <Dependencies />
+  <BuildAsset />
+  <BuildOutput />
+</PipelineBuildEvent>

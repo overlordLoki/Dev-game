@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>merder — Level Editor</title>
+<style>
+  :root {
+    --bg: #1e1f24;
+    --panel: #2a2c33;
+    --panel-2: #33363f;
+    --line: #3f424c;
+    --text: #e6e7ea;
+    --muted: #9a9db0;
+    --accent: #6b9b3f;
+    --accent-2: #4a7bd8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* ---- Sidebar ---- */
+  aside {
+    width: 300px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 16px;
+    overflow-y: auto;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 20px 0 8px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  label { font-size: 13px; color: var(--muted); }
+  input[type=number] {
+    width: 64px; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px; padding: 5px 7px; font-size: 13px;
+  }
+  button {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 7px 10px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #3c404a; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #10210a; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  /* palette swatches */
+  .palette { display: flex; flex-direction: column; gap: 6px; }
+  .swatch {
+    display: flex; align-items: center; gap: 10px; padding: 7px 9px;
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--panel-2);
+  }
+  .swatch.selected { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+  .chip { width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(0,0,0,.35); flex-shrink: 0; }
+  .swatch .name { font-size: 13px; }
+  .mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .mode-toggle button { flex: 1; }
+  .mode-toggle button.active { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  textarea {
+    width: 100%; height: 150px; background: #16171b; color: #b9d6a0; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+    resize: vertical;
+  }
+  /* ---- Canvas area ---- */
+  main { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 24px; }
+  #grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .cell {
+    position: relative; background: #6b9b3f; cursor: crosshair; user-select: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cell .obj { font-size: 60%; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+  .cell img.tile { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  .cell img.obj  { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .cell .objbadge {
+    position: absolute; bottom: 1px; right: 2px; font-size: 9px; color: #fff;
+    background: rgba(0,0,0,.5); border-radius: 3px; padding: 0 3px; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<aside>
+  <h1>merder — Level Editor</h1>
+  <div class="sub">Paint tiles, place objects, export JSON.</div>
+
+  <h2>Grid</h2>
+  <div class="row">
+    <label>Cols</label><input id="cols" type="number" min="1" max="60" value="8">
+    <label>Rows</label><input id="rows" type="number" min="1" max="60" value="5">
+    <button id="resize">Apply</button>
+  </div>
+
+  <h2>Mode</h2>
+  <div class="mode-toggle">
+    <button id="modeTiles" class="active">Paint Tiles</button>
+    <button id="modeObjects">Place Objects</button>
+  </div>
+
+  <div id="tilePanel">
+    <h2>Tiles</h2>
+    <div class="palette" id="tilePalette"></div>
+    <div class="row" style="margin-top:8px">
+      <label>Rotation</label>
+      <button id="tileRotateBtn">0°</button>
+      <span class="hint" style="margin:0">(press R)</span>
+    </div>
+    <div class="hint">Click or drag to paint. </div>
+  </div>
+
+  <div id="objectPanel" style="display:none">
+    <h2>Objects</h2>
+    <div class="palette" id="objectPalette"></div>
+    <div class="row" style="margin-top:8px">
+      <label>Variety</label>
+      <select id="variety" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px"></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label>Rotation</label>
+      <button id="rotateBtn">0°</button>
+      <span class="hint" style="margin:0">(press R)</span>
+    </div>
+    <div class="hint">Left-click a cell to place. Right-click to remove.</div>
+  </div>
+
+  <h2>File</h2>
+  <div class="row">
+    <button class="primary" id="download">Download .json</button>
+    <button id="copy">Copy</button>
+  </div>
+  <div class="row">
+    <button id="load">Load .json</button>
+    <button id="clearTiles">Clear Tiles</button>
+    <button id="clearObjects">Clear Objects</button>
+  </div>
+  <input id="fileInput" type="file" accept="application/json,.json" style="display:none">
+
+  <h2>JSON</h2>
+  <textarea id="json" readonly></textarea>
+</aside>
+
+<main><div id="grid"></div></main>
+
+<script src="sprites.js"></script>
+<script>
+/* =====================================================================
+   CONFIG — add new tile/object types here. Keep the "id" strings in sync
+   with the game's mapping (JSON tile name -> TileType enum, etc.).
+   "img" = a key in SPRITES (sprites.js). "color" is the fallback if no art.
+   ===================================================================== */
+const TILE_TYPES = [
+  { id: "grass",       name: "Grass",          color: "#6b9b3f", img: "grass" },
+  { id: "dirt",        name: "Dirt",           color: "#c9a06a", img: "dirt" },
+  { id: "dirt_road",   name: "Dirt Road",      color: "#a07a4a", img: "dirt_road" },
+  { id: "dirt_cross",  name: "Dirt Crossroad", color: "#8a6a3a", img: "dirt_cross" },
+];
+
+const OBJECT_TYPES = [
+  { id: "tree", name: "Tree", icon: "🌳", varieties: [
+      { value: 1, label: "Small",  img: "tree_1" },
+      { value: 2, label: "Medium", img: "tree_2" },
+      { value: 3, label: "Large",  img: "tree_3" },
+  ]},
+];
+
+// Look up a sprite data URI, tolerating a missing sprites.js.
+function sprite(key) {
+  try { return (typeof SPRITES !== "undefined" && SPRITES[key]) || null; }
+  catch { return null; }
+}
+
+const DEFAULT_TILE = TILE_TYPES[0].id;   // fresh cells start as grass
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let cols = 8, rows = 5;
+let tiles = [];                 // tiles[r][c] = tile id string
+let tileRot = [];               // tileRot[r][c] = rotation degrees (0/90/180/270)
+let objects = [];               // { type, variety, col, row, rotation }
+let mode = "tiles";             // "tiles" | "objects"
+let selectedTile = DEFAULT_TILE;
+let selectedObject = OBJECT_TYPES[0].id;
+let objRotation = 0;            // applied to newly placed objects
+let tileRotation = 0;           // applied to newly painted tiles
+let painting = false;
+
+const tileById = Object.fromEntries(TILE_TYPES.map(t => [t.id, t]));
+const objById  = Object.fromEntries(OBJECT_TYPES.map(o => [o.id, o]));
+
+/* =====================================================================
+   INIT GRID DATA
+   ===================================================================== */
+function newGrid(c, r, fill) {
+  const g = [];
+  for (let y = 0; y < r; y++) {
+    const rowArr = [];
+    for (let x = 0; x < c; x++) rowArr.push(fill);
+    g.push(rowArr);
+  }
+  return g;
+}
+function newTiles(c, r) { return newGrid(c, r, DEFAULT_TILE); }
+
+function resizeGrid(newCols, newRows) {
+  const oldTiles = tiles, oldRot = tileRot;
+  const g = newTiles(newCols, newRows);
+  const gr = newGrid(newCols, newRows, 0);
+  // preserve overlapping region
+  for (let y = 0; y < Math.min(newRows, oldTiles.length); y++)
+    for (let x = 0; x < Math.min(newCols, oldTiles[0].length); x++) {
+      g[y][x] = oldTiles[y][x];
+      gr[y][x] = oldRot[y][x];
+    }
+  tiles = g; tileRot = gr;
+  cols = newCols; rows = newRows;
+  // drop objects that fell outside the new bounds
+  objects = objects.filter(o => o.col < cols && o.row < rows);
+  render();
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+const gridEl = document.getElementById("grid");
+
+function objectAt(c, r) { return objects.find(o => o.col === c && o.row === r); }
+
+let cellPx = 40;   // current on-screen cell size, set in render()
+
+// Build the inner content of one cell (tile layer + optional object layer).
+function renderCell(x, y) {
+  const el = cellEl(x, y);
+  if (!el) return;
+  el.innerHTML = "";
+  el.style.background = "";
+
+  // --- tile layer ---
+  const tt = tileById[tiles[y][x]];
+  const timg = tt && sprite(tt.img);
+  if (timg) {
+    const t = document.createElement("img");
+    t.className = "tile";
+    t.src = timg;
+    t.style.transform = `rotate(${tileRot[y][x] || 0}deg)`;
+    el.appendChild(t);
+  } else {
+    el.style.background = tt?.color || "#000";
+  }
+
+  // --- object layer ---
+  const o = objectAt(x, y);
+  if (o) {
+    const ot = objById[o.type];
+    const variety = ot?.varieties.find(v => v.value === o.variety);
+    const oimg = variety && sprite(variety.img);
+    if (oimg) {
+      const img = document.createElement("img");
+      img.className = "obj";
+      img.src = oimg;
+      img.style.width = "100%"; img.style.height = "100%";
+      img.style.objectFit = "contain"; img.style.imageRendering = "pixelated";
+      img.style.transform = `rotate(${o.rotation || 0}deg)`;
+      el.appendChild(img);
+    } else {
+      const icon = document.createElement("span");
+      icon.className = "obj";
+      icon.style.fontSize = (cellPx * 0.7) + "px";
+      icon.textContent = ot?.icon || "?";
+      el.appendChild(icon);
+    }
+    const badge = document.createElement("span");
+    badge.className = "objbadge";
+    badge.textContent = o.variety;
+    el.appendChild(badge);
+  }
+}
+
+function render() {
+  // Fit cell size to viewport-ish; cap so big grids stay usable.
+  cellPx = Math.max(18, Math.min(64, Math.floor(560 / Math.max(cols, rows))));
+  gridEl.style.gridTemplateColumns = `repeat(${cols}, ${cellPx}px)`;
+  gridEl.style.gridTemplateRows = `repeat(${rows}, ${cellPx}px)`;
+  gridEl.innerHTML = "";
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const el = document.createElement("div");
+      el.className = "cell";
+      el.dataset.x = x; el.dataset.y = y;
+      gridEl.appendChild(el);
+      renderCell(x, y);
+    }
+  }
+  updateJson();
+}
+
+/* =====================================================================
+   EDITING
+   ===================================================================== */
+function paintCell(x, y) {
+  if (mode === "tiles") {
+    tiles[y][x] = selectedTile;
+    tileRot[y][x] = tileRotation;
+    renderCell(x, y);
+    updateJson();
+  }
+}
+
+function placeObject(x, y) {
+  const existingIdx = objects.findIndex(o => o.col === x && o.row === y);
+  const variety = parseInt(document.getElementById("variety").value, 10);
+  const obj = { type: selectedObject, variety, col: x, row: y, rotation: objRotation };
+  if (existingIdx >= 0) objects[existingIdx] = obj;
+  else objects.push(obj);
+  renderCell(x, y);
+  updateJson();
+}
+
+function removeObject(x, y) {
+  objects = objects.filter(o => !(o.col === x && o.row === y));
+  renderCell(x, y);
+  updateJson();
+}
+
+function cellEl(x, y) { return gridEl.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`); }
+
+gridEl.addEventListener("mousedown", e => {
+  const el = e.target.closest(".cell");
+  if (!el) return;
+  const x = +el.dataset.x, y = +el.dataset.y;
+  if (mode === "tiles") { painting = true; paintCell(x, y); }
+  else {
+    if (e.button === 2) removeObject(x, y);
+    else placeObject(x, y);
+  }
+});
+gridEl.addEventListener("mouseover", e => {
+  if (!painting) return;
+  const el = e.target.closest(".cell");
+  if (el) paintCell(+el.dataset.x, +el.dataset.y);
+});
+window.addEventListener("mouseup", () => painting = false);
+gridEl.addEventListener("contextmenu", e => e.preventDefault());
+
+/* =====================================================================
+   PALETTES
+   ===================================================================== */
+function buildTilePalette() {
+  const p = document.getElementById("tilePalette");
+  p.innerHTML = "";
+  TILE_TYPES.forEach(t => {
+    const el = document.createElement("div");
+    el.className = "swatch" + (t.id === selectedTile ? " selected" : "");
+    const timg = sprite(t.img);
+    const chip = timg
+      ? `<span class="chip" style="background-image:url(${timg});background-size:100% 100%;image-rendering:pixelated"></span>`
+      : `<span class="chip" style="background:${t.color}"></span>`;
+    el.innerHTML = `${chip}<span class="name">${t.name}</span>`;
+    el.onclick = () => { selectedTile = t.id; buildTilePalette(); };
+    p.appendChild(el);
+  });
+}
+
+function buildObjectPalette() {
+  const p = document.getElementById("objectPalette");
+  p.innerHTML = "";
+  OBJECT_TYPES.forEach(o => {
+    const el = document.createElement("div");
+    el.className = "swatch" + (o.id === selectedObject ? " selected" : "");
+    const oimg = sprite(o.varieties[0]?.img);
+    const chip = oimg
+      ? `<span class="chip" style="background-image:url(${oimg});background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated"></span>`
+      : `<span class="chip" style="display:flex;align-items:center;justify-content:center;background:#2a2c33">${o.icon}</span>`;
+    el.innerHTML = `${chip}<span class="name">${o.name}</span>`;
+    el.onclick = () => { selectedObject = o.id; buildObjectPalette(); buildVariety(); };
+    p.appendChild(el);
+  });
+}
+
+function buildVariety() {
+  const sel = document.getElementById("variety");
+  sel.innerHTML = "";
+  (objById[selectedObject].varieties || []).forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v.value; opt.textContent = `${v.value} — ${v.label}`;
+    sel.appendChild(opt);
+  });
+}
+
+/* =====================================================================
+   MODE SWITCH
+   ===================================================================== */
+document.getElementById("modeTiles").onclick = () => setMode("tiles");
+document.getElementById("modeObjects").onclick = () => setMode("objects");
+function setMode(m) {
+  mode = m;
+  document.getElementById("modeTiles").classList.toggle("active", m === "tiles");
+  document.getElementById("modeObjects").classList.toggle("active", m === "objects");
+  document.getElementById("tilePanel").style.display = m === "tiles" ? "" : "none";
+  document.getElementById("objectPanel").style.display = m === "objects" ? "" : "none";
+}
+
+/* rotation controls — each mode has its own current-rotation brush */
+function cycleObjRotation() {
+  objRotation = (objRotation + 90) % 360;
+  document.getElementById("rotateBtn").textContent = objRotation + "°";
+}
+function cycleTileRotation() {
+  tileRotation = (tileRotation + 90) % 360;
+  document.getElementById("tileRotateBtn").textContent = tileRotation + "°";
+}
+document.getElementById("rotateBtn").onclick = cycleObjRotation;
+document.getElementById("tileRotateBtn").onclick = cycleTileRotation;
+window.addEventListener("keydown", e => {
+  if (e.key.toLowerCase() !== "r") return;
+  if (mode === "objects") cycleObjRotation();
+  else cycleTileRotation();
+});
+
+/* =====================================================================
+   JSON EXPORT / IMPORT
+   ===================================================================== */
+function buildMap() {
+  return { cols, rows, tiles, rotations: tileRot, objects };
+}
+function updateJson() {
+  document.getElementById("json").value = JSON.stringify(buildMap(), null, 2);
+}
+
+document.getElementById("download").onclick = () => {
+  const blob = new Blob([JSON.stringify(buildMap(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "level.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(JSON.stringify(buildMap(), null, 2)); }
+  catch { document.getElementById("json").select(); document.execCommand("copy"); }
+};
+
+document.getElementById("resize").onclick = () => {
+  const c = Math.max(1, Math.min(60, +document.getElementById("cols").value || 1));
+  const r = Math.max(1, Math.min(60, +document.getElementById("rows").value || 1));
+  resizeGrid(c, r);
+};
+document.getElementById("clearTiles").onclick = () => { tiles = newTiles(cols, rows); tileRot = newGrid(cols, rows, 0); render(); };
+document.getElementById("clearObjects").onclick = () => { objects = []; render(); };
+
+document.getElementById("load").onclick = () => document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const map = JSON.parse(reader.result);
+      cols = map.cols; rows = map.rows;
+      tiles = map.tiles; objects = map.objects || [];
+      tileRot = map.rotations || newGrid(cols, rows, 0);   // older files have no rotations
+      document.getElementById("cols").value = cols;
+      document.getElementById("rows").value = rows;
+      render();
+    } catch (err) { alert("Could not read that file: " + err.message); }
+  };
+  reader.readAsText(file);
+};
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+tiles = newTiles(cols, rows);
+tileRot = newGrid(cols, rows, 0);
+buildTilePalette();
+buildObjectPalette();
+buildVariety();
+render();
+</script>
+</body>
+</html>

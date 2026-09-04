@@ -1,0 +1,175 @@
+
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:bin/$(Platform)
+/intermediateDir:obj/$(Platform)
+/platform:DesktopGL
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+
+#---------------------------------- Content ---------------------------------#
+
+#begin Fonts/Hud.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:Fonts/Hud.spritefont
+
+#begin Sprites/Player/D_Attack.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/D_Attack.png
+
+#begin Sprites/Player/D_Death.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/D_Death.png
+
+#begin Sprites/Player/D_Hurt.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/D_Hurt.png
+
+#begin Sprites/Player/D_Idle.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/D_Idle.png
+
+#begin Sprites/Player/D_Walk.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/D_Walk.png
+
+#begin Sprites/Player/S_Attack.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/S_Attack.png
+
+#begin Sprites/Player/S_Death.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/S_Death.png
+
+#begin Sprites/Player/S_Hurt.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/S_Hurt.png
+
+#begin Sprites/Player/S_Idle.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/S_Idle.png
+
+#begin Sprites/Player/S_Walk.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/S_Walk.png
+
+#begin Sprites/Player/U_Attack.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/U_Attack.png
+
+#begin Sprites/Player/U_Death.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/U_Death.png
+
+#begin Sprites/Player/U_Hurt.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/U_Hurt.png
+
+#begin Sprites/Player/U_Idle.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/U_Idle.png
+
+#begin Sprites/Player/U_Walk.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/U_Walk.png
+
+#begin Sprites/Tiles/cross_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/cross_dirt_road.png
+
+#begin Sprites/Tiles/dirt.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/dirt.png
+
+#begin Sprites/Tiles/grass.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/grass.png
+
+#begin Sprites/Tiles/straight_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/straight_dirt_road.png
+
+#begin Sprites/Objects/Tree_Small.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Tree_Small.png
+
+#begin Sprites/Objects/Tree_Medium.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Tree_Medium.png
+
+#begin Sprites/Objects/Tree_Large.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Tree_Large.png

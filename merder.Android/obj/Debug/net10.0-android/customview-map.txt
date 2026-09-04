@@ -1,0 +1,7 @@
+color;obj\Debug\net10.0-android\res\values\ic_launcher_background.xml
+item;obj\Debug\net10.0-android\res\values\styles.xml
+resources;obj\Debug\net10.0-android\res\values\ic_launcher_background.xml
+resources;obj\Debug\net10.0-android\res\values\strings.xml
+resources;obj\Debug\net10.0-android\res\values\styles.xml
+string;obj\Debug\net10.0-android\res\values\strings.xml
+style;obj\Debug\net10.0-android\res\values\styles.xml

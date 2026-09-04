@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>merder</name>
+    </assembly>
+    <members>
+        <member name="T:merder.Android.MainActivity">
+            <summary>
+            The main activity for the Android application. It initializes the game instance,
+            sets up the rendering view, and starts the game loop.
+            </summary>
+            <remarks>
+            This class is responsible for managing the Android activity lifecycle and integrating
+            with the MonoGame framework.
+            </remarks>
+        </member>
+        <member name="M:merder.Android.MainActivity.OnCreate(Android.OS.Bundle)">
+            <summary>
+            Called when the activity is first created. Initializes the game instance,
+            retrieves its rendering view, and sets it as the content view of the activity.
+            Finally, starts the game loop.
+            </summary>
+            <param name="bundle">A Bundle containing the activity's previously saved state, if any.</param>
+        </member>
+        <member name="T:merder.Android.Resource">
+            <summary>
+            Android Resource Designer class.
+            Exposes the Android Resource designer assembly into the project Namespace.
+            </summary>
+        </member>
+    </members>
+</doc>
