@@ -1,0 +1,104 @@
+# merder
+
+A top-down 2D game built with **MonoGame** (.NET) — a learning project exploring
+the fundamentals: the game loop, sprites and animation, tile maps, a screen/menu
+system, entity and object collision, and depth sorting.
+
+## Requirements
+
+- [.NET SDK](https://dotnet.microsoft.com/) (net10.0)
+- MonoGame is pulled in via NuGet (`MonoGame.Framework.DesktopGL` +
+  `MonoGame.Content.Builder.Task`) — no separate install needed.
+
+## Running
+
+The desktop build is the main target:
+
+```bash
+cd merder.DesktopGL
+dotnet run
+```
+
+Or open `merder.sln` in Visual Studio / VS Code, set **merder.DesktopGL** as the
+startup project, and press **F5** (with debugger) or **Ctrl+F5** (without).
+
+### Controls
+
+| Input | Action |
+|-------|--------|
+| Arrow keys | Move the player |
+| P | Pause / resume |
+| Esc | Quit |
+| Mouse | Menu / settings buttons |
+
+## Project layout
+
+This is a standard MonoGame cross-platform solution — shared game code lives in
+`merder.Core`, and each platform has a thin launcher.
+
+```
+merder.sln
+├── merder.Core/            # all shared game code (edit here)
+│   ├── merderGame.cs       # main Game class: the loop, screen manager wiring
+│   ├── Settings.cs         # height-based UI scale
+│   ├── Layout.cs           # single source of truth for tile-cell size
+│   ├── Textures.cs         # shared accessor over ContentManager
+│   ├── Entities/           # IEntity, Player, NPC (movement, collision)
+│   ├── Objects/            # IObject, Tree (world props)
+│   ├── Tiles/              # TileType, TileMap (the ground grid)
+│   ├── Levels/             # MapData + MapLoader (JSON level loading)
+│   ├── Screens/            # ScreenManager, Menu, Settings, Pause, World, Gamebox
+│   │   └── Locations/      # Location, Medows (a playable area)
+│   ├── Utility/            # IDrawable, Animation, Debug helpers
+│   ├── Localization/       # culture/string resources
+│   └── Content/            # assets + the MGCB pipeline (merder.mgcb)
+│       ├── Sprites/        # player sheets, tiles, object art
+│       └── levels/         # *.json level files
+├── merder.DesktopGL/       # Windows/Mac/Linux launcher (main run target)
+├── merder.Android/         # Android launcher
+├── merder.iOS/             # iOS launcher
+└── tools/                  # the level editor (see below)
+```
+
+## Systems
+
+- **Screen manager** — a stack of `IScreen`s (menu → game → pause overlay). The
+  top screen updates; screens draw bottom-to-top so overlays show the game behind.
+- **Responsive layout** — tiles stretch to fill the window; the player, NPCs, and
+  objects all size off `Layout.CellSize`, so everything scales together on resize.
+- **Animation** — sprite sheets sliced into frames by `Animation`, advanced on a timer.
+- **Tile maps** — a `TileType[,]` grid drawn from the current window size, with
+  optional per-tile rotation.
+- **Objects** — grid-placed props (trees) with tight collision boxes.
+- **Collision** — AABB push-out; entities collide with walls, each other, and
+  objects. Collision boxes are tight (feet/trunk), separate from sprite size.
+- **Depth sorting** — player, NPCs, and objects share `IDrawable.SortY` and draw
+  in base-Y order, so the player passes behind or in front of trees correctly.
+
+## Levels
+
+Levels are plain JSON in `merder.Core/Content/levels/`, loaded by
+`Levels/MapLoader.cs` (`System.Text.Json`). Format:
+
+```json
+{
+  "cols": 8,
+  "rows": 5,
+  "tiles":     [ ["grass", "dirt", ...], ... ],
+  "rotations": [ [0, 90, ...], ... ],
+  "objects":   [ { "type": "tree", "variety": 3, "col": 6, "row": 3, "rotation": 0 } ]
+}
+```
+
+Tile ids (`grass`, `dirt`, `dirt_road`, `dirt_cross`) must match
+`MapLoader.ParseTile`. `rotations` and object `rotation` are optional.
+
+## Tools
+
+- **`tools/level-editor.html`** — a browser-based level editor. Paint tiles, place
+  and rotate objects, and export/import the level JSON. Open it directly in a
+  browser (keep `tools/sprites.js` alongside it).
+- **`tools/build-sprites.py`** — regenerates `sprites.js` (the editor's embedded
+  art) when sprite files change.
+- **`tools/DESKTOP_EDITOR_PLAN.md`** — parked plan for turning the editor into a
+  native desktop app with direct file access.
