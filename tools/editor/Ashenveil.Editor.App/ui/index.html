@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ashenveil — Level Editor</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside>
+  <h1>Ashenveil — Level Editor</h1>
+
+  <!-- The project: which game folder we're editing. Set once, remembered. -->
+  <div class="project">
+    <div class="project-path" id="projectPath">No folder selected</div>
+    <button id="changeProject">Change folder…</button>
+  </div>
+
+  <h2>Level</h2>
+  <div class="row">
+    <select id="levelList" class="grow"></select>
+    <button id="reloadLevel" title="Discard changes and reload from disk">↻</button>
+  </div>
+  <div class="row">
+    <button class="primary grow" id="save">Save</button>
+    <button id="saveAs">Save As…</button>
+  </div>
+  <div class="row">
+    <button id="newLevel">New</button>
+    <button id="duplicate">Duplicate</button>
+    <button id="deleteLevel" class="danger">Delete</button>
+  </div>
+  <div class="hint" id="status">&nbsp;</div>
+
+  <h2>Grid</h2>
+  <div class="row">
+    <label>Cols</label><input id="cols" type="number" min="1" max="60" value="8">
+    <label>Rows</label><input id="rows" type="number" min="1" max="60" value="5">
+    <button id="resize">Apply</button>
+  </div>
+
+  <h2>Mode</h2>
+  <div class="mode-toggle">
+    <button id="modeTiles" class="active">Paint Tiles</button>
+    <button id="modeObjects">Place Objects</button>
+  </div>
+
+  <div id="tilePanel">
+    <h2>Tiles</h2>
+    <div class="palette" id="tilePalette"></div>
+    <div class="row" style="margin-top:8px">
+      <label>Rotation</label>
+      <button id="tileRotateBtn">0°</button>
+      <span class="hint inline">(press R)</span>
+    </div>
+    <div class="hint">Click or drag to paint.</div>
+  </div>
+
+  <div id="objectPanel" hidden>
+    <h2>Objects</h2>
+    <div class="palette" id="objectPalette"></div>
+    <div class="row" style="margin-top:8px">
+      <label>Variety</label>
+      <select id="variety"></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label>Rotation</label>
+      <button id="rotateBtn">0°</button>
+      <span class="hint inline">(press R)</span>
+    </div>
+    <div class="hint">Left-click a cell to place. Right-click to remove.</div>
+  </div>
+
+  <div id="warnings" hidden>
+    <h2>Palette warnings</h2>
+    <ul class="warnings" id="warningList"></ul>
+  </div>
+
+  <h2>JSON</h2>
+  <textarea id="json" readonly></textarea>
+</aside>
+
+<main><div id="grid"></div></main>
+
+<!-- The "held" brush: follows the cursor showing what's about to be placed,
+     at the rotation it will land with. Purely visual, never hit-tested. -->
+<div id="brush" hidden>
+  <div class="brush-art"><img id="brushImg" alt=""></div>
+  <span class="brush-rot" id="brushRot"></span>
+</div>
+
+<script src="api.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

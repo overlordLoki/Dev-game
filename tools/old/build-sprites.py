@@ -5,7 +5,7 @@ editor draws. Run this whenever you add or change art.
 
     python build-sprites.py
 
-To add a new sprite: drop the PNG under merder.Core/Content/Sprites/... and
+To add a new sprite: drop the PNG under Ashenveil.Core/Content/Sprites/... and
 add one line to FILES below (key -> path relative to the Sprites folder).
 The key is what the editor references via the `img` field in its config.
 """
@@ -16,7 +16,7 @@ import os
 
 # Folder that paths below are relative to.
 SPRITES_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "merder.Core", "Content", "Sprites"
+    os.path.dirname(__file__), "..", "Ashenveil.Core", "Content", "Sprites"
 )
 OUTPUT = os.path.join(os.path.dirname(__file__), "sprites.js")
 

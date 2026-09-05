@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../Ashenveil.Core/Content/Icon.ico</ApplicationIcon>
+    <AssemblyName>Ashenveil</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <MonoGameContentReference Include="..\Ashenveil.Core\Content\Ashenveil.mgcb">
+      <Link>Content\Ashenveil.mgcb</Link>
+    </MonoGameContentReference>
+  </ItemGroup>
+  <!-- Level JSON is plain data (not compiled by the pipeline): copy it next to the exe. -->
+  <ItemGroup>
+    <None Include="..\Ashenveil.Core\Content\levels\**\*.json" Link="Content\levels\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ashenveil.Core\Ashenveil.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
+  </ItemGroup>
+</Project>

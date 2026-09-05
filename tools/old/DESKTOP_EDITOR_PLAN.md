@@ -39,10 +39,10 @@ Either way the frontend is the same; only the bridge differs.
 
 - **Pick the game folder once** ("open project"), remembered in a small config
   file (e.g. `editor-config.json` in the app's own folder). This is the "project".
-- **Auto-load sprites on start** — scan `merder.Core/Content/Sprites/**` and hand
+- **Auto-load sprites on start** — scan `Ashenveil.Core/Content/Sprites/**` and hand
   the UI the images live. Kills `build-sprites.py` entirely; add a PNG, it shows up.
 - **Save / load levels in place** — write JSON straight into
-  `merder.Core/Content/levels/`, and list existing levels in a dropdown to reopen.
+  `Ashenveil.Core/Content/levels/`, and list existing levels in a dropdown to reopen.
 - **New level / duplicate level** helpers.
 
 
@@ -63,7 +63,7 @@ Either way the frontend is the same; only the bridge differs.
     "objects": [ { "type": "tree", "variety": 3, "col": 6, "row": 3, "rotation": 90 } ]
   }
   ```
-- Game side already loads this via `merder.Core/Levels/MapLoader.cs`
+- Game side already loads this via `Ashenveil.Core/Levels/MapLoader.cs`
   (`System.Text.Json` -> `TileType[,]` + objects). Tile ids must match
   `MapLoader.ParseTile`.
 

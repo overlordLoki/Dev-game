@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Ashenveil.Editor.App/Ashenveil.Editor.App.csproj" />
+  <Project Path="Ashenveil.Editor.Core/Ashenveil.Editor.Core.csproj" />
+</Solution>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===================================================================
-#  Starts the merder level editor.
+#  Starts the Ashenveil level editor.
 #
 #  Run it from a terminal, or mark it executable (chmod +x start-editor.sh)
 #  and launch it from your file manager. Either way it builds first
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-APP="$SCRIPT_DIR/Merder.Editor.App"
+APP="$SCRIPT_DIR/Ashenveil.Editor.App"
 
 CONFIG=Debug
 case "${1:-}" in
@@ -21,7 +21,7 @@ case "${1:-}" in
 esac
 
 OUT="$APP/bin/$CONFIG/net10.0"
-EXE="$OUT/Merder.Editor.App"
+EXE="$OUT/Ashenveil.Editor.App"
 
 die() {
     printf '\n  %s\n\n' "$*" >&2
@@ -60,7 +60,7 @@ echo "Starting..."
 # never inherits whatever folder this script was run from and the terminal is
 # free afterwards. Output goes to a log because a detached process has nowhere
 # else to put it.
-LOG="${TMPDIR:-/tmp}/merder-editor.log"
+LOG="${TMPDIR:-/tmp}/ashenveil-editor.log"
 cd "$OUT"
 nohup "$EXE" >"$LOG" 2>&1 &
 PID=$!

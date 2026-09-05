@@ -1,4 +1,4 @@
-# merder Level Editor (desktop)
+# Ashenveil Level Editor (desktop)
 
 A native window that edits levels straight in the game folder — no export step,
 no `build-sprites.py`, no dragging files into `Content/levels/`.
@@ -21,19 +21,19 @@ needs WebKitGTK (`libwebkit2gtk-4.1`) — it warns if that's missing.
 Or without the scripts:
 
 ```bash
-dotnet run --project tools/editor/Merder.Editor.App
+dotnet run --project tools/editor/Ashenveil.Editor.App
 ```
 
-First launch asks for the merder folder (the one containing `merder.sln`). It's
+First launch asks for the Ashenveil folder (the one containing `Ashenveil.sln`). It's
 remembered in `editor-config.json` next to the exe, so it only asks once.
 
 ## The two parts
 
 | Project | What it is | Knows about |
 |---|---|---|
-| `Merder.Editor.Core` | The backend. Config, sprite scanning, level read/write, the palette parser, and the request router. | Files and the game's source. **Not** Photino, not HTML. |
-| `Merder.Editor.App` | The shell. Opens a Photino window, serves art, carries messages. ~100 lines. | Photino and `EditorApi`. No editor logic. |
-| `Merder.Editor.App/ui` | The frontend. Plain HTML/CSS/JS. | The route API only. No .NET. |
+| `Ashenveil.Editor.Core` | The backend. Config, sprite scanning, level read/write, the palette parser, and the request router. | Files and the game's source. **Not** Photino, not HTML. |
+| `Ashenveil.Editor.App` | The shell. Opens a Photino window, serves art, carries messages. ~100 lines. | Photino and `EditorApi`. No editor logic. |
+| `Ashenveil.Editor.App/ui` | The frontend. Plain HTML/CSS/JS. | The route API only. No .NET. |
 
 The UI never calls .NET directly — it sends a JSON message and gets one back:
 

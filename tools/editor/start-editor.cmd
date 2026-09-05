@@ -1,6 +1,6 @@
 @echo off
 rem ===================================================================
-rem  Starts the merder level editor.
+rem  Starts the Ashenveil level editor.
 rem
 rem  Double-click it, or run it from a terminal. Either way it builds
 rem  first (incremental, so usually a second or two) and then opens the
@@ -12,12 +12,12 @@ rem ===================================================================
 setlocal
 
 set "ROOT=%~dp0"
-set "APP=%ROOT%Merder.Editor.App"
+set "APP=%ROOT%Ashenveil.Editor.App"
 
 set "CONFIG=Debug"
 if /i "%~1"=="release" set "CONFIG=Release"
 
-set "EXE=%APP%\bin\%CONFIG%\net10.0\Merder.Editor.App.exe"
+set "EXE=%APP%\bin\%CONFIG%\net10.0\Ashenveil.Editor.App.exe"
 
 where dotnet >nul 2>&1
 if errorlevel 1 (
@@ -46,7 +46,7 @@ echo Starting...
 
 rem /d sets the new process's working directory, so it never inherits
 rem whatever folder this script was launched from.
-start "merder level editor" /d "%APP%\bin\%CONFIG%\net10.0" "%EXE%"
+start "Ashenveil level editor" /d "%APP%\bin\%CONFIG%\net10.0" "%EXE%"
 
 endlocal
 exit /b 0

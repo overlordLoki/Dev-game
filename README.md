@@ -1,4 +1,4 @@
-# merder
+# The Ashenveil Murders
 
 A top-down 2D game built with **MonoGame** (.NET) — a learning project exploring
 the fundamentals: the game loop, sprites and animation, tile maps, a screen/menu
@@ -15,11 +15,11 @@ system, entity and object collision, and depth sorting.
 The desktop build is the main target:
 
 ```bash
-cd merder.DesktopGL
+cd Ashenveil.DesktopGL
 dotnet run
 ```
 
-Or open `merder.sln` in Visual Studio / VS Code, set **merder.DesktopGL** as the
+Or open `Ashenveil.sln` in Visual Studio / VS Code, set **Ashenveil.DesktopGL** as the
 startup project, and press **F5** (with debugger) or **Ctrl+F5** (without).
 
 ### Controls
@@ -34,12 +34,12 @@ startup project, and press **F5** (with debugger) or **Ctrl+F5** (without).
 ## Project layout
 
 This is a standard MonoGame cross-platform solution — shared game code lives in
-`merder.Core`, and each platform has a thin launcher.
+`Ashenveil.Core`, and each platform has a thin launcher.
 
 ```
-merder.sln
-├── merder.Core/            # all shared game code (edit here)
-│   ├── merderGame.cs       # main Game class: the loop, screen manager wiring
+Ashenveil.sln
+├── Ashenveil.Core/            # all shared game code (edit here)
+│   ├── AshenveilGame.cs       # main Game class: the loop, screen manager wiring
 │   ├── Settings.cs         # height-based UI scale
 │   ├── Layout.cs           # single source of truth for tile-cell size
 │   ├── Textures.cs         # shared accessor over ContentManager
@@ -51,11 +51,11 @@ merder.sln
 │   │   └── Locations/      # Location, Medows (a playable area)
 │   ├── Utility/            # IDrawable, Animation, Debug helpers
 │   ├── Localization/       # culture/string resources
-│   └── Content/            # assets + the MGCB pipeline (merder.mgcb)
+│   └── Content/            # assets + the MGCB pipeline (Ashenveil.mgcb)
 │       ├── Sprites/        # player sheets, tiles, object art
 │       └── levels/         # *.json level files
-├── merder.DesktopGL/       # Windows/Mac/Linux launcher (main run target)
-├── merder.Android/         # Android launcher
+├── Ashenveil.DesktopGL/       # Windows/Mac/Linux launcher (main run target)
+├── Ashenveil.Android/         # Android launcher
 └── tools/                  # the level editor (see below)
 ```
 
@@ -76,7 +76,7 @@ merder.sln
 
 ## Levels
 
-Levels are plain JSON in `merder.Core/Content/levels/`, loaded by
+Levels are plain JSON in `Ashenveil.Core/Content/levels/`, loaded by
 `Levels/MapLoader.cs` (`System.Text.Json`). Format:
 
 ```json
