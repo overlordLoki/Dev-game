@@ -56,7 +56,6 @@ merder.sln
 │       └── levels/         # *.json level files
 ├── merder.DesktopGL/       # Windows/Mac/Linux launcher (main run target)
 ├── merder.Android/         # Android launcher
-├── merder.iOS/             # iOS launcher
 └── tools/                  # the level editor (see below)
 ```
 
