@@ -114,11 +114,11 @@ namespace Ashenveil.Editor.Core
 
         private JsonNode SetProject(string path)
         {
-            if (!EditorConfig.IsGameFolder(path))
-                throw new InvalidOperationException(
-                    $"'{path}' doesn't look like the Ashenveil folder (no Ashenveil.Core/Content inside).");
+            string root = EditorConfig.ResolveGameFolder(path)
+                ?? throw new InvalidOperationException(
+                    $"'{path}' isn't inside the Ashenveil game. Pick the folder that contains Ashenveil.Core (the repo root).");
 
-            _config.GameFolder = path;
+            _config.GameFolder = root;
             _config.Save();
             return ProjectState();
         }

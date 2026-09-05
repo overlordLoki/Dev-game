@@ -46,8 +46,15 @@ namespace Ashenveil.Core.Levels
                 {
                     switch (o.type)
                     {
+                        // The saved file still says variety 1/2/3, so old levels keep
+                        // working; the number just picks a class now instead of a sprite.
                         case "tree":
-                            objects.Add(new Tree(o.col, o.row, o.variety));
+                            objects.Add(o.variety switch
+                            {
+                                1 => new TreeSmall(o.col, o.row),
+                                2 => new TreeMedium(o.col, o.row),
+                                _ => (Tree)new TreeLarge(o.col, o.row),
+                            });
                             break;
                         // add new object types here as the game grows
                     }

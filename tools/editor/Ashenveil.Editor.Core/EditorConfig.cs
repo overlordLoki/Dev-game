@@ -50,5 +50,19 @@ namespace Ashenveil.Editor.Core
             if (string.IsNullOrWhiteSpace(path)) return false;
             return Directory.Exists(Path.Combine(path, "Ashenveil.Core", "Content"));
         }
+
+        /// <summary>
+        /// Returns the repo root for a folder picked anywhere inside the game, or null
+        /// if it isn't in one. Picking Content or Ashenveil.Core is an easy slip in a file
+        /// dialog, and the answer is unambiguous, so walk up rather than refusing.
+        /// </summary>
+        public static string? ResolveGameFolder(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            for (var dir = new DirectoryInfo(path); dir != null; dir = dir.Parent)
+                if (IsGameFolder(dir.FullName))
+                    return dir.FullName;
+            return null;
+        }
     }
 }

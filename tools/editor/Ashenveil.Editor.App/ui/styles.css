@@ -44,9 +44,24 @@ input[type=number] {
   width: 64px; background: var(--panel-2); border: 1px solid var(--line);
   color: var(--text); border-radius: 6px; padding: 5px 7px; font-size: 13px;
 }
+/* appearance:none is load-bearing: without it WebKitGTK draws its own native
+   widget and ignores the background below, leaving pale text on a pale button.
+   Dropping the native look also drops the native arrow, so one is drawn back on. */
 select {
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
-  border-radius: 6px; padding: 5px; font-size: 13px;
+  appearance: none; -webkit-appearance: none;
+  background-color: var(--panel-2);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239a9db0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 26px 5px 7px; font-size: 13px;
+}
+/* The open dropdown is drawn by the platform, not the page: WebKitGTK gives it a
+   light system background while the options still inherit our light text, so the
+   list reads white-on-white. Setting both here keeps the popup legible. */
+select option {
+  background: var(--panel-2);
+  color: var(--text);
 }
 
 button {

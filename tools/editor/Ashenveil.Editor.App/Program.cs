@@ -40,7 +40,10 @@ namespace Ashenveil.Editor.App
 
             PhotinoWindow? window = null;
 
-            window = new PhotinoWindow()
+            // Photino narrates every call it receives on stdout. Useful when the window
+            // won't open, noise the rest of the time. Set as a property rather than via
+            // SetLogVerbosity, which announces itself before the setting takes effect.
+            window = new PhotinoWindow { LogVerbosity = 0 }
                 .SetTitle("Ashenveil level editor")
                 .SetUseOsDefaultSize(false)
                 .SetSize(1360, 900)
