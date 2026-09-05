@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Ashenveil.Editor.Core;
 using Photino.NET;
 
@@ -15,9 +16,25 @@ namespace Ashenveil.Editor.App
     /// </summary>
     internal static class Program
     {
+        [DllImport("libc", SetLastError = true)]
+        private static extern int setenv(string name, string value, int overwrite);
+
         [STAThread]
         private static void Main()
         {
+            // WebKitGTK 2.42+ paints through a DMA-BUF buffer that several Wayland
+            // compositors reject, killing the window the moment the page renders:
+            //   Gdk-Message: Error 71 (Protocol error) dispatching to Wayland display.
+            // The older renderer costs nothing at this size. Set here rather than in a
+            // launch script so it applies however the editor is started, and before the
+            // window exists so WebKit's child processes inherit it.
+            // Environment.SetEnvironmentVariable is no good here: on Unix it only updates
+            // a managed copy, which the unmanaged WebKit never reads. setenv is the real one.
+            if (OperatingSystem.IsLinux())
+            {
+                setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 1);
+            }
+
             var config = EditorConfig.Load();
             var api = new EditorApi(config);
 
