@@ -94,10 +94,32 @@ Tile ids (`grass`, `dirt`, `dirt_road`, `dirt_cross`) must match
 
 ## Tools
 
-- **`tools/level-editor.html`** — a browser-based level editor. Paint tiles, place
-  and rotate objects, and export/import the level JSON. Open it directly in a
-  browser (keep `tools/sprites.js` alongside it).
-- **`tools/build-sprites.py`** — regenerates `sprites.js` (the editor's embedded
-  art) when sprite files change.
-- **`tools/DESKTOP_EDITOR_PLAN.md`** — parked plan for turning the editor into a
-  native desktop app with direct file access.
+### Level editor — `tools/editor/`
+
+A native desktop app (Photino + .NET) that reads and writes levels **directly**
+in `Ashenveil.Core/Content/levels/` — no export step, no copying files around.
+
+```bash
+tools/editor/start-editor.cmd
+```
+
+```bash
+tools/editor/start-editor.sh
+```
+
+Either script builds and launches it, from any working directory. There is
+nothing to configure: the editor lives in this repo, so it finds the game by
+walking up from itself.
+
+Paint tiles, place and rotate objects, save straight into the levels folder.
+The palette is **not** hardcoded — it's derived from the game's own source
+(`Assets.cs`, `MapLoader.ParseTile`, `TileMap._assetNames`), so adding a tile
+to the game makes it appear in the editor, with its real art, with no editor
+change. Full details in [`tools/editor/README.md`](tools/editor/README.md).
+
+### Retired — `tools/old/`
+
+Kept for reference only; nothing uses these.
+
+- `level-editor.html` — the previous browser-based editor
+- `build-sprites.py` / `sprites.js` — its embedded art and the script that generated them
