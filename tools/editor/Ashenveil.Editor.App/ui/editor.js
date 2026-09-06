@@ -625,7 +625,10 @@ $("resize").onclick = () => {
 /* ----------------------------------------------------------------- boot */
 
 async function bindProject(state, opts) {
-  $("projectPath").textContent = state.gameFolder || "No folder selected";
+  // "auto" means we found the game around the editor rather than being told.
+  $("projectPath").textContent = state.gameFolder
+    ? (state.auto ? state.gameFolder + "  (auto)" : state.gameFolder)
+    : "No folder found";
   $("projectPath").title = state.gameFolder || "";
 
   const enabled = state.valid;

@@ -103,6 +103,7 @@ namespace Ashenveil.Editor.Core
         {
             ["gameFolder"] = _config.GameFolder,
             ["valid"]      = _config.IsValid,
+            ["auto"]       = _config.AutoDetected,
         };
 
         private JsonNode BrowseForProject()
@@ -116,9 +117,10 @@ namespace Ashenveil.Editor.Core
         {
             string root = EditorConfig.ResolveGameFolder(path)
                 ?? throw new InvalidOperationException(
-                    $"'{path}' isn't inside the Ashenveil game. Pick the folder that contains Ashenveil.Core (the repo root).");
+                    $"'{path}' isn't inside the game. Pick the repo root - the folder holding the .Core project.");
 
             _config.GameFolder = root;
+            _config.AutoDetected = false;   // an explicit choice, and it gets persisted
             _config.Save();
             return ProjectState();
         }
