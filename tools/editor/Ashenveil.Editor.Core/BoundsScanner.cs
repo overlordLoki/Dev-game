@@ -137,32 +137,52 @@ namespace Ashenveil.Editor.Core
                 return;
             }
 
-            // Defaults the subclasses inherit when they don't state their own.
-            var inherited = ReadKnobs(Path.Combine(dir, "Tree.cs"), OverrideKnob);
+            // Any abstract object base (Tree, and future ones) and the default knobs its
+            // subclasses inherit. Keyed by class name so a subclass can find its own base
+            // rather than assuming everything descends from Tree.
+            var baseKnobs = new Dictionary<string, Dictionary<string, BoundsKnob>>(StringComparer.Ordinal);
+            foreach (string file in Directory.EnumerateFiles(dir, "*.cs"))
+            {
+                string text = System.IO.File.ReadAllText(file);
+                if (!text.Contains("abstract class")) continue;
+                var decl = ClassDecl.Match(text);
+                if (!decl.Success) continue;
+                var k = ReadKnobs(file, OverrideKnob);
+                if (k.Count > 0) baseKnobs[decl.Groups[1].Value] = k;
+            }
 
             foreach (string file in Directory.EnumerateFiles(dir, "*.cs").OrderBy(f => f))
             {
                 string text = System.IO.File.ReadAllText(file);
                 string className = Path.GetFileNameWithoutExtension(file);
 
-                // Only concrete subclasses - Tree itself is abstract and has no box of its own.
+                // Concrete classes only; skip interfaces and the abstract bases themselves.
+                if (!Regex.IsMatch(text, @"\bclass\s+\w+")) continue;    // interface/enum file
+                if (text.Contains("abstract class")) continue;
                 var decl = ClassDecl.Match(text);
                 if (!decl.Success) continue;
-                if (text.Contains("abstract class")) continue;
-                if (!decl.Groups[2].Value.Contains("Tree")) continue;
 
                 var knobs = ReadKnobs(file, OverrideKnob);
-                if (knobs.Count == 0) continue;
+
+                // Which abstract base (if any) this class inherits its defaults from.
+                var bases = decl.Groups[2].Value.Split(',').Select(s => s.Trim());
+                string? inheritedFrom = bases.FirstOrDefault(b => baseKnobs.ContainsKey(b));
+
+                // Tunable only if it states its own knobs or inherits some from a base.
+                if (knobs.Count == 0 && inheritedFrom == null) continue;
 
                 // Fill in anything inherited rather than declared here.
-                foreach (var (id, knob) in inherited)
-                {
-                    if (knobs.ContainsKey(id)) continue;
-                    knobs[id] = new BoundsKnob
+                if (inheritedFrom != null)
+                    foreach (var (id, knob) in baseKnobs[inheritedFrom])
                     {
-                        Key = knob.Key, Identifier = id, Value = knob.Value, Declared = false,
-                    };
-                }
+                        if (knobs.ContainsKey(id)) continue;
+                        knobs[id] = new BoundsKnob
+                        {
+                            Key = knob.Key, Identifier = id, Value = knob.Value, Declared = false,
+                        };
+                    }
+
+                if (knobs.Count == 0) continue;
 
                 var target = new BoundsTarget
                 {
@@ -200,14 +220,18 @@ namespace Ashenveil.Editor.Core
             foreach (string file in Directory.EnumerateFiles(dir, "*.cs").OrderBy(f => f))
             {
                 string className = Path.GetFileNameWithoutExtension(file);
-                if (className.StartsWith("I")) continue;    // interfaces carry no numbers
+                string text = System.IO.File.ReadAllText(file);
+
+                // Skip interface files by their content, not the filename's first letter —
+                // an entity called "Imp" or "Ice" must not be mistaken for an interface.
+                if (!Regex.IsMatch(text, @"\bclass\s+\w+")) continue;
 
                 var knobs = ReadKnobs(file, ConstKnob);
                 if (knobs.Count == 0)
                 {
                     // The most likely reason is bare numbers inline in the Bounds getter,
                     // which there is no safe way to name or patch.
-                    if (System.IO.File.ReadAllText(file).Contains("Rectangle Bounds"))
+                    if (text.Contains("Rectangle Bounds"))
                         catalogue.Warnings.Add(
                             $"{className}: collision box uses inline numbers - " +
                             "give them named consts (boxW/boxH/footInset/xShift) to tune it here.");
