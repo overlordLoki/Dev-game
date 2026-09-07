@@ -13,6 +13,7 @@ namespace Ashenveil.Core.Tiles
             [TileType.Dirt]          = Assets.Dirt,
             [TileType.DirtRoad]      = Assets.DirtRoad,
             [TileType.DirtRoadCross] = Assets.DirtRoadCross,
+            [TileType.TurnDirtRoad]  = Assets.TurnDirtRoad
         };
 
         private TileType[,] _grid;

@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Ashenveil.Core.Tiles
 {
-    public enum TileType { Grass, Dirt, DirtRoad, DirtRoadCross }
+    public enum TileType { Grass, Dirt, DirtRoad, DirtRoadCross , TurnDirtRoad }
     public interface Tile
     {
         int Width { get; }
