@@ -29,7 +29,7 @@ namespace Ashenveil.Core.Levels
             var grid = new TileType[data.rows, data.cols];
             for (int y = 0; y < data.rows; y++)
                 for (int x = 0; x < data.cols; x++)
-                    grid[y, x] = ParseTile(data.tiles[y][x]);
+                    grid[y, x] = TileCatalog.Parse(data.tiles[y][x]);
 
             // rotations: optional. If the file has none, everything stays at 0.
             var rotations = new int[data.rows, data.cols];
@@ -63,15 +63,5 @@ namespace Ashenveil.Core.Levels
 
             return new LoadedMap { Grid = grid, Rotations = rotations, Objects = objects };
         }
-
-        // JSON tile name -> TileType. Must match the ids used in the level editor.
-        private static TileType ParseTile(string id) => id switch
-        {
-            "grass"      => TileType.Grass,
-            "dirt"       => TileType.Dirt,
-            "dirt_road"  => TileType.DirtRoad,
-            "dirt_cross" => TileType.DirtRoadCross,
-            _            => TileType.Grass,   // unknown -> grass fallback
-        };
     }
 }

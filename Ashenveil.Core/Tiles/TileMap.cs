@@ -6,15 +6,6 @@ namespace Ashenveil.Core.Tiles
 {
     public class TileMap
     {
-        // Which content asset each tile type uses. The one place tile art is mapped.
-        private static readonly Dictionary<TileType, string> _assetNames = new()
-        {
-            [TileType.Grass]         = Assets.Grass,
-            [TileType.Dirt]          = Assets.Dirt,
-            [TileType.DirtRoad]      = Assets.DirtRoad,
-            [TileType.DirtRoadCross] = Assets.DirtRoadCross,
-            [TileType.TurnDirtRoad]  = Assets.TurnDirtRoad
-        };
 
         private TileType[,] _grid;
         private int[,] _rotations;              // degrees (0/90/180/270) per cell
@@ -31,8 +22,8 @@ namespace Ashenveil.Core.Tiles
             // Build the texture lookup ourselves via the shared Textures accessor.
             // ContentManager caches, so loading every tile type here is cheap.
             _textures = new Dictionary<TileType, Texture2D>();
-            foreach (var pair in _assetNames)
-                _textures[pair.Key] = Textures.Get(pair.Value);
+            foreach (var def in TileCatalog.All)
+                _textures[def.Type] = Textures.Get(def.Asset);
         }
 
         public void Draw(SpriteBatch spriteBatch)

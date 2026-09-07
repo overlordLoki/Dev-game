@@ -122,43 +122,81 @@ namespace Ashenveil.Editor.Core
 
         // ------------------------------------------------------------------- tiles
 
-        private static readonly Regex ParseTileArm =
-            new(@"""(\w+)""\s*=>\s*TileType\.(\w+)", RegexOptions.Compiled);
+        // new("dirt_cross", TileType.DirtRoadCross, Assets.DirtRoadCross),
+        private static readonly Regex TileDefEntry = new(
+            @"new\s*\(\s*""(\w+)""\s*,\s*TileType\.(\w+)\s*,\s*Assets\.(\w+)\s*\)",
+            RegexOptions.Compiled);
 
-        private static readonly Regex AssetNameEntry =
-            new(@"\[TileType\.(\w+)\]\s*=\s*Assets\.(\w+)", RegexOptions.Compiled);
+        // public enum TileType { Grass, Dirt, ... }
+        private static readonly Regex TileTypeEnum = new(
+            @"enum\s+TileType\s*\{([^}]*)\}", RegexOptions.Compiled);
 
+        /// <summary>
+        /// Reads the palette from TileCatalog.All - one table holding id, enum value and
+        /// art together. Anything declared on TileType but missing from that table is
+        /// reported: the game refuses to start in that state, and it used to be the kind
+        /// of gap that silently turned a new tile into grass.
+        /// </summary>
         private static void BuildTiles(GameProject project, Dictionary<string, AssetConst> assets, Catalogue catalogue)
         {
-            // json id -> TileType name, in the order MapLoader lists them.
-            var idToType = ReadPairs(project.MapLoaderPath, ParseTileArm, catalogue.Warnings, "MapLoader.cs");
-
-            // TileType name -> Assets constant name.
-            var typeToAsset = ReadPairs(project.TileMapPath, AssetNameEntry, catalogue.Warnings, "TileMap.cs")
-                .GroupBy(p => p.Key, StringComparer.Ordinal)
-                .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.Ordinal);
-
-            foreach (var (id, typeName) in idToType)
+            string path = project.TileCatalogPath;
+            if (!File.Exists(path))
             {
-                // Duplicates would show the same tile twice in the palette. (ParseTile's
-                // "_ => TileType.Grass" fallback arm has no string literal, so the regex
-                // skips it already.)
+                catalogue.Warnings.Add("TileCatalog.cs not found - no tiles in the palette.");
+                return;
+            }
+
+            string text = File.ReadAllText(path);
+            var declared = new List<string>();
+
+            foreach (Match match in TileDefEntry.Matches(text))
+            {
+                string id = match.Groups[1].Value;
+                string typeName = match.Groups[2].Value;
+                string constName = match.Groups[3].Value;
+
+                declared.Add(typeName);
                 if (catalogue.Tiles.Any(t => t.Id == id)) continue;
 
                 var entry = new TileEntry { Id = id, Name = Humanise(id) };
 
-                if (typeToAsset.TryGetValue(typeName, out string? constName) &&
-                    assets.TryGetValue(constName, out var asset))
+                if (assets.TryGetValue(constName, out var asset))
                 {
                     entry.AssetPath = asset.Path;
                     entry.Url = SpriteUrl(project, asset.Path, catalogue.Warnings);
                 }
                 else
                 {
-                    catalogue.Warnings.Add($"Tile '{id}' (TileType.{typeName}) has no art mapped in TileMap/Assets.");
+                    catalogue.Warnings.Add($"Tile '{id}' points at Assets.{constName}, which isn't in Assets.cs.");
                 }
 
                 catalogue.Tiles.Add(entry);
+            }
+
+            if (catalogue.Tiles.Count == 0)
+                catalogue.Warnings.Add("Nothing recognised in TileCatalog.All - has its formatting changed?");
+
+            WarnAboutOrphans(project, declared, catalogue);
+        }
+
+        /// <summary>
+        /// Flags a TileType that exists but has no row in TileCatalog.All. Such a tile
+        /// can't be placed here and can't be loaded by the game either.
+        /// </summary>
+        private static void WarnAboutOrphans(GameProject project, List<string> declared, Catalogue catalogue)
+        {
+            string path = project.TileTypePath;
+            if (!File.Exists(path)) return;
+
+            var match = TileTypeEnum.Match(File.ReadAllText(path));
+            if (!match.Success) return;
+
+            foreach (string name in match.Groups[1].Value.Split(','))
+            {
+                string trimmed = name.Trim();
+                if (trimmed.Length == 0 || declared.Contains(trimmed)) continue;
+                catalogue.Warnings.Add(
+                    $"TileType.{trimmed} has no entry in TileCatalog.All - it can't be placed or loaded.");
             }
         }
 

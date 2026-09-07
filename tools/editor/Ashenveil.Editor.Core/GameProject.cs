@@ -37,7 +37,9 @@ namespace Ashenveil.Editor.Core
 
         // Game source files the editor reads to build its palette. See GameCatalogue.
         public string AssetsPath    => Path.Combine(ContentDir, "Assets.cs");
-        public string MapLoaderPath => Path.Combine(CoreDir, "Levels", "MapLoader.cs");
+        public string MapLoaderPath   => Path.Combine(CoreDir, "Levels", "MapLoader.cs");
+        public string TileCatalogPath => Path.Combine(CoreDir, "Tiles", "TileCatalog.cs");
+        public string TileTypePath    => Path.Combine(CoreDir, "Tiles", "ITile.cs");
         public string TileMapPath   => Path.Combine(CoreDir, "Tiles", "TileMap.cs");
 
         /// <summary>
