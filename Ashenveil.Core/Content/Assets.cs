@@ -16,6 +16,7 @@ namespace Ashenveil.Core
         public const string DirtRoad        = "Sprites/Tiles/straight_dirt_road";
         public const string DirtRoadCross   = "Sprites/Tiles/cross_dirt_road";
         public const string TurnDirtRoad    = "Sprites/Tiles/turn_dirt_road";
+        public const string BendDirtRoad    = "Sprites/Tiles/bend_dirt_road";
 
         //Objects
         public const string Tree_Small      = "Sprites/Objects/Tree_Small";

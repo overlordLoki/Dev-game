@@ -3,6 +3,7 @@ using System.Linq;
 
 namespace Ashenveil.Core.Tiles
 {
+    public enum TileType { Grass, Dirt, DirtRoad, DirtRoadCross , TurnDirtRoad , BendDirtRoad}
     /// <summary>
     /// One tile: the id it has in level JSON, its enum value, and its art.
     ///
@@ -26,6 +27,7 @@ namespace Ashenveil.Core.Tiles
             new("dirt_road",  TileType.DirtRoad,      Assets.DirtRoad),
             new("dirt_cross", TileType.DirtRoadCross, Assets.DirtRoadCross),
             new("dirt_turn",  TileType.TurnDirtRoad,  Assets.TurnDirtRoad),
+            new("dirt_bend",  TileType.BendDirtRoad,  Assets.BendDirtRoad),
         };
 
         /// <summary>
