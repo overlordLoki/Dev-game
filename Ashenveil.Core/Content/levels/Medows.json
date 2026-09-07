@@ -21,10 +21,10 @@
       "grass",
       "dirt_road",
       "grass",
-      "grass",
-      "grass",
-      "grass",
-      "grass"
+      "dirt_end",
+      "dirt_turn",
+      "dirt_bend",
+      "dirt_turn"
     ],
     [
       "grass",
@@ -34,8 +34,32 @@
       "dirt_cross",
       "dirt_road",
       "dirt_cross",
+      "dirt_tee",
+      "grass",
+      "dirt_bend"
+    ],
+    [
       "grass",
       "grass",
+      "grass",
+      "grass",
+      "dirt_road",
+      "grass",
+      "dirt_road",
+      "dirt_turn",
+      "dirt_bend",
+      "dirt_turn"
+    ],
+    [
+      "grass",
+      "grass",
+      "grass",
+      "grass",
+      "dirt_road",
+      "grass",
+      "dirt_road",
+      "dirt_turn",
+      "dirt_turn",
       "grass"
     ],
     [
@@ -46,32 +70,8 @@
       "dirt_road",
       "grass",
       "dirt_road",
-      "grass",
-      "grass",
-      "grass"
-    ],
-    [
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "dirt_road",
-      "grass",
-      "dirt_road",
-      "grass",
-      "grass",
-      "grass"
-    ],
-    [
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "dirt_road",
-      "grass",
-      "dirt_road",
-      "grass",
-      "grass",
+      "dirt_bend",
+      "dirt_bend",
       "grass"
     ],
     [
@@ -79,11 +79,11 @@
       "grass",
       "grass",
       "dirt_road",
-      "dirt_cross",
+      "dirt_tee",
       "dirt_road",
-      "dirt_cross",
-      "grass",
-      "grass",
+      "dirt_tee",
+      "dirt_tee",
+      "dirt_turn",
       "grass"
     ],
     [
@@ -120,9 +120,9 @@
       0,
       0,
       0,
-      0,
-      0,
-      0
+      180,
+      180,
+      270
     ],
     [
       0,
@@ -132,7 +132,19 @@
       0,
       90,
       0,
+      90,
       0,
+      270
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      90,
       0,
       0
     ],
@@ -144,8 +156,8 @@
       0,
       0,
       0,
-      0,
-      0,
+      180,
+      270,
       0
     ],
     [
@@ -156,20 +168,8 @@
       0,
       0,
       0,
-      0,
-      0,
-      0
-    ],
-    [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      90,
+      270,
       0
     ],
     [
@@ -177,10 +177,10 @@
       0,
       0,
       90,
-      0,
+      180,
       90,
-      0,
-      0,
+      180,
+      180,
       0,
       0
     ],
@@ -229,6 +229,13 @@
       "variety": 3,
       "col": 5,
       "row": 5,
+      "rotation": 0
+    },
+    {
+      "type": "tree",
+      "variety": 3,
+      "col": 8,
+      "row": 2,
       "rotation": 0
     }
   ]
