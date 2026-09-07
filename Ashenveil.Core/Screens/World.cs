@@ -74,7 +74,7 @@ namespace Ashenveil.Core.Screens
             {
                 npc.Move(gameTime);
                 npc.CheckEntityCollision(player);
-                ((IEntity)player).CheckEntityCollision(npc);
+                player.CheckEntityCollision(npc);
                 gamebox.CheckCollision(npc);
 
                 foreach (var other in NPCs)
@@ -89,6 +89,8 @@ namespace Ashenveil.Core.Screens
             {
                 foreach (var obj in loc.objects)
                 {
+                    // Cast needed: ResolveCollision lives only as a default method on
+                    // IEntity, so it isn't visible through the Player type.
                     ((IEntity)player).ResolveCollision(obj.Bounds);
                     foreach (var npc in NPCs)
                         npc.ResolveCollision(obj.Bounds);

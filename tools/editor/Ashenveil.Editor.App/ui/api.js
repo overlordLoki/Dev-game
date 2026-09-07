@@ -42,6 +42,10 @@ const Api = (() => {
     // --- palette, read from the game's own source ---
     getCatalogue: ()     => send("GET",  "/catalogue"),
 
+    // --- collision boxes, read from and written back to the game's source ---
+    getBounds:  ()             => send("GET",   "/bounds"),
+    saveBounds: (id, values)   => send("PATCH", "/bounds/" + encodeURIComponent(id), values),
+
     // --- levels ---
     listLevels:  ()          => send("GET",    "/levels"),
     readLevel:   name        => send("GET",    "/levels/" + encodeURIComponent(name)),

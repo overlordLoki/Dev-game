@@ -74,7 +74,7 @@ namespace Ashenveil.Editor.Core
         // ---------------------------------------------------------------- Assets.cs
 
         /// <summary>One constant from Assets.cs.</summary>
-        private record AssetConst(string Name, string Path, string Section);
+        internal record AssetConst(string Name, string Path, string Section);
 
         private static readonly Regex ConstLine =
             new(@"public\s+const\s+string\s+(\w+)\s*=\s*""([^""]+)""", RegexOptions.Compiled);
@@ -84,7 +84,7 @@ namespace Ashenveil.Editor.Core
         /// from the //Tiles and //Objects comments, which is what tells the editor whether
         /// a sprite is something you paint or something you place.
         /// </summary>
-        private static Dictionary<string, AssetConst> ParseAssets(GameProject project, List<string> warnings)
+        internal static Dictionary<string, AssetConst> ParseAssets(GameProject project, List<string> warnings)
         {
             var result = new Dictionary<string, AssetConst>(StringComparer.Ordinal);
 
@@ -228,7 +228,7 @@ namespace Ashenveil.Editor.Core
         /// checking the PNG is actually there so a missing file shows as a warning rather
         /// than a silently broken image.
         /// </summary>
-        private static string SpriteUrl(GameProject project, string assetPath, List<string> warnings)
+        internal static string SpriteUrl(GameProject project, string assetPath, List<string> warnings)
         {
             const string prefix = "Sprites/";
             string relative = assetPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)

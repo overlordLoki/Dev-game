@@ -166,3 +166,47 @@ main { flex: 1; display: flex; align-items: center; justify-content: center; ove
   position: absolute; bottom: 1px; right: 2px; font-size: 9px; color: #fff;
   background: rgba(0,0,0,.5); border-radius: 3px; padding: 0 3px; pointer-events: none;
 }
+
+/* ---- Screen tabs ---- */
+.screen-tabs { display: flex; gap: 6px; margin: 12px 0 4px; }
+.screen-tabs button { flex: 1; }
+.screen-tabs button.active { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+
+/* ---- Bounds: knob inputs ---- */
+.knobs { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; }
+.knobs label { font-size: 12px; }
+.knobs input[type=range] { width: 100%; accent-color: var(--accent-2); }
+.knobs .val {
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+  color: var(--text); min-width: 42px; text-align: right;
+}
+.knobs .inherited { color: var(--muted); font-style: italic; }
+
+/* ---- Bounds: the preview stage ---- */
+#boundsView { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#stage {
+  position: relative;
+  /* The tree sprite is drawn 1.5x the cell and overflows upward, so the stage
+     carries padding rather than clipping it. */
+  margin: 60px 80px;
+}
+#stageCell {
+  position: absolute; inset: 0;
+  background: #3a4a2a; border: 1px dashed rgba(255,255,255,.28);
+}
+#stageSprite { position: absolute; image-rendering: pixelated; pointer-events: none; }
+/* The rect the fractions are measured against — a cell, or the entity's own size. */
+#stageBase {
+  position: absolute; border: 1px solid rgba(74,123,216,.85);
+  pointer-events: none;
+}
+#stageBox {
+  position: absolute; cursor: move;
+  background: rgba(230,90,80,.28); border: 2px solid #e65a50;
+}
+#stageBox .handle {
+  position: absolute; right: -6px; bottom: -6px;
+  width: 12px; height: 12px; background: #e65a50;
+  border: 2px solid #fff; border-radius: 3px; cursor: nwse-resize;
+}
+.stage-caption { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.7; }

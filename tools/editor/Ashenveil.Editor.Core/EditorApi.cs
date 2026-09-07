@@ -90,6 +90,10 @@ namespace Ashenveil.Editor.Core
                 // Every PNG under Content/Sprites, for browsing art not yet wired up.
                 ("GET",  ["sprites"])            => Json(SpriteScanner.Scan(RequireProject())),
 
+                // Collision boxes, read from and written back to the game's source.
+                ("GET",   ["bounds"])            => Json(BoundsScanner.Build(RequireProject())),
+                ("PATCH", ["bounds", var b])     => SaveBounds(Decode(b), request.body),
+
                 ("GET",    ["levels"])           => Json(Levels().List()),
                 ("GET",    ["levels", var g])    => JsonNode.Parse(Levels().Read(Decode(g))),
                 ("PUT",    ["levels", var p])    => SaveLevel(Decode(p), request.body),
@@ -133,6 +137,36 @@ namespace Ashenveil.Editor.Core
             Levels().Write(name, body.ToJsonString(opts));
 
             return new JsonObject { ["saved"] = name };
+        }
+
+        /// <summary>
+        /// Writes tuned box numbers into the game's source. The target is re-scanned first
+        /// rather than trusted from the UI, so the line numbers used for the edit are the
+        /// ones on disk right now.
+        /// </summary>
+        private JsonNode SaveBounds(string id, JsonNode? body)
+        {
+            if (body == null) throw new InvalidOperationException("No values in request.");
+
+            var project = RequireProject();
+            var target = BoundsScanner.Build(project).Targets.FirstOrDefault(t => t.Id == id)
+                ?? throw new InvalidOperationException($"No collision box called '{id}'.");
+
+            var values = new Dictionary<string, float>();
+            foreach (string key in new[] { "width", "height", "footInset", "xShift" })
+            {
+                var node = body[key];
+                if (node != null) values[key] = node.GetValue<float>();
+            }
+
+            var changed = BoundsWriter.Apply(project, target, values);
+
+            return new JsonObject
+            {
+                ["id"]      = id,
+                ["file"]    = target.File,
+                ["changed"] = Json(changed),
+            };
         }
 
         private JsonNode DeleteLevel(string name)

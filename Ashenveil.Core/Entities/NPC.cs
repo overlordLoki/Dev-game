@@ -1,5 +1,3 @@
-
-
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -18,14 +16,22 @@ namespace Ashenveil.Core.Entities
         public int Height => (int)(Layout.CellSize * 0.9f);
         // Depth-sort key: the feet = bottom of the NPC's box.
         public int SortY => (int)(Position.Y + Height);
+
+        // Tight collision box around the body/feet. The sprite frame has transparent
+        // padding, so tune these knobs by eye against the debug box.
         public Rectangle Bounds
         {
             get
             {
-                int w = (int)(Width * 0.5f);
-                int h = (int)(Height * 0.4f);
-                int x = (int)Position.X + (Width - w) / 2;
-                int y = (int)Position.Y + (Height - h);
+                const float boxW      = 0.50f;  // width  as fraction of Width
+                const float boxH      = 0.40f;  // height as fraction of Height
+                const float footInset = 0.00f;  // lift box UP off the bottom edge
+                const float xShift    = 0.00f;  // + right, - left (fraction of Width)
+
+                int w = (int)(Width * boxW);
+                int h = (int)(Height * boxH);
+                int x = (int)Position.X + (Width - w) / 2 + (int)(Width * xShift);
+                int y = (int)Position.Y + Height - h - (int)(Height * footInset);
                 return new Rectangle(x, y, w, h);
             }
         }
@@ -54,32 +60,9 @@ namespace Ashenveil.Core.Entities
             // TODO: NPC AI logic
         }
 
-        public void CheckEntityCollision(IEntity entity)
-        {
-            Rectangle myBounds = new Rectangle((int)Position.X, (int)Position.Y, Width, Height);
-            Rectangle otherBounds = new Rectangle((int)entity.Position.X, (int)entity.Position.Y, entity.Width, entity.Height);
-
-            if (myBounds.Intersects(otherBounds))
-            {
-                float overlapLeft   = myBounds.Right  - otherBounds.Left;
-                float overlapRight  = otherBounds.Right  - myBounds.Left;
-                float overlapTop    = myBounds.Bottom - otherBounds.Top;
-                float overlapBottom = otherBounds.Bottom - myBounds.Top;
-
-                float pushX = overlapLeft < overlapRight ? -overlapLeft : overlapRight;
-                float pushY = overlapTop  < overlapBottom ? -overlapTop : overlapBottom;
-
-                if (Math.Abs(pushX) < Math.Abs(pushY))
-                {
-                    Position = new Vector2(Position.X + pushX, Position.Y);
-                    direction = new Vector2(-direction.X, direction.Y);
-                }
-                else
-                {
-                    Position = new Vector2(Position.X, Position.Y + pushY);
-                    direction = new Vector2(direction.X, -direction.Y);
-                }
-            }
-        }
+        // CheckEntityCollision and ResolveCollision come from IEntity, which resolves
+        // against Bounds — the tight box above. This class used to carry its own copy
+        // that collided on the full sprite rectangle instead, so the tuned box had no
+        // effect on entity-vs-entity hits.
     }
 }

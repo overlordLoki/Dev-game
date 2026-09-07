@@ -17,6 +17,14 @@
     <button id="changeProject">Change folder…</button>
   </div>
 
+  <!-- Two screens share this sidebar: level editing and collision-box tuning. -->
+  <div class="screen-tabs">
+    <button id="tabLevels" class="active">Levels</button>
+    <button id="tabBounds">Bounds</button>
+  </div>
+
+  <div id="levelsPanel">
+
   <h2>Level</h2>
   <div class="row">
     <select id="levelList" class="grow"></select>
@@ -79,9 +87,48 @@
 
   <h2>JSON</h2>
   <textarea id="json" readonly></textarea>
+
+  </div><!-- /levelsPanel -->
+
+  <div id="boundsPanel" hidden>
+    <h2>Collision boxes</h2>
+    <div class="palette" id="boundsList"></div>
+
+    <div id="boundsEditor" hidden>
+      <h2>Box</h2>
+      <div class="knobs" id="knobs"></div>
+
+      <div class="row" style="margin-top:10px">
+        <button class="primary grow" id="saveBounds">Save to source</button>
+        <button id="revertBounds" title="Discard changes and reload from disk">&#8635;</button>
+      </div>
+      <div class="hint" id="boundsFile"></div>
+      <div class="hint" id="boundsStatus">&nbsp;</div>
+      <div class="hint">Drag the box to move it, or its corner to resize. The
+        numbers are fractions of the <span id="basisWord">cell</span>.</div>
+    </div>
+
+    <div id="boundsWarnings" hidden>
+      <h2>Not tunable</h2>
+      <ul class="warnings" id="boundsWarningList"></ul>
+    </div>
+  </div>
 </aside>
 
-<main><div id="grid"></div></main>
+<main>
+  <div id="levelsView"><div id="grid"></div></div>
+
+  <!-- Bounds stage: the game's own draw maths, reproduced at a size you can see. -->
+  <div id="boundsView" hidden>
+    <div id="stage">
+      <div id="stageCell"></div>
+      <img id="stageSprite" alt="">
+      <div id="stageBase"></div>
+      <div id="stageBox"><div class="handle" id="stageHandle"></div></div>
+    </div>
+    <div class="stage-caption" id="stageCaption"></div>
+  </div>
+</main>
 
 <!-- The "held" brush: follows the cursor showing what's about to be placed,
      at the rotation it will land with. Purely visual, never hit-tested. -->
@@ -92,5 +139,6 @@
 
 <script src="api.js"></script>
 <script src="editor.js"></script>
+<script src="bounds.js"></script>
 </body>
 </html>

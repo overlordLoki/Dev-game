@@ -1,5 +1,3 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
@@ -26,8 +24,8 @@ namespace Ashenveil.Core.Entities
             get
             {
                 const float boxW      = 0.35f;  // width  as fraction of Width
-                const float boxH      = 0.28f;  // height as fraction of Height
-                const float footInset = 0.12f;  // lift box UP off the bottom edge
+                const float boxH      = 0.14f;  // height as fraction of Height
+                const float footInset = 0.24f;  // lift box UP off the bottom edge
                 const float xShift    = 0.0f;   // + right, - left (fraction of Width)
 
                 int w = (int)(Width * boxW);
@@ -70,27 +68,13 @@ namespace Ashenveil.Core.Entities
             if (kb.IsKeyDown(Keys.Down))  Position = new Vector2(Position.X, Position.Y + Speed * delta);
         }
 
-        public void CheckEntityCollision(IEntity entity)
-        {
-            Rectangle myBounds = new Rectangle((int)Position.X, (int)Position.Y, Width, Height);
-            Rectangle otherBounds = new Rectangle((int)entity.Position.X, (int)entity.Position.Y, entity.Width, entity.Height);
-
-            if (myBounds.Intersects(otherBounds))
-            {
-                float overlapLeft   = myBounds.Right  - otherBounds.Left;
-                float overlapRight  = otherBounds.Right  - myBounds.Left;
-                float overlapTop    = myBounds.Bottom - otherBounds.Top;
-                float overlapBottom = otherBounds.Bottom - myBounds.Top;
-
-                float pushX = overlapLeft < overlapRight ? -overlapLeft : overlapRight;
-                float pushY = overlapTop  < overlapBottom ? -overlapTop : overlapBottom;
-
-                if (Math.Abs(pushX) < Math.Abs(pushY))
-                    Position = new Vector2(Position.X + pushX, Position.Y);
-                else
-                    Position = new Vector2(Position.X, Position.Y + pushY);
-            }
-        }
+        // Push out of another entity, tight box against tight box. This deliberately
+        // isn't IEntity's default CheckEntityCollision: that one also flips `direction`
+        // to bounce the mover away, which is right for a wandering NPC and meaningless
+        // for the player, whose direction comes from the keyboard. ResolveCollision is
+        // the same push-out without the bounce.
+        public void CheckEntityCollision(IEntity entity) =>
+            ((IEntity)this).ResolveCollision(entity.Bounds);
 
         public void Draw(SpriteBatch spriteBatch)
         {
