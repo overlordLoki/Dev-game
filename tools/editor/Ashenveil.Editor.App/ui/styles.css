@@ -191,7 +191,22 @@ main { flex: 1; display: flex; align-items: center; justify-content: center; ove
 .screen-tabs button { flex: 1; }
 .screen-tabs button.active { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
 
-/* ---- Bounds: knob inputs ---- */
+/* ---- Bounds: the box list ---- */
+.boxlist { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.boxrow {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  border-radius: 6px; cursor: pointer; background: var(--panel-2, rgba(255,255,255,.04));
+}
+.boxrow.selected { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+.boxrow .name { font-size: 12px; flex: 1; }
+.boxrow .del {
+  border: none; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px;
+}
+.boxrow .del:hover { color: #e65a50; }
+.boxlist .empty { font-size: 12px; color: var(--muted); font-style: italic; padding: 4px 2px; }
+
+/* ---- Bounds: x/y/w/h inputs for the selected box ---- */
 .knobs { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; }
 .knobs label { font-size: 12px; }
 .knobs input[type=range] { width: 100%; accent-color: var(--accent-2); }
@@ -199,7 +214,6 @@ main { flex: 1; display: flex; align-items: center; justify-content: center; ove
   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
   color: var(--text); min-width: 42px; text-align: right;
 }
-.knobs .inherited { color: var(--muted); font-style: italic; }
 
 /* ---- Bounds: the preview stage ---- */
 #boundsView { display: flex; flex-direction: column; align-items: center; gap: 14px; }
@@ -219,11 +233,14 @@ main { flex: 1; display: flex; align-items: center; justify-content: center; ove
   position: absolute; border: 1px solid rgba(74,123,216,.85);
   pointer-events: none;
 }
-#stageBox {
-  position: absolute; cursor: move;
-  background: rgba(230,90,80,.28); border: 2px solid #e65a50;
+#stageBoxes { position: absolute; inset: 0; pointer-events: none; }
+/* Each collision box. Unselected boxes are dimmed but still clickable to select. */
+.box {
+  position: absolute; cursor: pointer; pointer-events: auto;
+  background: rgba(230,90,80,.14); border: 2px solid rgba(230,90,80,.55);
 }
-#stageBox .handle {
+.box.selected { cursor: move; background: rgba(230,90,80,.28); border-color: #e65a50; }
+.box .handle {
   position: absolute; right: -6px; bottom: -6px;
   width: 12px; height: 12px; background: #e65a50;
   border: 2px solid #fff; border-radius: 3px; cursor: nwse-resize;

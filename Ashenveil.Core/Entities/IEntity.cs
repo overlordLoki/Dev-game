@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -13,7 +14,8 @@ namespace Ashenveil.Core.Entities
         float Speed { get; set; }
         int Width { get; }
         int Height { get; }
-        Rectangle Bounds { get; }        // tight collision box (not the whole sprite)
+        IReadOnlyList<Rectangle> Boxes { get; }   // tight collision boxes (not the whole sprite)
+        Rectangle Bounds { get; }                 // union of Boxes, the mover's body box
         Vector2 direction { get; set; }
 
         Color color { get; set; }
@@ -51,6 +53,28 @@ namespace Ashenveil.Core.Entities
                 }
             }
         }
+        /// <summary>
+        /// Push out of a multi-box obstacle. Resolving against every overlapping box in
+        /// one frame makes them fight and jitter, so this picks the single deepest overlap
+        /// and resolves against that one - the rest sort themselves out over later frames.
+        /// </summary>
+        public void ResolveCollision(IReadOnlyList<Rectangle> others)
+        {
+            Rectangle me = Bounds;
+            Rectangle deepest = Rectangle.Empty;
+            float best = 0f;
+
+            foreach (var other in others)
+            {
+                if (!me.Intersects(other)) continue;
+                Rectangle o = Rectangle.Intersect(me, other);
+                float penetration = Math.Min(o.Width, o.Height);
+                if (penetration > best) { best = penetration; deepest = other; }
+            }
+
+            if (best > 0f) ResolveCollision(deepest);
+        }
+
         public void ResolveCollision(Rectangle other)
         {
             Rectangle me = Bounds;

@@ -42,9 +42,10 @@ const Api = (() => {
     // --- palette, read from the game's own source ---
     getCatalogue: ()     => send("GET",  "/catalogue"),
 
-    // --- collision boxes, read from and written back to the game's source ---
-    getBounds:  ()             => send("GET",   "/bounds"),
-    saveBounds: (id, values)   => send("PATCH", "/bounds/" + encodeURIComponent(id), values),
+    // --- collision boxes, read from and written back to Content/bounds.json ---
+    getBounds:  ()          => send("GET", "/bounds"),
+    // The whole box list is sent each save, so this covers add, remove and edit.
+    saveBounds: (id, boxes) => send("PUT", "/bounds/" + encodeURIComponent(id), { boxes }),
 
     // --- assets: content-pipeline audit + auto-register into the .mgcb ---
     auditAssets:    ()    => send("GET",  "/assets/audit"),

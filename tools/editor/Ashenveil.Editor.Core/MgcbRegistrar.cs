@@ -12,7 +12,7 @@ namespace Ashenveil.Editor.Core
     /// Content/Sprites actually gets built into an .xnb. This is the auto-fix that
     /// replaces hand-editing the .mgcb.
     ///
-    /// Like BoundsWriter, it is deliberately additive and timid: it only ever appends
+    /// It is deliberately additive and timid: it only ever appends
     /// blocks for files that are on disk and not already registered, it never rewrites
     /// or reorders existing entries, and it writes atomically so a crash mid-write
     /// can't leave a half-broken pipeline file.

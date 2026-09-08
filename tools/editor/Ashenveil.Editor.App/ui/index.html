@@ -96,21 +96,27 @@
     <div class="palette" id="boundsList"></div>
 
     <div id="boundsEditor" hidden>
-      <h2>Box</h2>
-      <div class="knobs" id="knobs"></div>
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h2 style="margin:0">Boxes</h2>
+        <button id="addBox">+ Add box</button>
+      </div>
+      <div class="boxlist" id="boxList"></div>
+
+      <!-- x / y / w / h for the selected box. Hidden until a box is picked. -->
+      <div class="knobs" id="boxFields" hidden></div>
 
       <div class="row" style="margin-top:10px">
-        <button class="primary grow" id="saveBounds">Save to source</button>
+        <button class="primary grow" id="saveBounds">Save</button>
         <button id="revertBounds" title="Discard changes and reload from disk">&#8635;</button>
       </div>
       <div class="hint" id="boundsFile"></div>
       <div class="hint" id="boundsStatus">&nbsp;</div>
-      <div class="hint">Drag the box to move it, or its corner to resize. The
-        numbers are fractions of the <span id="basisWord">cell</span>.</div>
+      <div class="hint">Pick a box, then drag it on the stage to move it or its corner to
+        resize. Numbers are fractions of the <span id="basisWord">cell</span>.</div>
     </div>
 
     <div id="boundsWarnings" hidden>
-      <h2>Not tunable</h2>
+      <h2>Notes</h2>
       <ul class="warnings" id="boundsWarningList"></ul>
     </div>
   </div>
@@ -155,7 +161,8 @@
       <div id="stageCell"></div>
       <img id="stageSprite" alt="">
       <div id="stageBase"></div>
-      <div id="stageBox"><div class="handle" id="stageHandle"></div></div>
+      <!-- One .box div per collision box; the selected one carries a resize handle. -->
+      <div id="stageBoxes"></div>
     </div>
     <div class="stage-caption" id="stageCaption"></div>
   </div>

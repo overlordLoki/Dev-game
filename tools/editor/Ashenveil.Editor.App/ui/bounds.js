@@ -1,40 +1,41 @@
 /* =====================================================================
    The collision-box screen.
 
-   Every box in the game is four fractions — width, height, lift off the
-   bottom, sideways shift — of some base rectangle. This screen reproduces
-   the game's own draw maths at a size you can actually see, lets you drag
-   the box, and writes the numbers back into the source they came from.
+   A shape is now a list of boxes, each four fractions — x, y (top-left
+   corner) and w, h — of some base rectangle. This screen reproduces the
+   game's own placement maths at a size you can see, lets you add, remove
+   and drag boxes, and writes the list back to Content/bounds.json.
 
-   The maths mirrored here:
+   The base each fraction is measured against:
 
-     objects (Tree.Bounds)      base = one cell
-                                sprite drawn at 1.5x the cell, bottom-aligned
-     entities (Player.Bounds)   base = the entity's own Width/Height (0.9 cell)
-                                sprite fills the base exactly
+     objects   base = one cell            sprite drawn at 1.5x, bottom-aligned
+     entities  base = the entity's own Width/Height (0.9 cell)
 
-     bw = baseW * width          bx = (baseW - bw)/2 + baseW * xShift
-     bh = baseH * height         by =  baseH - bh    - baseH * footInset
+     boxLeft = base.w * x     boxW = base.w * w
+     boxTop  = base.h * y     boxH = base.h * h
 
-   If the game's draw code changes, this has to change with it — nothing
-   enforces the match.
+   This mirrors Box.ToRectangle in the game. If that changes, this has to
+   change with it — nothing enforces the match.
    ===================================================================== */
 
 const BoundsScreen = (() => {
 
   const CELL = 300;            // on-screen size of one cell, in px
-  const KNOBS = [
-    { key: "width",     label: "Width",      min: 0.02, max: 1.5 },
-    { key: "height",    label: "Height",     min: 0.02, max: 1.5 },
-    { key: "footInset", label: "Foot inset", min: -0.5, max: 1 },
-    { key: "xShift",    label: "X shift",    min: -1,   max: 1 },
+  const FIELDS = [
+    { key: "x", label: "X",      min: -1,   max: 2 },
+    { key: "y", label: "Y",      min: -1,   max: 2 },
+    { key: "w", label: "Width",  min: 0.02, max: 2 },
+    { key: "h", label: "Height", min: 0.02, max: 2 },
   ];
+  // A fresh box lands centred-ish so it's visible and easy to grab.
+  const DEFAULT_BOX = { x: 0.30, y: 0.45, w: 0.40, h: 0.40 };
 
   let targets = [];
   let warnings = [];
   let current = null;          // the selected target
-  let values = {};             // live values, keyed by knob
-  let saved = {};              // what's on disk, to detect changes
+  let boxes = [];              // live boxes for the current target
+  let saved = "[]";            // snapshot of what's on disk, to detect changes
+  let selected = -1;           // index of the selected box, or -1
   let loaded = false;
 
   const el = id => document.getElementById(id);
@@ -109,82 +110,137 @@ const BoundsScreen = (() => {
     el("boundsWarnings").hidden = relevant.length === 0;
   }
 
-  /* ---------------------------------------------------------- selection */
+  /* --------------------------------------------------- target selection */
 
   function select(target) {
     current = target;
     el("boundsEditor").hidden = !target;
     if (!target) { buildList(); return; }
 
-    values = {};
-    saved = {};
-    target.knobs.forEach(k => { values[k.key] = k.value; saved[k.key] = k.value; });
+    boxes = (target.boxes || []).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h }));
+    saved = JSON.stringify(boxes);
+    selected = boxes.length ? 0 : -1;
 
     el("boundsFile").textContent = target.file;
     el("basisWord").textContent = target.basis === "cell" ? "cell" : "sprite";
 
     buildList();
-    buildKnobs();
+    buildBoxList();
+    buildFields();
     draw();
     setBoundsStatus("");
   }
 
-  function buildKnobs() {
-    const box = el("knobs");
+  /* ------------------------------------------------------- the box list */
+
+  function buildBoxList() {
+    const list = el("boxList");
+    list.innerHTML = "";
+
+    if (boxes.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No boxes yet — add one.";
+      list.appendChild(empty);
+      return;
+    }
+
+    boxes.forEach((_, i) => {
+      const row = document.createElement("div");
+      row.className = "boxrow" + (i === selected ? " selected" : "");
+
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = "Box " + (i + 1);
+
+      const del = document.createElement("button");
+      del.className = "del";
+      del.title = "Remove this box";
+      del.innerHTML = "&times;";
+      del.onclick = e => { e.stopPropagation(); removeBox(i); };
+
+      row.append(name, del);
+      row.onclick = () => selectBox(i);
+      list.appendChild(row);
+    });
+  }
+
+  function selectBox(i) {
+    selected = i;
+    buildBoxList();
+    buildFields();
+    draw();
+  }
+
+  function addBox() {
+    boxes.push({ ...DEFAULT_BOX });
+    selected = boxes.length - 1;
+    buildBoxList();
+    buildFields();
+    draw();
+    setBoundsStatus(dirty() ? "Unsaved changes" : "");
+  }
+
+  function removeBox(i) {
+    boxes.splice(i, 1);
+    if (selected >= boxes.length) selected = boxes.length - 1;
+    buildBoxList();
+    buildFields();
+    draw();
+    setBoundsStatus(dirty() ? "Unsaved changes" : "");
+  }
+
+  /* ------------------------------------------------ fields for one box */
+
+  function buildFields() {
+    const box = el("boxFields");
     box.innerHTML = "";
+    box.hidden = selected < 0;
+    if (selected < 0) return;
 
-    KNOBS.forEach(spec => {
-      const knob = current.knobs.find(k => k.key === spec.key);
-      if (!knob) return;
-
+    const b = boxes[selected];
+    FIELDS.forEach(spec => {
       const label = document.createElement("label");
       label.textContent = spec.label;
-      // An inherited value has no line of its own yet; saving will add one.
-      if (!knob.declared) {
-        label.classList.add("inherited");
-        label.title = `Inherited — saving adds ${knob.identifier} to this class`;
-      }
 
       const slider = document.createElement("input");
       slider.type = "range";
       slider.min = spec.min; slider.max = spec.max; slider.step = 0.01;
-      slider.value = values[spec.key];
-      slider.oninput = () => setValue(spec.key, parseFloat(slider.value));
+      slider.value = b[spec.key];
+      slider.oninput = () => setField(spec.key, parseFloat(slider.value));
 
       const readout = document.createElement("span");
       readout.className = "val";
       readout.id = "val-" + spec.key;
-      readout.textContent = values[spec.key].toFixed(2);
+      readout.textContent = b[spec.key].toFixed(2);
 
       box.append(label, slider, readout);
     });
   }
 
-  function setValue(key, value) {
-    values[key] = value;
+  function setField(key, value) {
+    boxes[selected][key] = value;
     const readout = el("val-" + key);
     if (readout) readout.textContent = value.toFixed(2);
 
-    syncSliders();
     draw();
-    setBoundsStatus(dirtyBounds() ? "Unsaved changes" : "");
+    setBoundsStatus(dirty() ? "Unsaved changes" : "");
   }
 
   /** Pushes values back into the sliders after a drag on the stage. */
-  function syncSliders() {
-    const sliders = el("knobs").querySelectorAll("input[type=range]");
-    let i = 0;
-    KNOBS.forEach(spec => {
-      if (!current.knobs.find(k => k.key === spec.key)) return;
-      const slider = sliders[i++];
-      if (slider) slider.value = values[spec.key];
+  function syncFields() {
+    if (selected < 0) return;
+    const b = boxes[selected];
+    const sliders = el("boxFields").querySelectorAll("input[type=range]");
+    FIELDS.forEach((spec, i) => {
+      if (sliders[i]) sliders[i].value = b[spec.key];
       const readout = el("val-" + spec.key);
-      if (readout) readout.textContent = values[spec.key].toFixed(2);
+      if (readout) readout.textContent = b[spec.key].toFixed(2);
     });
   }
 
-  function dirtyBounds() {
-    return Object.keys(values).some(k => Math.abs(values[k] - saved[k]) > 0.0005);
+  function dirty() {
+    return JSON.stringify(boxes) !== saved;
   }
 
   /* --------------------------------------------------------------- draw */
@@ -200,7 +256,6 @@ const BoundsScreen = (() => {
     const stage = el("stage");
     const base = baseSize();
 
-    // The stage is one cell; the base sits centred in it (identical for objects).
     stage.style.width = CELL + "px";
     stage.style.height = CELL + "px";
 
@@ -214,11 +269,11 @@ const BoundsScreen = (() => {
     baseEl.style.height = base.h + "px";
 
     drawSprite(base, baseLeft, baseTop);
-    drawBox(base, baseLeft, baseTop);
+    drawBoxes(base, baseLeft, baseTop);
 
     el("stageCaption").textContent =
-      `${current.name} — ${current.basis === "cell" ? "box is a fraction of the cell (dashed)" :
-        "box is a fraction of the entity's own size (blue)"}`;
+      `${current.name} — ${current.basis === "cell" ? "boxes are fractions of the cell" :
+        "boxes are fractions of the entity's own size"} (${boxes.length} box${boxes.length === 1 ? "" : "es"})`;
   }
 
   function drawSprite(base, baseLeft, baseTop) {
@@ -229,7 +284,7 @@ const BoundsScreen = (() => {
     img.src = current.spriteUrl;
 
     if (current.basis === "cell") {
-      // Tree.Draw: size = CellSize * 1.5, centred horizontally, sat on the cell's bottom.
+      // GameObject.Draw: size = CellSize * 1.5, centred horizontally, sat on the bottom.
       const size = CELL * current.spriteScale;
       img.style.width = size + "px";
       img.style.height = size + "px";
@@ -252,62 +307,65 @@ const BoundsScreen = (() => {
     }
   }
 
-  /** The box, positioned by exactly the maths the game uses. */
-  function boxRect(base) {
-    const bw = base.w * values.width;
-    const bh = base.h * values.height;
-    const bx = (base.w - bw) / 2 + base.w * (values.xShift || 0);
-    const by = base.h - bh - base.h * (values.footInset || 0);
-    return { bw, bh, bx, by };
-  }
+  /** One .box div per box; the selected one gets a resize handle. */
+  function drawBoxes(base, baseLeft, baseTop) {
+    const host = el("stageBoxes");
+    host.innerHTML = "";
 
-  function drawBox(base, baseLeft, baseTop) {
-    const { bw, bh, bx, by } = boxRect(base);
-    const box = el("stageBox");
-    box.style.left = (baseLeft + bx) + "px";
-    box.style.top = (baseTop + by) + "px";
-    box.style.width = Math.max(2, bw) + "px";
-    box.style.height = Math.max(2, bh) + "px";
+    boxes.forEach((b, i) => {
+      const div = document.createElement("div");
+      div.className = "box" + (i === selected ? " selected" : "");
+      div.style.left = (baseLeft + base.w * b.x) + "px";
+      div.style.top = (baseTop + base.h * b.y) + "px";
+      div.style.width = Math.max(2, base.w * b.w) + "px";
+      div.style.height = Math.max(2, base.h * b.h) + "px";
+
+      if (i === selected) {
+        const handle = document.createElement("div");
+        handle.className = "handle";
+        div.appendChild(handle);
+      }
+
+      div.addEventListener("mousedown", e => startDrag(e, i));
+      host.appendChild(div);
+    });
   }
 
   /* ------------------------------------------------------------ dragging */
 
   let drag = null;
 
-  el("stageBox").addEventListener("mousedown", e => {
-    if (!current) return;
+  function startDrag(e, i) {
     e.preventDefault();
+    // Clicking an unselected box just selects it; the next drag moves it.
+    if (i !== selected) { selectBox(i); return; }
 
-    const base = baseSize();
-    const resizing = e.target.id === "stageHandle";
     drag = {
-      resizing,
+      resizing: e.target.classList.contains("handle"),
       startX: e.clientX,
       startY: e.clientY,
-      base,
-      from: { ...values },
+      base: baseSize(),
+      from: { ...boxes[selected] },
     };
-  });
+  }
 
   window.addEventListener("mousemove", e => {
-    if (!drag || !current) return;
+    if (!drag || selected < 0) return;
 
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     const base = drag.base;
+    const b = boxes[selected];
 
     if (drag.resizing) {
-      // The box is centred and bottom-anchored, so a corner drag moves both
-      // edges: a pixel right widens it by two pixels' worth of fraction.
-      values.width = clamp(drag.from.width + (dx * 2) / base.w, 0.02, 2);
-      values.height = clamp(drag.from.height + (dy * 2) / base.h, 0.02, 2);
+      b.w = clamp(drag.from.w + dx / base.w, 0.02, 2);
+      b.h = clamp(drag.from.h + dy / base.h, 0.02, 2);
     } else {
-      values.xShift = clamp(drag.from.xShift + dx / base.w, -1, 1);
-      // Positive footInset lifts the box, so dragging down reduces it.
-      values.footInset = clamp(drag.from.footInset - dy / base.h, -1, 1);
+      b.x = clamp(drag.from.x + dx / base.w, -1, 2);
+      b.y = clamp(drag.from.y + dy / base.h, -1, 2);
     }
 
-    syncSliders();
+    syncFields();
     draw();
     setBoundsStatus("Unsaved changes");
   });
@@ -321,14 +379,11 @@ const BoundsScreen = (() => {
   async function save() {
     if (!current) return;
 
-    const result = await guard(`Saving ${current.name}`, () => Api.saveBounds(current.id, values));
+    const result = await guard(`Saving ${current.name}`, () => Api.saveBounds(current.id, boxes));
     if (!result) return;
 
-    // Line numbers shift when a knob is added, so re-read rather than assume.
     await load();
-    setBoundsStatus(
-      result.changed.length ? `Wrote ${result.changed.join(", ")} to ${result.file}` : "No changes",
-      result.changed.length ? "ok" : "");
+    setBoundsStatus(`Saved ${result.count} box${result.count === 1 ? "" : "es"} to ${result.file}`, "ok");
   }
 
   function setBoundsStatus(text, kind) {
@@ -337,6 +392,7 @@ const BoundsScreen = (() => {
     status.className = "hint" + (kind ? " " + kind : "");
   }
 
+  el("addBox").onclick = addBox;
   el("saveBounds").onclick = save;
   el("revertBounds").onclick = load;
 

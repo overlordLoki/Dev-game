@@ -10,8 +10,11 @@ namespace Ashenveil.Core.Objects
         int Row { get; }
         Texture2D Texture { get; }
         int Rotate { get; }
-        Rectangle Bounds { get; }
-        // Draw and SortY come from IDrawable. Each object implements Draw itself.
 
+        // A shape can now be several boxes, not one. Boxes are world-space and derived
+        // at draw/collision time; Bounds is their union, kept for cheap broad-phase work.
+        IReadOnlyList<Rectangle> Boxes { get; }
+        Rectangle Bounds { get; }
+        // Draw and SortY come from IDrawable. Drawing is shared in GameObject now.
     }
 }

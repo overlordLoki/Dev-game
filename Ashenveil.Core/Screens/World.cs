@@ -90,10 +90,11 @@ namespace Ashenveil.Core.Screens
                 foreach (var obj in loc.objects)
                 {
                     // Cast needed: ResolveCollision lives only as a default method on
-                    // IEntity, so it isn't visible through the Player type.
-                    ((IEntity)player).ResolveCollision(obj.Bounds);
+                    // IEntity, so it isn't visible through the Player type. Boxes is the
+                    // object's full multi-box shape; the resolver picks the deepest hit.
+                    ((IEntity)player).ResolveCollision(obj.Boxes);
                     foreach (var npc in NPCs)
-                        npc.ResolveCollision(obj.Bounds);
+                        npc.ResolveCollision(obj.Boxes);
                 }
             }
         }

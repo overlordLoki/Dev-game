@@ -33,6 +33,9 @@ namespace Ashenveil.Editor.Core
         public string SpritesDir => Path.Combine(ContentDir, "Sprites");
         public string LevelsDir  => Path.Combine(ContentDir, "levels");
 
+        /// <summary>Collision boxes as plain data - the file this editor tunes.</summary>
+        public string BoundsPath => Path.Combine(ContentDir, "bounds.json");
+
         public string LevelPath(string name) => Path.Combine(LevelsDir, name + ".json");
 
         // Game source files the editor reads to build its palette. See GameCatalogue.

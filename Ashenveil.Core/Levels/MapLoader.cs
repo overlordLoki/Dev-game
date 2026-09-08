@@ -56,6 +56,17 @@ namespace Ashenveil.Core.Levels
                                 _ => (Tree)new TreeLarge(o.col, o.row),
                             });
                             break;
+                        case "bush":
+                            objects.Add(o.variety switch
+                            {
+                                1 => new BushSmall(o.col, o.row),
+                                2 => new BushMedium(o.col, o.row),
+                                _ => (Bush)new BushLarge(o.col, o.row),
+                            });
+                            break;
+                        case "well":
+                            objects.Add(new Well(o.col, o.row, Assets.Well));
+                            break;
                         // add new object types here as the game grows
                     }
                 }

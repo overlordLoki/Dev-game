@@ -18,6 +18,10 @@
     <None Include="..\Ashenveil.Core\Content\levels\**\*.json" Link="Content\levels\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Collision boxes: also plain data, read at runtime by BoundsStore. -->
+    <None Include="..\Ashenveil.Core\Content\bounds.json" Link="Content\bounds.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ashenveil.Core\Ashenveil.Core.csproj" />

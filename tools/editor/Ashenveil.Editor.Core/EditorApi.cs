@@ -90,9 +90,9 @@ namespace Ashenveil.Editor.Core
                 // Every PNG under Content/Sprites, for browsing art not yet wired up.
                 ("GET",  ["sprites"])            => Json(SpriteScanner.Scan(RequireProject())),
 
-                // Collision boxes, read from and written back to the game's source.
-                ("GET",   ["bounds"])            => Json(BoundsScanner.Build(RequireProject())),
-                ("PATCH", ["bounds", var b])     => SaveBounds(Decode(b), request.body),
+                // Collision boxes, read from and written back to Content/bounds.json.
+                ("GET", ["bounds"])              => Json(BoundsScanner.Build(RequireProject())),
+                ("PUT", ["bounds", var b])       => SaveBounds(Decode(b), request.body),
 
                 // Asset audit: what's on disk vs .mgcb vs Assets.cs, and the .mgcb auto-fix.
                 ("GET",  ["assets", "audit"])    => Json(AssetAudit.Run(RequireProject())),
@@ -144,32 +144,36 @@ namespace Ashenveil.Editor.Core
         }
 
         /// <summary>
-        /// Writes tuned box numbers into the game's source. The target is re-scanned first
-        /// rather than trusted from the UI, so the line numbers used for the edit are the
-        /// ones on disk right now.
+        /// Writes a target's full box list into Content/bounds.json. The whole list is
+        /// sent each save, so this covers add, remove and edit with one route. The target
+        /// is re-scanned to settle its basis (cell vs sprite) rather than trusting the UI.
         /// </summary>
         private JsonNode SaveBounds(string id, JsonNode? body)
         {
-            if (body == null) throw new InvalidOperationException("No values in request.");
+            if (body == null) throw new InvalidOperationException("No boxes in request.");
 
             var project = RequireProject();
             var target = BoundsScanner.Build(project).Targets.FirstOrDefault(t => t.Id == id)
-                ?? throw new InvalidOperationException($"No collision box called '{id}'.");
+                ?? throw new InvalidOperationException($"No collision target called '{id}'.");
 
-            var values = new Dictionary<string, float>();
-            foreach (string key in new[] { "width", "height", "footInset", "xShift" })
-            {
-                var node = body[key];
-                if (node != null) values[key] = node.GetValue<float>();
-            }
+            var boxes = new List<BoxDto>();
+            if (body["boxes"] is JsonArray arr)
+                foreach (var b in arr)
+                    boxes.Add(new BoxDto
+                    {
+                        X = (float)(b?["x"]?.GetValue<double>() ?? 0),
+                        Y = (float)(b?["y"]?.GetValue<double>() ?? 0),
+                        W = (float)(b?["w"]?.GetValue<double>() ?? 0),
+                        H = (float)(b?["h"]?.GetValue<double>() ?? 0),
+                    });
 
-            var changed = BoundsWriter.Apply(project, target, values);
+            BoundsFile.Save(project, id, target.Basis, boxes);
 
             return new JsonObject
             {
-                ["id"]      = id,
-                ["file"]    = target.File,
-                ["changed"] = Json(changed),
+                ["id"]    = id,
+                ["file"]  = target.File,
+                ["count"] = boxes.Count,
             };
         }
 

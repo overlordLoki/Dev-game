@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ashenveil.Core.Collision;
 using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -17,24 +18,22 @@ namespace Ashenveil.Core.Entities
         public int Width  => (int)(Layout.CellSize * 0.9f);
         // Depth-sort key: the feet = bottom of the player's box.
         public int SortY => (int)(Position.Y + Height);
-        // Tight collision box around the body/feet. The sprite frame has transparent
-        // padding, so tune these knobs by eye against the debug box.
-        public Rectangle Bounds
+        // Tight collision box(es) around the body/feet. The sprite frame has transparent
+        // padding, so these are tuned by eye in the editor against the debug outline and
+        // stored under "Player" in Content/bounds.json (basis = the sprite's own size).
+        public IReadOnlyList<Rectangle> Boxes
         {
             get
             {
-                const float boxW      = 0.35f;  // width  as fraction of Width
-                const float boxH      = 0.14f;  // height as fraction of Height
-                const float footInset = 0.24f;  // lift box UP off the bottom edge
-                const float xShift    = 0.0f;   // + right, - left (fraction of Width)
-
-                int w = (int)(Width * boxW);
-                int h = (int)(Height * boxH);
-                int x = (int)Position.X + (Width - w) / 2 + (int)(Width * xShift);
-                int y = (int)Position.Y + Height - h - (int)(Height * footInset);
-                return new Rectangle(x, y, w, h);
+                var boxes = BoundsStore.For(nameof(Player));
+                var rects = new Rectangle[boxes.Count];
+                for (int i = 0; i < boxes.Count; i++)
+                    rects[i] = boxes[i].ToRectangle((int)Position.X, (int)Position.Y, Width, Height);
+                return rects;
             }
         }
+
+        public Rectangle Bounds => Geometry.Union(Boxes);
         public Color color { get; set; } = Color.Red;
         public Vector2 direction { get; set; }
         public Dictionary<string, Animation> animations { get; set; } = new();
