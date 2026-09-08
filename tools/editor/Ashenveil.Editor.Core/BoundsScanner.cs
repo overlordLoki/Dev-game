@@ -91,7 +91,7 @@ namespace Ashenveil.Editor.Core
 
         // protected override float TrunkW => 0.40f;
         private static readonly Regex OverrideKnob = new(
-            @"^\s*protected\s+(?:override|virtual)\s+float\s+(\w+)\s*=>\s*(-?\d*\.?\d+)f\s*;",
+            @"^\s*protected\s+(?:(?:override|virtual|new)\s+)?float\s+(\w+)\s*=>\s*(-?\d*\.?\d+)f\s*;",
             RegexOptions.Compiled);
 
         // const float boxW = 0.35f;
@@ -105,6 +105,10 @@ namespace Ashenveil.Editor.Core
         // : base(col, row, Assets.Tree_Small, rotate)
         private static readonly Regex BaseAsset = new(
             @"base\s*\([^)]*Assets\.(\w+)", RegexOptions.Compiled);
+
+        // Any Assets.X mention, for classes that don't chain to a base constructor.
+        private static readonly Regex AnyAsset = new(
+            @"Assets\.(\w+)", RegexOptions.Compiled);
 
         // public static readonly SpriteSheetInfo PLAYERIDLE = new("Sprites/Player/D_Idle", 4, 32);
         private static readonly Regex SheetDecl = new(
@@ -141,7 +145,7 @@ namespace Ashenveil.Editor.Core
             // subclasses inherit. Keyed by class name so a subclass can find its own base
             // rather than assuming everything descends from Tree.
             var baseKnobs = new Dictionary<string, Dictionary<string, BoundsKnob>>(StringComparer.Ordinal);
-            foreach (string file in Directory.EnumerateFiles(dir, "*.cs"))
+            foreach (string file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
             {
                 string text = System.IO.File.ReadAllText(file);
                 if (!text.Contains("abstract class")) continue;
@@ -151,7 +155,9 @@ namespace Ashenveil.Editor.Core
                 if (k.Count > 0) baseKnobs[decl.Groups[1].Value] = k;
             }
 
-            foreach (string file in Directory.EnumerateFiles(dir, "*.cs").OrderBy(f => f))
+            // Recursive: object families live in their own folders (Objects/Tree,
+            // Objects/Bush), so a top-level-only scan finds nothing at all.
+            foreach (string file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories).OrderBy(f => f))
             {
                 string text = System.IO.File.ReadAllText(file);
                 string className = Path.GetFileNameWithoutExtension(file);
@@ -184,6 +190,17 @@ namespace Ashenveil.Editor.Core
 
                 if (knobs.Count == 0) continue;
 
+                // Width and height are what make a box; without them there is nothing to
+                // draw and the screen would render from undefined values. Say why rather
+                // than silently dropping the class from the list.
+                if (!knobs.Values.Any(k => k.Key == "width") || !knobs.Values.Any(k => k.Key == "height"))
+                {
+                    catalogue.Warnings.Add(
+                        $"{className}: needs TrunkW and TrunkH as values " +
+                        "(protected float TrunkW => 0.30f;) before its box can be tuned.");
+                    continue;
+                }
+
                 var target = new BoundsTarget
                 {
                     Id          = className,
@@ -195,14 +212,48 @@ namespace Ashenveil.Editor.Core
                     Knobs       = Sort(knobs.Values),
                 };
 
-                var asset = BaseAsset.Match(text);
-                if (asset.Success && assets.TryGetValue(asset.Groups[1].Value, out var found))
-                    target.SpriteUrl = GameCatalogue.SpriteUrl(project, found.Path, catalogue.Warnings);
+                string? constName = FindAssetConst(text, className, assets);
+                if (constName != null)
+                    target.SpriteUrl = GameCatalogue.SpriteUrl(project, assets[constName].Path, catalogue.Warnings);
                 else
-                    catalogue.Warnings.Add($"{className}: couldn't tell which sprite it uses.");
+                    catalogue.Warnings.Add(
+                        $"{className}: couldn't tell which sprite it uses - the box is still " +
+                        "tunable, just without a picture behind it.");
 
                 catalogue.Targets.Add(target);
             }
+
+            if (!catalogue.Targets.Any(t => t.Kind == "object"))
+                catalogue.Warnings.Add(
+                    "No object collision boxes found under Objects/ - none of the classes " +
+                    "there declare TrunkW/TrunkH or inherit them from an abstract base.");
+        }
+
+        /// <summary>
+        /// Works out which sprite a class draws, in decreasing order of confidence:
+        /// the constant it passes to its base constructor, any Assets constant it names
+        /// at all, then a constant matching its own class name. The last one covers
+        /// classes that take their asset as a constructor parameter (Well), where the
+        /// source simply doesn't say which art it ends up with.
+        /// </summary>
+        private static string? FindAssetConst(string text, string className,
+            Dictionary<string, GameCatalogue.AssetConst> assets)
+        {
+            var baseMatch = BaseAsset.Match(text);
+            if (baseMatch.Success && assets.ContainsKey(baseMatch.Groups[1].Value))
+                return baseMatch.Groups[1].Value;
+
+            foreach (Match match in AnyAsset.Matches(text))
+                if (assets.ContainsKey(match.Groups[1].Value))
+                    return match.Groups[1].Value;
+
+            // Well -> Assets.Well, Bush_Small -> a class called BushSmall.
+            string flattened = className.Replace("_", "");
+            foreach (var name in assets.Keys)
+                if (string.Equals(name.Replace("_", ""), flattened, StringComparison.OrdinalIgnoreCase))
+                    return name;
+
+            return null;
         }
 
         // ----------------------------------------------------------------- entities

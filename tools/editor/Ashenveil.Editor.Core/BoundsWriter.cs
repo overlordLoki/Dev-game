@@ -24,7 +24,7 @@ namespace Ashenveil.Editor.Core
     public static class BoundsWriter
     {
         private static readonly Regex OverrideKnob = new(
-            @"^(\s*protected\s+(?:override|virtual)\s+float\s+(\w+)\s*=>\s*)(-?\d*\.?\d+)(f\s*;.*)$",
+            @"^(\s*protected\s+(?:(?:override|virtual|new)\s+)?float\s+(\w+)\s*=>\s*)(-?\d*\.?\d+)(f\s*;.*)$",
             RegexOptions.Compiled);
 
         private static readonly Regex ConstKnob = new(
