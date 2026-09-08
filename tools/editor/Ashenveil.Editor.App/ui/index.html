@@ -21,6 +21,7 @@
   <div class="screen-tabs">
     <button id="tabLevels" class="active">Levels</button>
     <button id="tabBounds">Bounds</button>
+    <button id="tabAssets">Assets</button>
   </div>
 
   <div id="levelsPanel">
@@ -113,6 +114,36 @@
       <ul class="warnings" id="boundsWarningList"></ul>
     </div>
   </div>
+
+  <div id="assetsPanel" hidden>
+    <h2>Assets</h2>
+    <div class="hint" id="assetsSummary">&nbsp;</div>
+
+    <!-- The one that matters: on disk but not built, so loading crashes the game. -->
+    <div id="assetsUnregistered" hidden>
+      <h2>Not in the pipeline</h2>
+      <div class="hint">On disk but not built — loading these crashes the game.</div>
+      <ul class="asset-list" id="unregisteredList"></ul>
+      <button class="primary grow" id="registerAll">Register all in the .mgcb</button>
+    </div>
+
+    <div id="assetsMissing" hidden>
+      <h2>Missing files</h2>
+      <div class="hint">Named in Assets.cs but no PNG found — a typo or a moved file.</div>
+      <ul class="warnings" id="missingList"></ul>
+    </div>
+
+    <div id="assetsUnused" hidden>
+      <h2>Not wired up</h2>
+      <div class="hint">On disk but nothing in Assets.cs points at them yet.</div>
+      <ul class="asset-list muted" id="unusedList"></ul>
+    </div>
+
+    <div class="hint" id="assetsStatus">&nbsp;</div>
+    <div class="row" style="margin-top:8px">
+      <button id="refreshAssets">&#8635; Re-scan</button>
+    </div>
+  </div>
 </aside>
 
 <main>
@@ -128,6 +159,11 @@
     </div>
     <div class="stage-caption" id="stageCaption"></div>
   </div>
+
+  <!-- Assets screen has no canvas; a plain status board reads better in the main area. -->
+  <div id="assetsView" hidden>
+    <div class="assets-hero" id="assetsHero"></div>
+  </div>
 </main>
 
 <!-- The "held" brush: follows the cursor showing what's about to be placed,
@@ -140,5 +176,6 @@
 <script src="api.js"></script>
 <script src="editor.js"></script>
 <script src="bounds.js"></script>
+<script src="assets.js"></script>
 </body>
 </html>

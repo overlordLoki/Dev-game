@@ -91,6 +91,8 @@ method and changing nothing else. `ui/api.js` is the only file that touches
 | `GET /levels/{name}` | one level's JSON |
 | `PUT /levels/{name}` | save (validated, written atomically via temp-file + move) |
 | `DELETE /levels/{name}` | delete |
+| `GET /assets/audit` | cross-references disk / `.mgcb` / `Assets.cs`, reports the gaps |
+| `POST /assets/register` | appends `.mgcb` entries for unregistered sprites (the auto-fix) |
 
 ## The palette builds itself
 
@@ -148,6 +150,38 @@ Levels are saved as the exact JSON the UI produced, not re-serialised through a
 C# DTO — so a field the UI adds can't be silently dropped by a backend that
 hasn't learned about it yet. `LevelStore` only checks it's valid JSON with
 `cols`, `rows` and `tiles`.
+
+## Asset registration — no more hand-editing the .mgcb
+
+Adding art to the game is three separate steps that must agree, and forgetting
+one crashes the game at load with a bare "file not found":
+
+1. the PNG exists under `Content/Sprites/…`
+2. it's registered in `Content/*.mgcb` (so the pipeline builds it to `.xnb`)
+3. `Assets.cs` has a constant pointing at its content name
+
+Step 2 is the one that's easy to miss and gives the worst error. `AssetAudit`
+(`GET /assets/audit`) cross-references all three and reports the gaps:
+
+- **`notRegistered`** — on disk but not in the `.mgcb` → will crash if loaded (the common trap)
+- **`missingFile`** — named in `Assets.cs` but no matching file → typo / moved file
+- **`notInAssets`** — on disk but no `Assets.cs` reference → art present, not wired up yet
+
+`POST /assets/register` is the fix. With no body it registers everything in
+`notRegistered`; with `{ "paths": [...] }` it registers a chosen subset. It
+appends the standard pixel-art block (`TextureImporter` / `TextureProcessor`,
+`ColorKeyEnabled=False`, `TextureFormat=Color`) — the same block that used to be
+pasted by hand — written atomically, skipping anything already registered or not
+actually on disk, and never touching entries it didn't add. It re-audits before
+and after, so the decision is made against the files on disk right now and the
+response carries the fresh state. `MgcbRegistrar` does the writing;
+`AssetAudit` reuses the existing `Content/Sprites` scan and `Assets.cs` parser.
+
+The audit reads both `const string` paths and `SpriteSheetInfo("Sprites/…")`
+paths, so animation sheets (the player) are checked too, not just single images.
+
+Not yet surfaced in the UI — the routes work, a sidebar panel for them is the
+remaining piece.
 
 ## Known gap: object rotation isn't loaded
 

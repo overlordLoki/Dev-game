@@ -94,6 +94,10 @@ namespace Ashenveil.Editor.Core
                 ("GET",   ["bounds"])            => Json(BoundsScanner.Build(RequireProject())),
                 ("PATCH", ["bounds", var b])     => SaveBounds(Decode(b), request.body),
 
+                // Asset audit: what's on disk vs .mgcb vs Assets.cs, and the .mgcb auto-fix.
+                ("GET",  ["assets", "audit"])    => Json(AssetAudit.Run(RequireProject())),
+                ("POST", ["assets", "register"]) => RegisterAssets(request.body),
+
                 ("GET",    ["levels"])           => Json(Levels().List()),
                 ("GET",    ["levels", var g])    => JsonNode.Parse(Levels().Read(Decode(g))),
                 ("PUT",    ["levels", var p])    => SaveLevel(Decode(p), request.body),
@@ -166,6 +170,32 @@ namespace Ashenveil.Editor.Core
                 ["id"]      = id,
                 ["file"]    = target.File,
                 ["changed"] = Json(changed),
+            };
+        }
+
+        /// <summary>
+        /// Appends .mgcb entries for the given content names (or, if none are given,
+        /// every sprite the audit found missing from the .mgcb). Re-audits first so the
+        /// decision is made against the files on disk right now, not a stale UI list.
+        /// </summary>
+        private JsonNode RegisterAssets(JsonNode? body)
+        {
+            var project = RequireProject();
+
+            // Explicit list from the UI, or fall back to "everything currently unregistered".
+            List<string> names;
+            var requested = body?["paths"]?.AsArray();
+            if (requested != null)
+                names = requested.Select(n => n!.GetValue<string>()).ToList();
+            else
+                names = AssetAudit.Run(project).NotRegistered;
+
+            var added = MgcbRegistrar.Register(project, names);
+
+            return new JsonObject
+            {
+                ["added"] = Json(added),
+                ["audit"] = Json(AssetAudit.Run(project)),   // fresh state after the write
             };
         }
 

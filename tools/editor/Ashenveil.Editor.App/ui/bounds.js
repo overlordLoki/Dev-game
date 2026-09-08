@@ -348,19 +348,24 @@ const BoundsScreen = (() => {
 
 /* ------------------------------------------------------------ screen tabs */
 
+const SCREENS = {
+  levels: { tab: "tabLevels", panel: "levelsPanel", view: "levelsView" },
+  bounds: { tab: "tabBounds", panel: "boundsPanel", view: "boundsView" },
+  assets: { tab: "tabAssets", panel: "assetsPanel", view: "assetsView" },
+};
+
 function setScreen(name) {
-  const bounds = name === "bounds";
+  for (const [key, ids] of Object.entries(SCREENS)) {
+    const on = key === name;
+    document.getElementById(ids.tab).classList.toggle("active", on);
+    document.getElementById(ids.panel).hidden = !on;
+    document.getElementById(ids.view).hidden = !on;
+  }
 
-  document.getElementById("tabLevels").classList.toggle("active", !bounds);
-  document.getElementById("tabBounds").classList.toggle("active", bounds);
-  document.getElementById("levelsPanel").hidden = bounds;
-  document.getElementById("boundsPanel").hidden = !bounds;
-  document.getElementById("levelsView").hidden = bounds;
-  document.getElementById("boundsView").hidden = !bounds;
-
-  if (bounds) BoundsScreen.show();
+  if (name === "bounds") BoundsScreen.show();
+  else if (name === "assets") AssetsScreen.show();
   else render();   // the grid needs a re-fit after being hidden
 }
 
-document.getElementById("tabLevels").onclick = () => setScreen("levels");
-document.getElementById("tabBounds").onclick = () => setScreen("bounds");
+for (const [key, ids] of Object.entries(SCREENS))
+  document.getElementById(ids.tab).onclick = () => setScreen(key);

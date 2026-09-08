@@ -46,6 +46,11 @@ const Api = (() => {
     getBounds:  ()             => send("GET",   "/bounds"),
     saveBounds: (id, values)   => send("PATCH", "/bounds/" + encodeURIComponent(id), values),
 
+    // --- assets: content-pipeline audit + auto-register into the .mgcb ---
+    auditAssets:    ()    => send("GET",  "/assets/audit"),
+    // paths omitted => register everything currently unregistered
+    registerAssets: paths => send("POST", "/assets/register", paths ? { paths } : null),
+
     // --- levels ---
     listLevels:  ()          => send("GET",    "/levels"),
     readLevel:   name        => send("GET",    "/levels/" + encodeURIComponent(name)),
