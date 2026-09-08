@@ -25,6 +25,10 @@ namespace Ashenveil.Core
         public const string Tree_Small      = "Sprites/Objects/Tree_Small";
         public const string Tree_Medium     = "Sprites/Objects/Tree_Medium";
         public const string Tree_Large      = "Sprites/Objects/Tree_Large";
+        public const string Well             = "Sprites/Objects/Well";
+        public const string Bush_Small      = "Sprites/Objects/Bushes_Small";
+        public const string Bush_Medium     = "Sprites/Objects/Bushes_Medium";
+        public const string Bush_Large      = "Sprites/Objects/Bushes_Large";
   
     }
 }

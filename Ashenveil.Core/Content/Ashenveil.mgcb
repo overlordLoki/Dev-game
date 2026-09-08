@@ -173,3 +173,65 @@
 /processorParam:ColorKeyEnabled=False
 /processorParam:TextureFormat=Color
 /build:Sprites/Objects/Tree_Large.png
+#begin Sprites/Tiles/turn_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/turn_dirt_road.png
+
+#begin Sprites/Tiles/bend_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/bend_dirt_road.png
+
+#begin Sprites/Tiles/end_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/end_dirt_road.png
+
+#begin Sprites/Tiles/tee_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/tee_dirt_road.png
+
+#begin Sprites/Tiles/single_dirt_road.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Tiles/single_dirt_road.png
+
+#begin Sprites/Objects/Well.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Well.png
+
+#begin Sprites/Objects/Bushes_Small.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Bushes_Small.png
+
+#begin Sprites/Objects/Bushes_Medium.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Bushes_Medium.png
+
+#begin Sprites/Objects/Bushes_Large.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Bushes_Large.png
