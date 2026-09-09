@@ -12,7 +12,7 @@ namespace Ashenveil.Core.Screens
 {
     public class World : IScreen
     {
-        public Gamebox gamebox;
+        public WorldBounds worldBounds;
         public Player player;
         public List<IEntity> NPCs = new List<IEntity>();
         private MouseState _prevMouse;
@@ -21,14 +21,15 @@ namespace Ashenveil.Core.Screens
         private KeyboardState _prevKb;
         public List<Location> locations = new List<Location>();
 
-        public World(Gamebox gamebox, Player player, Texture2D pixel, Action onPause)
+        public World(Player player, Texture2D pixel, Action onPause)
         {
             this.player = player;
-            this.gamebox = gamebox;
             this._pixel = pixel;
             this._onPause = onPause;
             var medows = new Medows();
             this.locations.Add(medows);
+            // Keep entities inside the active map, in world space - see WorldBounds.
+            this.worldBounds = new WorldBounds(medows.tileMap);
         }
 
         // Recompute cell size from the window + the active location's grid.
@@ -49,8 +50,6 @@ namespace Ashenveil.Core.Screens
             foreach (Location loc in locations)
                 loc.tileMap.Draw(spriteBatch);
 
-            gamebox.Draw(spriteBatch);
-
             // 2. collect everything that stands up (player, NPCs, objects)
             var drawables = new List<IDrawable>();
             drawables.Add(player);
@@ -69,13 +68,13 @@ namespace Ashenveil.Core.Screens
         public void Update(GameTime gameTime)
         {
             player.Update(gameTime);
-            gamebox.CheckCollision(player);
+            worldBounds.Clamp(player);
             foreach (var npc in NPCs)
             {
                 npc.Move(gameTime);
                 npc.CheckEntityCollision(player);
                 player.CheckEntityCollision(npc);
-                gamebox.CheckCollision(npc);
+                worldBounds.Clamp(npc);
 
                 foreach (var other in NPCs)
                 {

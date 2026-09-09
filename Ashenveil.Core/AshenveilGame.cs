@@ -65,7 +65,8 @@ namespace Ashenveil.Core
         {
             if (_pixel == null) return;
             Settings.UpdateScale(GraphicsDevice.Viewport.Height);
-            this.world.gamebox = new Gamebox(_pixel, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+            // WorldBounds recomputes itself from Layout, so a resize only needs the layout
+            // refreshed - no bounds object to rebuild anymore.
             this.world.UpdateLayout(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
         }
         /// <summary>
@@ -111,7 +112,7 @@ namespace Ashenveil.Core
                 () => _screenManager.Pop(),   // Resume
                 () => { /* Quit — TODO */ },
                 w, h);
-            this.world = new World(new Gamebox(_pixel, w, h), new Player(new Vector2(100, 100),0), _pixel, ()=> _screenManager.Push(pause));
+            this.world = new World(new Player(new Vector2(100, 100),0), _pixel, ()=> _screenManager.Push(pause));
             this.world.UpdateLayout(w, h);   // set initial cell size before the first frame
             Debug.Pixel = _pixel;
 
