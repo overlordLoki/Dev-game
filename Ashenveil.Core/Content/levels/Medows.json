@@ -251,6 +251,48 @@
       "col": 2,
       "row": 4,
       "rotation": 0
+    },
+    {
+      "type": "castle",
+      "variety": 1,
+      "col": 3,
+      "row": 5,
+      "rotation": 0
+    },
+    {
+      "type": "castle",
+      "variety": 1,
+      "col": 1,
+      "row": 4,
+      "rotation": 0
+    },
+    {
+      "type": "bush",
+      "variety": 1,
+      "col": 5,
+      "row": 1,
+      "rotation": 0
+    },
+    {
+      "type": "bush",
+      "variety": 3,
+      "col": 9,
+      "row": 4,
+      "rotation": 0
+    },
+    {
+      "type": "bush",
+      "variety": 2,
+      "col": 6,
+      "row": 0,
+      "rotation": 0
+    },
+    {
+      "type": "bush",
+      "variety": 1,
+      "col": 4,
+      "row": 0,
+      "rotation": 0
     }
   ]
 }

@@ -235,3 +235,59 @@
 /processorParam:ColorKeyEnabled=False
 /processorParam:TextureFormat=Color
 /build:Sprites/Objects/Bushes_Large.png
+
+#begin Sprites/Objects/Castle_Round.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Castle_Round.png
+
+#begin Sprites/Objects/Castle_Square.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Castle_Square.png
+
+#begin Sprites/Objects/House.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/House.png
+
+#begin Sprites/Objects/Tent.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Tent.png
+
+#begin Sprites/Objects/Windmill.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Windmill.png
+
+#begin Sprites/Objects/Wooden_Bridge_Horizontal.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Wooden_Bridge_Horizontal.png
+
+#begin Sprites/Objects/Wooden_Bridge_Vertical.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Objects/Wooden_Bridge_Vertical.png
+
+#begin Sprites/Player/player.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Player/player.png
