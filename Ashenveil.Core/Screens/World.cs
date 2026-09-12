@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Tiles;
+using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -14,12 +15,17 @@ namespace Ashenveil.Core.Screens
     {
         public WorldBounds worldBounds;
         public Player player;
+        public Camera camera = new Camera();
         public List<IEntity> NPCs = new List<IEntity>();
         private MouseState _prevMouse;
         private Texture2D _pixel;
         private Action _onPause;
         private KeyboardState _prevKb;
+        private int _viewWidth, _viewHeight;
         public List<Location> locations = new List<Location>();
+
+        // The world draws in world coordinates; the camera shifts it onto the screen.
+        public Matrix Transform => camera.View;
 
         public World(Player player, Texture2D pixel, Action onPause)
         {
@@ -32,20 +38,17 @@ namespace Ashenveil.Core.Screens
             this.worldBounds = new WorldBounds(medows.tileMap);
         }
 
-        // Recompute cell size from the window + the active location's grid.
-        // Call on load and whenever the window resizes.
+        // Recompute cell size from the window, and remember the window size so Update
+        // can scroll the camera. Call on load and whenever the window resizes.
         public void UpdateLayout(int viewportWidth, int viewportHeight)
         {
-            if (locations.Count == 0) return;
-            var map = locations[0].tileMap;
-            Layout.Update(viewportWidth, viewportHeight, map.Cols, map.Rows);
+            _viewWidth = viewportWidth;
+            _viewHeight = viewportHeight;
+            Layout.Update(viewportHeight);
         }
 
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
-            var vp = spriteBatch.GraphicsDevice.Viewport;
-            spriteBatch.Draw(pixel, new Rectangle(0, 0, vp.Width, vp.Height), Color.Black);
-
             // 1. flat ground first — never occludes anything that stands up
             foreach (Location loc in locations)
                 loc.tileMap.Draw(spriteBatch);
@@ -96,6 +99,12 @@ namespace Ashenveil.Core.Screens
                         npc.ResolveCollision(obj.Boxes);
                 }
             }
+
+            // Last, so the view follows where the player actually ended up this frame
+            // rather than where they were before collisions pushed them back.
+            camera.Follow(
+                player.Position + new Vector2(player.Width / 2f, player.Height / 2f),
+                _viewWidth, _viewHeight, worldBounds.Bounds);
         }
         private void OnMouseAction()
         {

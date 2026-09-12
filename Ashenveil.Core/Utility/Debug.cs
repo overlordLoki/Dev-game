@@ -7,7 +7,7 @@ namespace Ashenveil.Core.Utility
     public static class Debug
     {
         public static Texture2D Pixel;
-        public static bool SHOWBOUNDS = true;
+        public static bool SHOWBOUNDS = false;
         // Draws a hollow outline so you can still see the sprite inside.
         public static void DrawRect(SpriteBatch sb, Rectangle r, Color c, int thickness = 2)
         {

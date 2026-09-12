@@ -157,15 +157,11 @@ namespace Ashenveil.Core
         /// </param>
         protected override void Draw(GameTime gameTime)
         {
-            // Clears the screen with the MonoGame orange color before drawing.
-            GraphicsDevice.Clear(Color.MonoGameOrange);
-
-            // TODO: Add your drawing code here
             GraphicsDevice.Clear(Color.Black);
 
-            _spriteBatch.Begin();
+            // ScreenManager begins/ends a batch per screen so each can supply its own
+            // transform (the world uses its camera's).
             _screenManager.Draw(_spriteBatch, _pixel);
-            _spriteBatch.End();
             base.Draw(gameTime);
         }
     }

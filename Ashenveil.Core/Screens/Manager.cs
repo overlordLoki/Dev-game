@@ -21,8 +21,15 @@ namespace Ashenveil.Core.Screens
 
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
+            // One batch per screen: each screen picks its own transform, so the world
+            // can be drawn through the camera while a menu stacked on top of it stays
+            // pinned to the window.
             foreach (var screen in _screens.Reverse())
+            {
+                spriteBatch.Begin(transformMatrix: screen.Transform);
                 screen.Draw(spriteBatch, pixel);
+                spriteBatch.End();
+            }
         }
     }
 }
