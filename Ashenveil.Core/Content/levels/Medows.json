@@ -390,22 +390,9 @@
       "col": 3,
       "row": 6,
       "to": "CastleInterior",
-      "spawnCol": 3,
-      "spawnRow": 4
-    },
-    {
-      "col": 3,
-      "row": 7,
-      "to": "CastleInterior",
-      "spawnCol": 3,
-      "spawnRow": 4
-    },
-    {
-      "col": 1,
-      "row": 5,
-      "to": "CastleInterior",
-      "spawnCol": 3,
-      "spawnRow": 4
+      "spawnCol": 0,
+      "spawnRow": 0,
+      "rotation": 180
     }
   ]
 }
