@@ -53,6 +53,8 @@
   <div class="mode-toggle">
     <button id="modeTiles" class="active">Paint Tiles</button>
     <button id="modeObjects">Place Objects</button>
+    <button id="modeSelect">Select</button>
+    <button id="modeExits">Doors</button>
   </div>
 
   <div id="tilePanel">
@@ -79,6 +81,57 @@
       <span class="hint inline">(press R)</span>
     </div>
     <div class="hint">Left-click a cell to place. Right-click to remove.</div>
+  </div>
+
+  <!-- Select mode: a marquee over both layers at once, and what you can do to it. -->
+  <div id="selectPanel" hidden>
+    <h2>Selection</h2>
+    <div class="row">
+      <button id="copySel" class="grow" disabled>Copy</button>
+      <button id="cutSel" class="grow" disabled>Cut</button>
+    </div>
+    <div class="row">
+      <button id="pasteSel" class="grow" disabled>Paste</button>
+      <button id="deleteSel" class="grow danger" disabled>Delete</button>
+    </div>
+    <div class="hint" id="selInfo">Drag on the grid to select.</div>
+    <div class="hint">Ctrl+C copy · Ctrl+X cut · Ctrl+V paste · Ctrl+A all<br>
+      Ctrl+drag inside the marquee moves the block · Del clears it · Esc cancels.<br>
+      Tiles and objects travel together.</div>
+  </div>
+
+  <!-- Doors: a cell that swaps the level when the player stands on it and presses E. -->
+  <div id="exitPanel" hidden>
+    <h2>Doors</h2>
+
+    <!-- Every door in the level, so the whole set is readable at a glance rather
+         than only by hunting for outlined cells on the grid. -->
+    <div class="exit-list" id="exitList"></div>
+
+    <div class="row">
+      <label>To</label>
+      <select id="exitTo" class="grow"></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label>Spawn</label>
+      <input id="exitSpawnCol" type="number" min="0" max="59" value="0" title="Column in the destination">
+      <input id="exitSpawnRow" type="number" min="0" max="59" value="0" title="Row in the destination">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label>Side</label>
+      <button id="exitRotateBtn">top</button>
+      <span class="hint inline">(press R)</span>
+    </div>
+    <div class="hint" id="exitInfo">Left-click a cell to put a door on it.</div>
+    <div class="hint">Right-click removes one. Clicking a door loads it into the fields
+      above so you can re-aim it.<br>
+      Side is which edge of the cell the bar sits on — face it towards the way in.
+      With a door selected, R moves its bar; otherwise R sets the side for the next one.<br>
+      Put the door on the walkable cell <em>in front of</em> the building — the art
+      itself is solid, so the player can't stand on it.<br>
+      Spawn is the cell they land on over there. For a way back, the destination
+      needs its own door on that cell.</div>
+    <ul class="warnings" id="exitWarnings" hidden></ul>
   </div>
 
   <div id="warnings" hidden>

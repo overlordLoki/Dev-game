@@ -48,7 +48,7 @@ Ashenveil.sln
 │   ├── Tiles/              # TileType, TileMap (the ground grid)
 │   ├── Levels/             # MapData + MapLoader (JSON level loading)
 │   ├── Screens/            # ScreenManager, Menu, Settings, Pause, World, Gamebox
-│   │   └── Locations/      # Location, Medows (a playable area)
+│   │   └── Locations/      # Location (a playable area, built from a level file)
 │   ├── Utility/            # IDrawable, Animation, Debug helpers
 │   ├── Localization/       # culture/string resources
 │   └── Content/            # assets + the MGCB pipeline (Ashenveil.mgcb)

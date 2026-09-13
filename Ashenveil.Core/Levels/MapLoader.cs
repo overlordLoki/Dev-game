@@ -13,6 +13,7 @@ namespace Ashenveil.Core.Levels
         public TileType[,] Grid;
         public int[,] Rotations;
         public List<IObject> Objects;
+        public List<ExitData> Exits;
     }
 
     public static class MapLoader
@@ -50,7 +51,14 @@ namespace Ashenveil.Core.Levels
                 }
             }
 
-            return new LoadedMap { Grid = grid, Rotations = rotations, Objects = objects };
+            return new LoadedMap
+            {
+                Grid = grid,
+                Rotations = rotations,
+                Objects = objects,
+                // exits: optional. A level with none is simply one you can't leave by a door.
+                Exits = data.exits ?? new List<ExitData>(),
+            };
         }
     }
 }

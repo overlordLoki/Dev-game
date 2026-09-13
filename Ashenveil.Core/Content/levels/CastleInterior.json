@@ -1,0 +1,21 @@
+{
+  "cols": 7,
+  "rows": 5,
+  "tiles": [
+    ["dirt", "dirt", "dirt", "dirt", "dirt", "dirt", "dirt"],
+    ["dirt", "dirt", "dirt", "dirt", "dirt", "dirt", "dirt"],
+    ["dirt", "dirt", "dirt", "dirt", "dirt", "dirt", "dirt"],
+    ["dirt", "dirt", "dirt", "dirt", "dirt", "dirt", "dirt"],
+    ["dirt", "dirt", "dirt", "dirt", "dirt", "dirt", "dirt"]
+  ],
+  "objects": [],
+  "exits": [
+    {
+      "col": 3,
+      "row": 4,
+      "to": "Medows",
+      "spawnCol": 3,
+      "spawnRow": 7
+    }
+  ]
+}

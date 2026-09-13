@@ -21,6 +21,20 @@
       "grass",
       "grass",
       "grass",
+      "grass",
+      "grass",
+      "grass",
+      "grass",
+      "grass",
+      "grass",
+      "grass",
+      "grass"
+    ],
+    [
+      "grass",
+      "grass",
+      "grass",
+      "grass",
       "dirt_end",
       "grass",
       "dirt_end",
@@ -74,8 +88,8 @@
     ],
     [
       "grass",
-      "grass",
-      "grass",
+      "dirt_turn",
+      "dirt_turn",
       "grass",
       "dirt_road",
       "grass",
@@ -89,27 +103,13 @@
     [
       "grass",
       "grass",
-      "dirt_end",
-      "dirt_road",
+      "dirt_turn",
+      "dirt_tee",
       "dirt_tee",
       "dirt_road",
       "dirt_tee",
       "dirt_tee",
       "dirt_turn",
-      "grass",
-      "grass",
-      "grass"
-    ],
-    [
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "grass",
-      "grass",
       "grass",
       "grass",
       "grass"
@@ -148,6 +148,20 @@
       0,
       0,
       0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
       270,
       270,
       270,
@@ -216,8 +230,8 @@
     ],
     [
       0,
-      0,
-      0,
+      90,
+      270,
       0,
       0,
       0,
@@ -231,26 +245,12 @@
     [
       0,
       0,
-      270,
-      90,
-      180,
       90,
       180,
       180,
-      0,
-      0,
-      0,
-      0
-    ],
-    [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      270,
-      0,
+      90,
+      180,
+      180,
       0,
       0,
       0,
@@ -290,24 +290,19 @@
       "type": "tree",
       "variety": 2,
       "col": 2,
-      "row": 2
-    },
-    {
-      "type": "tree",
-      "variety": 1,
-      "col": 3,
-      "row": 1
-    },
-    {
-      "type": "tree",
-      "variety": 2,
-      "col": 5,
       "row": 3,
       "rotation": 0
     },
     {
       "type": "tree",
-      "variety": 3,
+      "variety": 1,
+      "col": 3,
+      "row": 2,
+      "rotation": 0
+    },
+    {
+      "type": "tree",
+      "variety": 2,
       "col": 5,
       "row": 4,
       "rotation": 0
@@ -317,70 +312,100 @@
       "variety": 3,
       "col": 5,
       "row": 5,
+      "rotation": 0
+    },
+    {
+      "type": "tree",
+      "variety": 3,
+      "col": 5,
+      "row": 6,
       "rotation": 0
     },
     {
       "type": "tree",
       "variety": 3,
       "col": 8,
-      "row": 2,
-      "rotation": 0
-    },
-    {
-      "type": "well",
-      "variety": 1,
-      "col": 3,
       "row": 3,
       "rotation": 0
     },
     {
       "type": "well",
       "variety": 1,
-      "col": 2,
+      "col": 3,
       "row": 4,
       "rotation": 0
     },
     {
-      "type": "castle",
+      "type": "well",
       "variety": 1,
-      "col": 3,
+      "col": 2,
       "row": 5,
       "rotation": 0
     },
     {
       "type": "castle",
       "variety": 1,
-      "col": 1,
-      "row": 4,
+      "col": 3,
+      "row": 6,
       "rotation": 0
     },
     {
       "type": "bush",
       "variety": 1,
       "col": 5,
-      "row": 1,
+      "row": 2,
       "rotation": 0
     },
     {
       "type": "bush",
       "variety": 3,
       "col": 9,
-      "row": 4,
+      "row": 5,
       "rotation": 0
     },
     {
       "type": "bush",
       "variety": 2,
       "col": 6,
-      "row": 0,
+      "row": 1,
       "rotation": 0
     },
     {
       "type": "bush",
       "variety": 1,
       "col": 4,
-      "row": 0,
+      "row": 1,
       "rotation": 0
+    },
+    {
+      "type": "castle",
+      "variety": 1,
+      "col": 1,
+      "row": 5,
+      "rotation": 0
+    }
+  ],
+  "exits": [
+    {
+      "col": 3,
+      "row": 6,
+      "to": "CastleInterior",
+      "spawnCol": 3,
+      "spawnRow": 4
+    },
+    {
+      "col": 3,
+      "row": 7,
+      "to": "CastleInterior",
+      "spawnCol": 3,
+      "spawnRow": 4
+    },
+    {
+      "col": 1,
+      "row": 5,
+      "to": "CastleInterior",
+      "spawnCol": 3,
+      "spawnRow": 4
     }
   ]
 }
