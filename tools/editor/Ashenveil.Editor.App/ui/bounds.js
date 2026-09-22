@@ -247,9 +247,11 @@ const BoundsScreen = (() => {
 
   /** The base rectangle the fractions are measured against, in stage pixels. */
   function baseSize() {
-    // Objects measure against a whole cell; entities against their own drawn size.
-    const scale = current.basis === "cell" ? 1 : current.spriteScale;
-    return { w: CELL * scale, h: CELL * scale };
+    // Objects measure against a whole cell; entities against their own drawn size,
+    // which is SizeInCells tall and as wide as the sheet's frame aspect makes it.
+    if (current.basis === "cell") return { w: CELL, h: CELL };
+    const h = CELL * current.spriteScale;
+    return { w: h * (current.spriteAspect || 1), h };
   }
 
   function draw() {
@@ -292,7 +294,7 @@ const BoundsScreen = (() => {
       img.style.top = (CELL - size) + "px";
       img.style.clipPath = "";
     } else {
-      // Player.Draw: the frame fills Width x Height exactly.
+      // Entity.Draw: the frame fills Width x Height exactly.
       img.style.width = base.w + "px";
       img.style.height = base.h + "px";
       img.style.left = baseLeft + "px";

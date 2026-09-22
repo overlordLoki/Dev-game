@@ -17,7 +17,7 @@ namespace Ashenveil.Core.Screens
         public WorldBounds worldBounds;
         public Player player;
         public Camera camera = new Camera();
-        public List<IEntity> NPCs = new List<IEntity>();
+        public List<NPC> NPCs = new List<NPC>();
         private MouseState _prevMouse;
         private Texture2D _pixel;
         private Action _onPause;
@@ -112,7 +112,7 @@ namespace Ashenveil.Core.Screens
             worldBounds.Clamp(player);
             foreach (var npc in NPCs)
             {
-                npc.Move(gameTime);
+                npc.Update(gameTime);
                 npc.CheckEntityCollision(player);
                 player.CheckEntityCollision(npc);
                 worldBounds.Clamp(npc);
@@ -127,10 +127,9 @@ namespace Ashenveil.Core.Screens
             OnKeyAction();
             foreach (var obj in location.objects)
             {
-                // Cast needed: ResolveCollision lives only as a default method on
-                // IEntity, so it isn't visible through the Player type. Boxes is the
-                // object's full multi-box shape; the resolver picks the deepest hit.
-                ((IEntity)player).ResolveCollision(obj.Boxes);
+                // Boxes is the object's full multi-box shape; the resolver picks the
+                // deepest hit.
+                player.ResolveCollision(obj.Boxes);
                 foreach (var npc in NPCs)
                     npc.ResolveCollision(obj.Boxes);
             }
@@ -152,8 +151,8 @@ namespace Ashenveil.Core.Screens
             //     //print
             //     Console.WriteLine($"Mouse position: {mouse.X}, {mouse.Y}");
             //     int id = NPCs.Count;
-            //     //create a new npc at the location. //(Texture2D texture2D, Vector2 pos)
-            //     NPC npc = new(_pixel, new Vector2(mouse.X, mouse.Y), id);
+            //     //create a new npc at the location. //(Vector2 pos, int id)
+            //     Knight npc = new(new Vector2(mouse.X, mouse.Y), id);
             //     NPCs.Add(npc);
             // }
             _prevMouse = mouse;  // always save at the end of Update

@@ -37,29 +37,29 @@ namespace Ashenveil.Core.Screens
             if (entity.Position.X < bounds.Left)
             {
                 entity.Position = new Vector2(bounds.Left, entity.Position.Y);
-                if (entity.direction != Vector2.Zero)
-                    entity.direction = new Vector2(-entity.direction.X, entity.direction.Y);
+                if (entity.Direction != Vector2.Zero)
+                    entity.Direction = new Vector2(-entity.Direction.X, entity.Direction.Y);
             }
             // right wall
             if (entity.Position.X + entity.Width > bounds.Right)
             {
                 entity.Position = new Vector2(bounds.Right - entity.Width, entity.Position.Y);
-                if (entity.direction != Vector2.Zero)
-                    entity.direction = new Vector2(-entity.direction.X, entity.direction.Y);
+                if (entity.Direction != Vector2.Zero)
+                    entity.Direction = new Vector2(-entity.Direction.X, entity.Direction.Y);
             }
             // top wall
             if (entity.Position.Y < bounds.Top)
             {
                 entity.Position = new Vector2(entity.Position.X, bounds.Top);
-                if (entity.direction != Vector2.Zero)
-                    entity.direction = new Vector2(entity.direction.X, -entity.direction.Y);
+                if (entity.Direction != Vector2.Zero)
+                    entity.Direction = new Vector2(entity.Direction.X, -entity.Direction.Y);
             }
             // bottom wall
             if (entity.Position.Y + entity.Height > bounds.Bottom)
             {
                 entity.Position = new Vector2(entity.Position.X, bounds.Bottom - entity.Height);
-                if (entity.direction != Vector2.Zero)
-                    entity.direction = new Vector2(entity.direction.X, -entity.direction.Y);
+                if (entity.Direction != Vector2.Zero)
+                    entity.Direction = new Vector2(entity.Direction.X, -entity.Direction.Y);
             }
         }
     }

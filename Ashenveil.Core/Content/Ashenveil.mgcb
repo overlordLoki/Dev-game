@@ -291,3 +291,73 @@
 /processorParam:ColorKeyEnabled=False
 /processorParam:TextureFormat=Color
 /build:Sprites/Player/player.png
+
+#begin Sprites/NPC/Knight/IDLE.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/IDLE.png
+
+#begin Sprites/NPC/Knight/WALK.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/WALK.png
+
+#begin Sprites/NPC/Knight/RUN.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/RUN.png
+
+#begin Sprites/NPC/Knight/JUMP.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/JUMP.png
+
+#begin Sprites/NPC/Knight/ATTACK1.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/ATTACK1.png
+
+#begin Sprites/NPC/Knight/ATTACK2.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/ATTACK2.png
+
+#begin Sprites/NPC/Knight/ATTACK3.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/ATTACK3.png
+
+#begin Sprites/NPC/Knight/DEFEND.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/DEFEND.png
+
+#begin Sprites/NPC/Knight/HURT.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/HURT.png
+
+#begin Sprites/NPC/Knight/DEATH.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/NPC/Knight/DEATH.png

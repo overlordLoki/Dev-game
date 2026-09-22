@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
@@ -35,10 +36,15 @@ namespace Ashenveil.Editor.Core
         public string Basis { get; set; } = "";
 
         /// <summary>
-        /// How big the art is drawn relative to a cell: objects at 1.5, entities at 0.9.
-        /// Taken from the game's own draw code so the preview matches what you see in game.
+        /// How big the art is drawn relative to a cell: objects at 1.5, entities at their
+        /// SizeInCells (0.9 unless the class overrides it). For entities this is the drawn
+        /// height; the width follows from <see cref="SpriteAspect"/>.
+        /// Taken from the game's own source so the preview matches what you see in game.
         /// </summary>
         public float SpriteScale { get; set; } = 1f;
+
+        /// <summary>Frame width / height of an entity's sheet (1 for square frames).</summary>
+        public float SpriteAspect { get; set; } = 1f;
 
         /// <summary>Art to preview behind the boxes, or "" when the class has no fixed sprite.</summary>
         public string SpriteUrl { get; set; } = "";
@@ -79,10 +85,16 @@ namespace Ashenveil.Editor.Core
         private static readonly Regex AnyAsset = new(
             @"Assets\.(\w+)", RegexOptions.Compiled);
 
-        // public static readonly SpriteSheetInfo PLAYERIDLE = new("Sprites/Player/D_Idle", 4, 32);
+        // public static readonly SpriteSheetInfo PLAYERIDLE = new("Sprites/Player/D_Idle", 4, 32, 32);
+        // (frame width, frame height). The height is optional so an older square
+        // (Path, count, size) declaration still reads.
         private static readonly Regex SheetDecl = new(
-            @"SpriteSheetInfo\s+(\w+)\s*=\s*new\s*\(\s*""([^""]+)""\s*,\s*(\d+)\s*,\s*(\d+)\s*\)",
+            @"SpriteSheetInfo\s+(\w+)\s*=\s*new\s*\(\s*""([^""]+)""\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*(\d+)\s*)?\)",
             RegexOptions.Compiled);
+
+        // protected override float SizeInCells => 1.2f;
+        private static readonly Regex SizeInCellsDecl = new(
+            @"SizeInCells\s*=>\s*([\d.]+)f?", RegexOptions.Compiled);
 
         public static BoundsCatalogue Build(GameProject project)
         {
@@ -199,6 +211,11 @@ namespace Ashenveil.Editor.Core
                 if (!Regex.IsMatch(text, @"\bclass\s+\w+")) continue;
                 if (text.Contains("abstract class")) continue;
 
+                // Entity: Height = CellSize * SizeInCells (0.9 unless overridden).
+                var size = SizeInCellsDecl.Match(text);
+                float scale = size.Success && float.TryParse(size.Groups[1].Value,
+                    NumberStyles.Float, CultureInfo.InvariantCulture, out float s) ? s : 0.9f;
+
                 catalogue.Targets.Add(new BoundsTarget
                 {
                     Id           = className,
@@ -206,9 +223,10 @@ namespace Ashenveil.Editor.Core
                     Kind         = "entity",
                     File         = Relative(project, project.BoundsPath),
                     Basis        = "sprite",
-                    SpriteScale  = 0.9f,     // Player/NPC: Width = Height = CellSize * 0.9f
-                    SpriteUrl    = EntitySprite(project, className, catalogue, out int frames),
+                    SpriteScale  = scale,
+                    SpriteUrl    = EntitySprite(project, className, catalogue, out int frames, out float aspect),
                     SpriteFrames = frames,
+                    SpriteAspect = aspect,
                     Boxes        = BoundsFile.BoxesFor(boxes, className),
                 });
             }
@@ -216,14 +234,16 @@ namespace Ashenveil.Editor.Core
 
         /// <summary>
         /// Entities are drawn from animation sheets, not single images. Finds the sheet
-        /// whose name looks like this entity's and reports its frame count so the preview
-        /// can show just the first frame. Returns "" when there's nothing obvious - the
-        /// boxes are still tunable, they just get a plain backdrop.
+        /// whose name looks like this entity's and reports its frame count (so the preview
+        /// can show just the first frame) and frame aspect (so a non-square frame isn't
+        /// squashed). Returns "" when there's nothing obvious - the boxes are still
+        /// tunable, they just get a plain backdrop.
         /// </summary>
         private static string EntitySprite(GameProject project, string className,
-            BoundsCatalogue catalogue, out int frames)
+            BoundsCatalogue catalogue, out int frames, out float aspect)
         {
             frames = 1;
+            aspect = 1f;
 
             string assetsFile = project.AssetsPath;
             if (!System.IO.File.Exists(assetsFile)) return "";
@@ -234,6 +254,10 @@ namespace Ashenveil.Editor.Core
                 if (!name.StartsWith(className, StringComparison.OrdinalIgnoreCase)) continue;
 
                 frames = int.TryParse(match.Groups[3].Value, out int f) && f > 0 ? f : 1;
+                if (match.Groups[5].Success
+                    && int.TryParse(match.Groups[4].Value, out int w) && w > 0
+                    && int.TryParse(match.Groups[5].Value, out int h) && h > 0)
+                    aspect = w / (float)h;
                 return GameCatalogue.SpriteUrl(project, match.Groups[2].Value, catalogue.Warnings);
             }
 
