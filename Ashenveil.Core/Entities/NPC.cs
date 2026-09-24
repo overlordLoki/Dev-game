@@ -11,11 +11,13 @@ namespace Ashenveil.Core.Entities
     public abstract class NPC : Entity
     {
         protected NpcBrain Brain { get; }
-        protected NPC(Vector2 position, int id) : base(position, id)
+        public string Name { get; }
+        protected NPC(Vector2 position, int id, string name) : base(position, id)
         {
             Brain = new WanderBrain();
             float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
             Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+            this.Name = name;
         }
 
         public override void Update(GameTime gameTime)

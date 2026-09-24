@@ -151,8 +151,8 @@ namespace Ashenveil.Core.Screens
             //     //print
             //     Console.WriteLine($"Mouse position: {mouse.X}, {mouse.Y}");
             //     int id = NPCs.Count;
-            //     //create a new npc at the location. //(Vector2 pos, int id)
-            //     Knight npc = new(new Vector2(mouse.X, mouse.Y), id);
+            //     //create a new npc at the location. //(Vector2 pos, int id, string name)
+            //     Knight npc = new(new Vector2(mouse.X, mouse.Y), id, "Sir Bently");
             //     NPCs.Add(npc);
             // }
             _prevMouse = mouse;  // always save at the end of Update
