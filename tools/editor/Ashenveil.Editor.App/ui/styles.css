@@ -241,6 +241,28 @@ main { flex: 1; display: flex; align-items: center; justify-content: center; ove
   background: rgba(255,255,255,.12);
 }
 
+/* ---- Points of interest ----
+   A teardrop pin in the cell centre plus the point's name. Editor furniture, like
+   a door bar — there's no sprite, the game turns the point into a spawn position. */
+.cell .poi-pin {
+  position: absolute; left: 50%; top: 46%; width: 11px; height: 11px; z-index: 3;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--accent-2); border: 1px solid #fff; border-radius: 50% 50% 50% 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none;
+}
+.cell .poi-pin.selected { background: #fff; }
+.cell .poi-pin.broken   { background: var(--danger); }   /* duplicate name */
+.cell .poi-label {
+  position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); z-index: 3;
+  font-size: 9px; color: #fff; background: rgba(0,0,0,.55); border-radius: 3px;
+  padding: 0 3px; pointer-events: none; white-space: nowrap;
+  max-width: 96%; overflow: hidden; text-overflow: ellipsis;
+}
+#grid.points .cell:hover::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: rgba(255,255,255,.12);
+}
+
 /* ---- The door list ----
    One row per door: where you stand, then where it puts you. The two halves are
    split by a bar rather than an arrow — an arrow implies a one-way trip that

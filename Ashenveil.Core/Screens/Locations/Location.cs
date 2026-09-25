@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Objects;
+using Ashenveil.Core.Screens.Locations;
 using Ashenveil.Core.Tiles;
 
 namespace Ashenveil.Core.Screens
@@ -18,6 +19,7 @@ namespace Ashenveil.Core.Screens
         public TileMap tileMap { get; }
         public List<IObject> objects { get; }
         public List<ExitData> exits { get; }
+        public Dictionary<string, PointOfInterest> pointsOfInterest { get; }
 
         public Location(string name)
         {
@@ -26,10 +28,15 @@ namespace Ashenveil.Core.Screens
             tileMap = new TileMap(loaded.Grid, loaded.Rotations);
             objects = loaded.Objects;
             exits = loaded.Exits;
+            pointsOfInterest = loaded.PointsOfInterest;
         }
 
         /// <summary>The doorway on this cell, or null if it's an ordinary tile.</summary>
         public ExitData ExitAt(int col, int row) =>
             exits.FirstOrDefault(e => e.col == col && e.row == row);
+
+        /// <summary>The named point with this name, or null if the level has none.</summary>
+        public PointOfInterest Poi(string name) =>
+            pointsOfInterest.TryGetValue(name, out var p) ? p : null;
     }
 }

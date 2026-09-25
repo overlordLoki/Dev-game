@@ -22,11 +22,13 @@ let objects = [];               // { type, variety, col, row, rotation }
 let exits = [];                 // { col, row, to, spawnCol, spawnRow, rotation } — doorways to
                                 // other levels; rotation is which edge the bar is drawn on
 let selectedExitCell = null;    // { col, row } of the door the sidebar fields are editing
+let pois = [];                  // { name, x, y } — named cells the game looks up by name
+let selectedPoiCell = null;     // { x, y } of the point the name field is editing
 let extras = {};                // keys of the level file the editor doesn't edit,
                                 // kept verbatim so saving doesn't silently delete them
 let levelNames = [];            // every level on disk, for checking a door's destination
 
-let mode = "tiles";             // "tiles" | "objects" | "select" | "exits"
+let mode = "tiles";             // "tiles" | "objects" | "select" | "exits" | "pois"
 let selectedTile = null;
 let selectedObject = null;
 let objRotation = 0;            // applied to newly placed objects
@@ -113,7 +115,9 @@ function resizeGrid(newCols, newRows) {
   // drop objects and doors that fell outside the new bounds
   objects = objects.filter(o => o.col < cols && o.row < rows);
   exits = exits.filter(e => e.col < cols && e.row < rows);
+  pois = pois.filter(p => p.x < cols && p.y < rows);
   selectedExitCell = null;
+  selectedPoiCell = null;
 
   cancelPaste();
   clearSelection();
@@ -126,6 +130,11 @@ function resizeGrid(newCols, newRows) {
 function objectAt(c, r) { return objects.find(o => o.col === c && o.row === r); }
 
 function exitAt(c, r) { return exits.find(e => e.col === c && e.row === r); }
+
+function poiAt(c, r) { return pois.find(p => p.x === c && p.y === r); }
+
+/** True when another point shares this one's name — a clash the game can't resolve. */
+function poiNameClashes(p) { return pois.some(q => q !== p && q.name === p.name); }
 
 function cellEl(x, y) { return gridEl.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`); }
 
@@ -217,11 +226,35 @@ function isKnownLevel(name) {
   return levelNames.includes(name);
 }
 
+/**
+ * Draws the POI marker on a cell fillCell has just filled. Like a door, a point is
+ * editor furniture — a named spot, not a sprite standing on the cell — which the game
+ * turns into a spawn position.
+ */
+function markPoi(el, p) {
+  el.classList.toggle("has-poi", !!p);
+  if (!p) return;
+
+  const selected = selectedPoiCell && p.x === selectedPoiCell.x && p.y === selectedPoiCell.y;
+
+  const pin = document.createElement("span");
+  pin.className = "poi-pin" + (poiNameClashes(p) ? " broken" : selected ? " selected" : "");
+  el.appendChild(pin);
+
+  const label = document.createElement("span");
+  label.className = "poi-label";
+  label.textContent = p.name;
+  el.appendChild(label);
+
+  el.title = `Point "${p.name}" at ${p.x},${p.y}`;
+}
+
 function renderCell(x, y) {
   const el = cellEl(x, y);
   if (!el) return;
   fillCell(el, tiles[y][x], tileRot[y][x], objectAt(x, y));
   markExit(el, exitAt(x, y));
+  markPoi(el, poiAt(x, y));
 }
 
 function render() {
@@ -523,8 +556,9 @@ const brushRotEl = $("brushRot");
 
 /** What the next click will place: its art and the rotation it lands with. */
 function currentBrush() {
-  // Neither mode holds a piece: select drags a marquee, doors set a property.
-  if (mode === "select" || mode === "exits") return { url: null, rotation: 0 };
+  // These modes hold no piece: select drags a marquee, doors and points set a
+  // property of the cell rather than placing a sprite.
+  if (mode === "select" || mode === "exits" || mode === "pois") return { url: null, rotation: 0 };
 
   if (mode === "tiles") {
     const tile = tileById[selectedTile];
@@ -859,6 +893,146 @@ function updateExitUi() {
   list.hidden = broken.length === 0;
 }
 
+/* --------------------------------------------------- points of interest */
+
+/* Named cells the game fetches by name — a spawn, an NPC's start. Simpler than a
+   door: just a name on a cell. The name field describes the next point when none is
+   selected, and renames the selected one. Selection is a coordinate, not a reference,
+   because the pois array is rebuilt by filter() on remove. */
+
+function selectedPoi() {
+  return selectedPoiCell && poiAt(selectedPoiCell.x, selectedPoiCell.y);
+}
+
+function selectPoi(p) {
+  const was = selectedPoiCell;
+  selectedPoiCell = p ? { x: p.x, y: p.y } : null;
+
+  if (was) renderCell(was.x, was.y);
+  if (p) { renderCell(p.x, p.y); $("poiName").value = p.name; }
+  updatePoiUi();
+}
+
+/** Left-click: rename the point already here, or drop a new one from the name field. */
+function placePoi(x, y) {
+  const existing = poiAt(x, y);
+  if (existing) { selectPoi(existing); return; }
+
+  const name = $("poiName").value.trim();
+  if (!name) { setStatus("Type a name before placing a point.", "error"); return; }
+  if (pois.some(p => p.name === name)) {
+    setStatus(`A point called "${name}" already exists — names must be unique.`, "error");
+    return;
+  }
+
+  const p = { name, x, y };
+  pois.push(p);
+  selectPoi(p);
+  renderCell(x, y);
+  updateJson();
+  markDirty();
+}
+
+function removePoi(x, y) {
+  const before = pois.length;
+  pois = pois.filter(p => !(p.x === x && p.y === y));
+  if (pois.length === before) return;
+
+  if (selectedPoiCell && selectedPoiCell.x === x && selectedPoiCell.y === y)
+    selectedPoiCell = null;
+
+  renderCell(x, y);
+  updateJson();
+  updatePoiUi();
+  markDirty();
+}
+
+/** Renames the selected point live from the name field. */
+function applyPoiName() {
+  const p = selectedPoi();
+  if (!p) return;
+
+  const name = $("poiName").value.trim();
+  if (!name) return;                                  // don't let a point go nameless
+  if (pois.some(q => q !== p && q.name === name)) {
+    setStatus(`A point called "${name}" already exists.`, "error");
+    return;
+  }
+
+  p.name = name;
+  renderCell(p.x, p.y);
+  updateJson();
+  updatePoiUi();
+  markDirty();
+}
+$("poiName").onchange = applyPoiName;
+
+function buildPoiList() {
+  const list = $("poiList");
+  list.innerHTML = "";
+
+  if (pois.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "exit-empty";
+    empty.textContent = "No points yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  // Reading order, top-left to bottom-right — matches the eye's scan of the grid.
+  const ordered = pois.slice().sort((a, b) => a.y - b.y || a.x - b.x);
+  const sel = selectedPoiCell;
+
+  ordered.forEach(p => {
+    const row = document.createElement("div");
+    row.className = "exit-row";
+    if (sel && sel.x === p.x && sel.y === p.y) row.classList.add("selected");
+    if (poiNameClashes(p)) row.classList.add("broken");
+
+    const at = document.createElement("span");
+    at.className = "exit-at";
+    at.textContent = `${p.x},${p.y}`;
+
+    const name = document.createElement("span");
+    name.className = "exit-dest";
+    name.textContent = p.name;
+
+    const del = document.createElement("button");
+    del.className = "exit-del";
+    del.textContent = "×";
+    del.title = "Remove this point";
+    del.onclick = ev => { ev.stopPropagation(); removePoi(p.x, p.y); };
+
+    row.append(at, name, del);
+    row.onclick = () => selectPoi(p);
+    list.appendChild(row);
+  });
+}
+
+function updatePoiUi() {
+  buildPoiList();
+
+  const sel = selectedPoi();
+  $("poiInfo").textContent = sel
+    ? `Editing "${sel.name}" at ${sel.x},${sel.y} — change the name above.`
+    : pois.length
+      ? "Click a point to rename it, or type a name and click a cell."
+      : "Type a name, then left-click a cell to place it.";
+
+  // Duplicate names break the game's by-name lookup — surface them.
+  const seen = new Set(), dupes = new Set();
+  pois.forEach(p => { if (seen.has(p.name)) dupes.add(p.name); seen.add(p.name); });
+
+  const list = $("poiWarnings");
+  list.innerHTML = "";
+  dupes.forEach(n => {
+    const li = document.createElement("li");
+    li.textContent = `More than one point named "${n}" — the game can only find one.`;
+    list.appendChild(li);
+  });
+  list.hidden = dupes.size === 0;
+}
+
 gridEl.addEventListener("mousedown", e => {
   const el = e.target.closest(".cell");
   if (!el) return;
@@ -885,6 +1059,9 @@ gridEl.addEventListener("mousedown", e => {
   else if (mode === "tiles") { painting = true; paintCell(x, y); }
   else if (mode === "exits") {
     if (e.button === 2) removeExit(x, y); else placeExit(x, y);
+  }
+  else if (mode === "pois") {
+    if (e.button === 2) removePoi(x, y); else placePoi(x, y);
   }
   else if (e.button === 2) removeObject(x, y);
   else placeObject(x, y);
@@ -1008,12 +1185,15 @@ $("modeTiles").onclick = () => setMode("tiles");
 $("modeObjects").onclick = () => setMode("objects");
 $("modeSelect").onclick = () => setMode("select");
 $("modeExits").onclick = () => setMode("exits");
+$("modePois").onclick = () => setMode("pois");
 
 const MODES = {
-  tiles: "modeTiles", objects: "modeObjects", select: "modeSelect", exits: "modeExits",
+  tiles: "modeTiles", objects: "modeObjects", select: "modeSelect",
+  exits: "modeExits", pois: "modePois",
 };
 const MODE_PANELS = {
-  tiles: "tilePanel", objects: "objectPanel", select: "selectPanel", exits: "exitPanel",
+  tiles: "tilePanel", objects: "objectPanel", select: "selectPanel",
+  exits: "exitPanel", pois: "poiPanel",
 };
 
 function setMode(m) {
@@ -1025,6 +1205,7 @@ function setMode(m) {
   for (const [key, id] of Object.entries(MODE_PANELS)) $(id).hidden = key !== m;
   gridEl.classList.toggle("selecting", m === "select");
   gridEl.classList.toggle("doors", m === "exits");
+  gridEl.classList.toggle("points", m === "pois");
 
   // The door preview belongs to this mode only, and the pointer hasn't moved,
   // so it has to be taken down (or put up) here rather than on the next mousemove.
@@ -1033,6 +1214,7 @@ function setMode(m) {
   updateBrush();
   updateSelectionUi();
   updateExitUi();
+  updatePoiUi();
   updateExitHover();
 }
 
@@ -1075,7 +1257,7 @@ function rotateExits(step) {
 
 /** Turns whichever brush is active. step is +90 or -90. */
 function rotateBrush(step) {
-  if (mode === "select") return;         // nothing is held in select mode
+  if (mode === "select" || mode === "pois") return;   // nothing rotatable is held
   if (mode === "exits") rotateExits(step);
   else if (mode === "objects") rotateObjects(step);
   else rotateTiles(step);
@@ -1119,21 +1301,22 @@ window.addEventListener("keydown", e => {
   if (key === "delete" || key === "backspace") { e.preventDefault(); deleteSelection(); return; }
   if (key === "escape") {
     if (dragging) dropDrag(true);
-    else { cancelPaste(); clearSelection(); selectExit(null); }
+    else { cancelPaste(); clearSelection(); selectExit(null); selectPoi(null); }
   }
 });
 
 /* ------------------------------------------------------- the level file */
 
-const EDITED_KEYS = ["cols", "rows", "tiles", "rotations", "objects", "exits"];
+const EDITED_KEYS = ["cols", "rows", "tiles", "rotations", "objects", "exits", "pois"];
 
 function buildMap() {
-  // exits is omitted when empty rather than written as [] — most levels have no
-  // doors, and the loader treats a missing key and an empty list the same way.
+  // exits/pois are omitted when empty rather than written as [] — most levels have
+  // neither, and the loader treats a missing key and an empty list the same way.
   return {
     ...extras,
     cols, rows, tiles, rotations: tileRot, objects,
     ...(exits.length ? { exits } : {}),
+    ...(pois.length ? { pois } : {}),
   };
 }
 
@@ -1147,6 +1330,7 @@ function loadMap(map) {
   tiles = map.tiles;
   objects = map.objects || [];
   exits = map.exits || [];                             // levels with no doors have no key
+  pois = map.pois || [];                               // ...nor with no points
   tileRot = map.rotations || newGrid(cols, rows, 0);   // older files have no rotations
   extras = Object.fromEntries(
     Object.entries(map).filter(([k]) => !EDITED_KEYS.includes(k)));
@@ -1154,8 +1338,10 @@ function loadMap(map) {
   cancelPaste();
   clearSelection();
   selectedExitCell = null;
+  selectedPoiCell = null;
   buildExitTargets();
   updateExitUi();
+  updatePoiUi();
   render();
 }
 
@@ -1165,14 +1351,17 @@ function blankMap() {
   tileRot = newGrid(cols, rows, 0);
   objects = [];
   exits = [];
+  pois = [];
   extras = {};
   currentLevel = null;
   dirty = false;
   cancelPaste();
   clearSelection();
   selectedExitCell = null;
+  selectedPoiCell = null;
   buildExitTargets();
   updateExitUi();
+  updatePoiUi();
   render();
 }
 

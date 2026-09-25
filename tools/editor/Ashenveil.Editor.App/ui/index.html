@@ -55,6 +55,7 @@
     <button id="modeObjects">Place Objects</button>
     <button id="modeSelect">Select</button>
     <button id="modeExits">Doors</button>
+    <button id="modePois">Points</button>
   </div>
 
   <div id="tilePanel">
@@ -132,6 +133,24 @@
       Spawn is the cell they land on over there. For a way back, the destination
       needs its own door on that cell.</div>
     <ul class="warnings" id="exitWarnings" hidden></ul>
+  </div>
+
+  <!-- Points of interest: named cells the game looks up (a spawn, an NPC's start). -->
+  <div id="poiPanel" hidden>
+    <h2>Points of interest</h2>
+
+    <!-- Every point in the level, readable at a glance. -->
+    <div class="exit-list" id="poiList"></div>
+
+    <div class="row">
+      <label>Name</label>
+      <input id="poiName" type="text" class="grow" placeholder="e.g. spawn, bently_start">
+    </div>
+    <div class="hint" id="poiInfo">Type a name, then left-click a cell to place it.</div>
+    <div class="hint">Right-click removes one. Click a point to rename it.<br>
+      Names must be unique in a level — the game looks a point up by its name
+      (e.g. spawn an NPC at "bently_start").</div>
+    <ul class="warnings" id="poiWarnings" hidden></ul>
   </div>
 
   <div id="warnings" hidden>

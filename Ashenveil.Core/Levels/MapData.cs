@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ashenveil.Core.Screens.Locations;
 
 namespace Ashenveil.Core.Levels
 {
@@ -14,6 +15,19 @@ namespace Ashenveil.Core.Levels
         public int[][] rotations { get; set; }        // optional, parallel to tiles; degrees per cell
         public List<ObjectData> objects { get; set; }
         public List<ExitData> exits { get; set; }     // optional; doorways to other levels
+        public List<PoiData> pois { get; set; }       // optional; named spawn points (matches the editor's "pois")
+    }
+
+    /// <summary>
+    /// A named point on the grid — a spawn cell, an NPC's start. x/y are grid cells
+    /// (col, row), not pixels. A plain DTO like ObjectData/ExitData; the loader maps
+    /// it to the domain <see cref="PointOfInterest"/>.
+    /// </summary>
+    public class PoiData
+    {
+        public string name { get; set; }
+        public int x { get; set; }   // column
+        public int y { get; set; }   // row
     }
 
     public class ObjectData

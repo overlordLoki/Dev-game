@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Ashenveil.Core.Objects;
+using Ashenveil.Core.Screens.Locations;
 using Ashenveil.Core.Tiles;
 
 namespace Ashenveil.Core.Levels
@@ -14,6 +15,7 @@ namespace Ashenveil.Core.Levels
         public int[,] Rotations;
         public List<IObject> Objects;
         public List<ExitData> Exits;
+        public Dictionary<string, PointOfInterest> PointsOfInterest;
     }
 
     public static class MapLoader
@@ -50,6 +52,14 @@ namespace Ashenveil.Core.Levels
                     if (obj != null) objects.Add(obj);
                 }
             }
+            // Points of interest: optional. Map each DTO to the domain type, keyed by
+            // name (the game looks them up by name). If the file has none, empty dict.
+            var pointsOfInterest = new Dictionary<string, PointOfInterest>();
+            if (data.pois != null)
+            {
+                foreach (var p in data.pois)
+                    pointsOfInterest[p.name] = new PointOfInterest(p.name, p.x, p.y);
+            }
 
             return new LoadedMap
             {
@@ -58,6 +68,7 @@ namespace Ashenveil.Core.Levels
                 Objects = objects,
                 // exits: optional. A level with none is simply one you can't leave by a door.
                 Exits = data.exits ?? new List<ExitData>(),
+                PointsOfInterest = pointsOfInterest
             };
         }
     }
