@@ -48,21 +48,24 @@ namespace Ashenveil.Core.Screens
         {
             // spawn the player at the level's spawn point, which is a named point of interest
             var player_spawn_point = location.Poi("Player_spawn");
-            Spawn(player, player_spawn_point);
+            Spawn(player, "Player_spawn");
 
             // add a knight npc to the world
-            
+            var knight = new Knight(new Vector2(200, 200), 1, "Sir Lancelot");
+            Spawn(knight, "Knight_spawn");
+            NPCs.Add(knight);
         }
 
         public void Spawn(Entity entity, String poi_name)
         {
+            PointOfInterest poi;
             if(location.Poi(poi_name) == null)
             {
-                PointOfInterest poi = location.Poi("default");
+                poi = location.Poi("default");
             }
             else
             {
-                PointOfInterest poi = location.Poi(poi_name);
+                poi = location.Poi(poi_name);
             }
 
             entity.Position = poi.ToPixel() - new Vector2(entity.Width / 2f, entity.Height / 2f);
