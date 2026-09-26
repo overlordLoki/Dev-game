@@ -29,6 +29,9 @@ namespace Ashenveil.Core.Screens
             objects = loaded.Objects;
             exits = loaded.Exits;
             pointsOfInterest = loaded.PointsOfInterest;
+            //add a default spawn point for fallback
+            PointOfInterest defaultSpawn = new PointOfInterest("default", 1, 1);
+            pointsOfInterest["default"] = defaultSpawn;
         }
 
         /// <summary>The doorway on this cell, or null if it's an ordinary tile.</summary>

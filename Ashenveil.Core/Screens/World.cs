@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Levels;
+using Ashenveil.Core.Screens.Locations;
 using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
@@ -32,12 +33,40 @@ namespace Ashenveil.Core.Screens
         // The world draws in world coordinates; the camera shifts it onto the screen.
         public Matrix Transform => camera.View;
 
-        public World(Player player, Texture2D pixel, Action onPause)
+        public World(Texture2D pixel, Action onPause)
         {
-            this.player = player;
+            this.player = new Player(new Vector2(100, 100), 0);
             this._pixel = pixel;
             this._onPause = onPause;
             SetLocation(new Location("Medows"));
+        }
+
+        /// <summary>
+        /// Called on first load of a new game, player is spawned here.
+        /// </summary>
+        public void Init()
+        {
+            // spawn the player at the level's spawn point, which is a named point of interest
+            var player_spawn_point = location.Poi("Player_spawn");
+            Spawn(player, player_spawn_point);
+
+            // add a knight npc to the world
+            
+        }
+
+        public void Spawn(Entity entity, String poi_name)
+        {
+            if(location.Poi(poi_name) == null)
+            {
+                PointOfInterest poi = location.Poi("default");
+            }
+            else
+            {
+                PointOfInterest poi = location.Poi(poi_name);
+            }
+
+            entity.Position = poi.ToPixel() - new Vector2(entity.Width / 2f, entity.Height / 2f);
+
         }
 
         /// <summary>
