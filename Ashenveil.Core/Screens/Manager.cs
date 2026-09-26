@@ -12,6 +12,7 @@ namespace Ashenveil.Core.Screens
 
         public void Push(IScreen screen) => _screens.Push(screen);
         public void Pop() { if (_screens.Count > 0) _screens.Pop(); }
+        public IScreen Current => _screens.Count > 0 ? _screens.Peek() : null;
 
         public void Update(GameTime gameTime)
         {

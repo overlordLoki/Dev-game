@@ -25,7 +25,10 @@ namespace Ashenveil.Core
         public World world;
         private Menu _menu;
         private SettingsScreen _settings;
+        private Pause _pause;
         private ScreenManager _screenManager = new();
+        private KeyboardState _prevKb;
+        private ButtonState _prevPadBack = ButtonState.Released;
         // Resources for drawing.
         private GraphicsDeviceManager graphicsDeviceManager;
 
@@ -108,12 +111,12 @@ namespace Ashenveil.Core
             var h = GraphicsDevice.Viewport.Height;
             var w = GraphicsDevice.Viewport.Width;
             var font = Content.Load<SpriteFont>("Fonts/Hud");
-            var pause = new Pause(font,
+            _pause = new Pause(font,
                 () => _screenManager.Pop(),   // Resume
-                () => { /* Quit — TODO */ },
+                Exit,                         // Quit to Desktop
                 w, h);
 
-            this.world = new World(_pixel, () => _screenManager.Push(pause));
+            this.world = new World(_pixel, () => _screenManager.Push(_pause));
             this.world.UpdateLayout(w, h);   // set initial cell size before the first frame
             this.world.Init();  // spawn the player and set up the level on first load
             Debug.Pixel = _pixel;
@@ -140,10 +143,20 @@ namespace Ashenveil.Core
         /// </param>
         protected override void Update(GameTime gameTime)
         {
-            // Exit the game if the Back button (GamePad) or Escape key (Keyboard) is pressed.
-            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed
-                || Keyboard.GetState().IsKeyDown(Keys.Escape))
-                Exit();
+            // Toggle the pause menu with the Back button (GamePad) or Escape key (Keyboard).
+            var kb = Keyboard.GetState();
+            var padBack = GamePad.GetState(PlayerIndex.One).Buttons.Back;
+            bool pausePressed = (kb.IsKeyDown(Keys.Escape) && !_prevKb.IsKeyDown(Keys.Escape))
+                || (padBack == ButtonState.Pressed && _prevPadBack == ButtonState.Released);
+            if (pausePressed)
+            {
+                if (_screenManager.Current == _pause)
+                    _screenManager.Pop();
+                else if (_screenManager.Current == world)
+                    _screenManager.Push(_pause);
+            }
+            _prevKb = kb;
+            _prevPadBack = padBack;
 
             _screenManager.Update(gameTime);
             base.Update(gameTime);
