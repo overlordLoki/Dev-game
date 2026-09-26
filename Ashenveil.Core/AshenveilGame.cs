@@ -113,6 +113,7 @@ namespace Ashenveil.Core
                 () => { /* Quit — TODO */ },
                 w, h);
 
+            this.world = new World(_pixel, () => _screenManager.Push(pause));
             this.world.UpdateLayout(w, h);   // set initial cell size before the first frame
             this.world.Init();  // spawn the player and set up the level on first load
             Debug.Pixel = _pixel;
