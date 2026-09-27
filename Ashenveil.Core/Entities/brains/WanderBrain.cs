@@ -1,7 +1,31 @@
+using System;
+using Microsoft.Xna.Framework;
+
 namespace Ashenveil.Core.Entities
 {
+    /// <summary>
+    /// Pick a random heading, walk it, and bounce off whatever gets in the way.
+    /// </summary>
     public class WanderBrain : NpcBrain
     {
-        
+        public override void Start(NPC npc)
+        {
+            float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+            npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+        }
+
+        public override void Update(NPC npc, GameTime gameTime)
+        {
+
+        }
+
+        // Flip the heading on the pushed axis, so a wanderer turns away instead of
+        // pressing into whatever it hit.
+        public override void OnBlocked(NPC npc, bool horizontal)
+        {
+            npc.Direction = horizontal
+                ? new Vector2(-npc.Direction.X, npc.Direction.Y)
+                : new Vector2(npc.Direction.X, -npc.Direction.Y);
+        }
     }
 }
