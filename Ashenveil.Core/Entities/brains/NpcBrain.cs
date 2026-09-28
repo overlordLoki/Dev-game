@@ -2,12 +2,6 @@ using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.Entities
 {
-    //State machine for NPCs
-    public enum NPCState
-    {
-        Idle,
-        Walking,
-    }
 
     /// <summary>
     /// Decides how an NPC moves. NPC owns the body (position, push-out collision,
@@ -16,8 +10,15 @@ namespace Ashenveil.Core.Entities
     /// </summary>
     public abstract class NpcBrain
     {
+        //State machine for NPCs
+        public enum NPCState
+        {
+            Idle,
+            Walking,
+        }
+        public NPCState State { get; protected set; } = NPCState.Idle;
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
-        public virtual void Start(NPC npc) { }
+        public virtual void Start(NPC npc) {}
 
         public abstract void Update(NPC npc, GameTime gameTime);
 

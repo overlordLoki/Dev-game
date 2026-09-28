@@ -8,6 +8,10 @@ namespace Ashenveil.Core.Entities
     /// </summary>
     public class WanderBrain : NpcBrain
     {
+        public WanderBrain()
+        {
+            this.State = NPCState.Walking;
+        }
         public override void Start(NPC npc)
         {
             float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
