@@ -1,5 +1,6 @@
 using System;
-using Ashenveil.Core.Utility;
+using System.Collections.Generic;
+using Ashenveil.Core.Utility.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -8,53 +9,33 @@ namespace Ashenveil.Core.Screens
 {
     public class Pause : IScreen
     {
-        private Action onResume;
-        private Action onQuit;
-        SpriteFont font;
-        private int screenWidth;
-        private int screenHeight;
-        //buttons
-        private Rectangle resumeButton;
-        private Rectangle quitButton;
-        //Mouse
+        private SpriteFont font;
+        private List<Widget> widgets = new();
         private MouseState prevMouse;
 
         public Pause(SpriteFont font, Action onResume, Action onQuit, int screenWidth, int screenHeight)
         {
             this.font = font;
-            this.onResume = onResume;
-            this.onQuit = onQuit;
-            this.screenWidth = screenWidth;
-            this.screenHeight = screenHeight;
 
             int btnW = 200, btnH = 50, gap = 20;
             int centreX = screenWidth / 2 - btnW / 2;
+            var resumeRect = new Rectangle(centreX, screenHeight / 2 - btnH, btnW, btnH);
+            var quitRect   = new Rectangle(centreX, resumeRect.Bottom + gap, btnW, btnH);
 
-            resumeButton = new Rectangle(centreX, screenHeight / 2 - btnH, btnW, btnH);
-            quitButton = new Rectangle(centreX, resumeButton.Bottom + gap, btnW, btnH);
-        }
-        public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
-        {
-            UI.DrawButtonPixel(spriteBatch, resumeButton, "Resume", Color.Green, pixel, font);
-            UI.DrawButtonPixel(spriteBatch, quitButton, "Quit to Desktop", Color.Red, pixel, font);
+            widgets.Add(new Button(resumeRect, "Resume", "button_brown", onResume));
+            widgets.Add(new Button(quitRect,   "Quit to Desktop", "button_brown", onQuit));
         }
 
         public void Update(GameTime gameTime)
         {
             var mouse = Mouse.GetState();
-            if (mouse.LeftButton == ButtonState.Pressed && prevMouse.LeftButton == ButtonState.Released)
-            {
-                if (resumeButton.Contains(mouse.X, mouse.Y))
-                {
-                    onResume();
-                }
-                if (quitButton.Contains(mouse.X, mouse.Y))
-                {
-                    onQuit();
-                }
-            }
+            foreach (var w in widgets) w.Update(mouse, prevMouse);
             prevMouse = mouse;
         }
 
+        public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
+        {
+            foreach (var w in widgets) w.Draw(spriteBatch, font);
+        }
     }
 }
