@@ -42,16 +42,5 @@ namespace Ashenveil.Core.Screens
 
             UI.DrawButtonPixel(spriteBatch, backButton, "Back", Color.Gray, pixel, font);
         }
-
-        // private void DrawButton(SpriteBatch spriteBatch, Rectangle button, String text, Color color, Texture2D pixel)
-        // {
-        //     spriteBatch.Draw(pixel, button, color);
-        //     Vector2 textSize = font.MeasureString(text);
-        //     Vector2 textPos = new Vector2(
-        //         button.X + (button.Width - textSize.X) / 2,
-        //         button.Y + (button.Height - textSize.Y) / 2
-        //     );
-        //     spriteBatch.DrawString(font, text, textPos, Color.Black);
-        // }
     }
 }
