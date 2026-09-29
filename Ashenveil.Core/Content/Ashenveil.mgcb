@@ -361,3 +361,13 @@
 /processorParam:ColorKeyEnabled=False
 /processorParam:TextureFormat=Color
 /build:Sprites/NPC/Knight/DEATH.png
+
+#begin Sprites/UI/spritesheet-default.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/UI/spritesheet-default.png
+
+#begin Sprites/UI/spritesheet-default.xml
+/copy:Sprites/UI/spritesheet-default.xml

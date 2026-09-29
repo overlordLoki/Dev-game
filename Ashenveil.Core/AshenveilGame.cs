@@ -31,6 +31,7 @@ namespace Ashenveil.Core
         private ButtonState _prevPadBack = ButtonState.Released;
         // Resources for drawing.
         private GraphicsDeviceManager graphicsDeviceManager;
+        public static TextureAtlas UiAtlas { get; private set; }
 
         /// <summary>
         /// Indicates if the game is running on a mobile platform.
@@ -123,6 +124,9 @@ namespace Ashenveil.Core
 
             // create screens first
             _settings = new SettingsScreen(font, () => _screenManager.Pop(), w, h);
+
+            //UI
+            UiAtlas = TextureAtlas.FromXml(Content, Assets.UiAtlas);
 
             _menu = new Menu(
                 font,

@@ -35,8 +35,8 @@ namespace Ashenveil.Core.Screens
         }
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
-            UI.DrawButton(spriteBatch, resumeButton, "Resume", Color.Green, pixel, font);
-            UI.DrawButton(spriteBatch, quitButton, "Quit to Desktop", Color.Red, pixel, font);
+            UI.DrawButtonPixel(spriteBatch, resumeButton, "Resume", Color.Green, pixel, font);
+            UI.DrawButtonPixel(spriteBatch, quitButton, "Quit to Desktop", Color.Red, pixel, font);
         }
 
         public void Update(GameTime gameTime)

@@ -12,9 +12,10 @@ namespace Ashenveil.Core.Entities
         // himself stands about as tall as the player on screen; the rest is transparent
         // padding. Tune this, then retune the "Knight" boxes in the editor to match.
         protected override float SizeInCells => 1.2f;
-
+        
         public Knight(Vector2 position, int id, string name) : base(position, id, name)
         {
+            Portrait = Assets.KnightPortrait;
             Speed = 100f;
 
             AddAnimation("idle",    Assets.KnightIdle,    0.12);

@@ -12,6 +12,7 @@ namespace Ashenveil.Core.Entities
     {
         protected NpcBrain Brain { get; }
         public string Name { get; }
+        public string Portrait { get; set; }
         protected NPC(Vector2 position, int id, string name) : base(position, id)
         {
             Brain = new WanderBrain();

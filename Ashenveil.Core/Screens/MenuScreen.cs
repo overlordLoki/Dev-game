@@ -48,9 +48,10 @@ namespace Ashenveil.Core.Screens
         }
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
-            //draw the button
-            UI.DrawButton(spriteBatch, newGameButton, "New Game", Color.Green, pixel,font);
-            UI.DrawButton(spriteBatch, settingsButton, "Settings", Color.Blue, pixel,font);
+            UI.DrawButton(spriteBatch, newGameButton, "New Game", "button_brown", font , Color.Black); 
+
+
+            UI.DrawButtonPixel(spriteBatch, settingsButton, "Settings", Color.Blue, pixel,font);
         }
 
     }
