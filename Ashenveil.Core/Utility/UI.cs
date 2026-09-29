@@ -63,6 +63,18 @@ namespace Ashenveil.Core.Utility
             spriteBatch.DrawString(font, text, pos, color);
         }
 
+        // Empty track + a coloured fill `value` (0..1) of the way across. The progress_* sprites are
+        // upright 16x32 pills; nine-slicing them into a wide rectangle keeps the rounded ends.
+        public static void DrawProgressBar(SpriteBatch spriteBatch, Rectangle bar, string colour, float value)
+        {
+            DrawNineSlice(spriteBatch, AshenveilGame.UiAtlas, "progress_transparent", bar, border: 7, scale: 2, Color.White);
+
+            int fillW = (int)(bar.Width * MathHelper.Clamp(value, 0f, 1f));
+            if (fillW <= 0) return;
+            var fill = new Rectangle(bar.X, bar.Y, fillW, bar.Height);
+            DrawNineSlice(spriteBatch, AshenveilGame.UiAtlas, $"progress_{colour}", fill, border: 7, scale: 2, Color.White);
+        }
+
 
     }
 }
