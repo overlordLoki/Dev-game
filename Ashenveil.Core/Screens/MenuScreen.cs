@@ -9,6 +9,7 @@ namespace Ashenveil.Core.Screens
 {
     public class Menu : IScreen
     {
+        public List<Widget> Widgets { get; set;} = new List<Widget>();
         private SpriteFont font;
         private List<Widget> widgets = new();
         private MouseState prevMouse;

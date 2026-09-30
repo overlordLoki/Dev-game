@@ -9,8 +9,8 @@ namespace Ashenveil.Core.Screens
 {
     public class SettingsScreen : IScreen
     {
+        public List<Widget> Widgets { get; set;} = new List<Widget>();
         private SpriteFont font;
-        private List<Widget> widgets = new();
         private MouseState prevMouse;
 
         public SettingsScreen(SpriteFont font, Action onBack, int screenWidth, int screenHeight)
@@ -21,20 +21,20 @@ namespace Ashenveil.Core.Screens
             int centreX = screenWidth / 2 - btnW / 2;
             var backRect = new Rectangle(centreX, screenHeight - btnH - 40, btnW, btnH);
 
-            widgets.Add(new Button(backRect, "Back", "button_brown", onBack));
+            Widgets.Add(new Button(backRect, "Back", "button_brown", onBack));
         }
 
         public void Update(GameTime gameTime)
         {
             var mouse = Mouse.GetState();
-            foreach (var w in widgets) w.Update(mouse, prevMouse);
+            foreach (var w in Widgets) w.Update(mouse, prevMouse);
             prevMouse = mouse;
         }
 
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
             spriteBatch.DrawString(font, "Settings", new Vector2(40, 40), Color.White);
-            foreach (var w in widgets) w.Draw(spriteBatch, font);
+            foreach (var w in Widgets) w.Draw(spriteBatch, font);
         }
     }
 }

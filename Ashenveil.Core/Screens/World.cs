@@ -7,6 +7,7 @@ using Ashenveil.Core.Levels;
 using Ashenveil.Core.Screens.Locations;
 using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
+using Ashenveil.Core.Utility.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -19,6 +20,7 @@ namespace Ashenveil.Core.Screens
         public Player player;
         public Camera camera = new Camera();
         public List<NPC> NPCs = new List<NPC>();
+        public List<Widget> Widgets { get; set; } = new List<Widget>();
         private MouseState _prevMouse;
         private Texture2D _pixel;
         private Action _onPause;
