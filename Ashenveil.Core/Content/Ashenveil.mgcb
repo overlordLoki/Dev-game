@@ -371,3 +371,11 @@
 
 #begin Sprites/UI/spritesheet-default.xml
 /copy:Sprites/UI/spritesheet-default.xml
+
+#begin Sprites/Portrait/soldier.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Portrait/soldier.png
+

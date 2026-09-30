@@ -47,7 +47,7 @@ namespace Ashenveil.Core
         public const string Castle_Square   = "Sprites/Objects/Castle_Square";
 
         //Portraits
-        public const string KnightPortrait = "Sprites/Portrait/soldier.png";
+        public const string KnightPortrait = "Sprites/Portrait/soldier";
 
         //UI
         public const string UiAtlas = "Sprites/UI/spritesheet-default.xml";

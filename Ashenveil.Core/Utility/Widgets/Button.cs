@@ -10,6 +10,9 @@ namespace Ashenveil.Core.Utility.Widgets
         private string _text, _sprite;
         private Action _onClick;
 
+        // Settable so one button can change its caption (e.g. "Next" -> "Close").
+        public string Text { get => _text; set => _text = value; }
+
         public Button(Rectangle bounds, string text, string sprite, Action onClick)
             : base(bounds)
         {

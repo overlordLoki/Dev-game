@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
+using System.Collections.Generic;
 
 namespace Ashenveil.Core.Utility
 {
@@ -61,6 +62,29 @@ namespace Ashenveil.Core.Utility
                 (int)(button.Y + (button.Height - size.Y) / 2));
 
             spriteBatch.DrawString(font, text, pos, color);
+        }
+
+        // Breaks text into lines no wider than maxWidth, splitting on spaces. A single word wider
+        // than the box gets a line to itself rather than being chopped. "\n" forces a break.
+        public static List<string> WrapText(SpriteFont font, string text, float maxWidth)
+        {
+            var lines = new List<string>();
+            foreach (string paragraph in text.Split('\n'))
+            {
+                string line = "";
+                foreach (string word in paragraph.Split(' '))
+                {
+                    string attempt = line.Length == 0 ? word : line + " " + word;
+                    if (line.Length > 0 && font.MeasureString(attempt).X > maxWidth)
+                    {
+                        lines.Add(line);
+                        line = word;
+                    }
+                    else line = attempt;
+                }
+                lines.Add(line);
+            }
+            return lines;
         }
 
         // Empty track + a coloured fill `value` (0..1) of the way across. The progress_* sprites are
