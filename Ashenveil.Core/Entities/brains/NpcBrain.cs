@@ -15,6 +15,7 @@ namespace Ashenveil.Core.Entities
         {
             Idle,
             Walking,
+            Talking,
         }
         public NPCState State { get; protected set; } = NPCState.Idle;
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>

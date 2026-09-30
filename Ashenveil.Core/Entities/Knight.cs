@@ -17,6 +17,12 @@ namespace Ashenveil.Core.Entities
         {
             Portrait = Assets.KnightPortrait;
             Speed = 100f;
+            Dialogue = new[]
+            {
+                $"Halt, traveller. I am {name}, sworn to guard these meadows.",
+                "The roads have grown dangerous since the ash began to fall. Wolves, bandits, and worse things that walk at night.",
+                "Keep to the path, and if you hear bells in the fog... run.",
+            };
 
             AddAnimation("idle",    Assets.KnightIdle,    0.12);
             AddAnimation("walk",    Assets.KnightWalk,    0.10);

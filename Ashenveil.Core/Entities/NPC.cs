@@ -13,6 +13,8 @@ namespace Ashenveil.Core.Entities
         protected NpcBrain Brain { get; }
         public string Name { get; }
         public string Portrait { get; set; }
+        // What they say when the player talks to them, one box per line.
+        public string[] Dialogue { get; set; } = { "..." };
         protected NPC(Vector2 position, int id, string name) : base(position, id)
         {
             Brain = new WanderBrain();
