@@ -5,9 +5,14 @@ namespace Ashenveil.Core.Entities
 {
     public class Player : Entity
     {
-        // ~90% of a tile cell, so the player reads as roughly one tile in size. That's the
-        // Entity default (SizeInCells = 0.9), so there's nothing to override here.
-
+        public enum PlayerState
+        {
+            Idle,
+            Walking,
+            Talking,
+        }
+        public PlayerState State { get; set; } = PlayerState.Idle;
+        
         public Player(Vector2 position, int id) : base(position, id)
         {
             Speed = 200f;
