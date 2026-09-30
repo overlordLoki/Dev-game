@@ -21,7 +21,21 @@ namespace Ashenveil.Core.Entities
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         public virtual void Start(NPC npc) {}
 
-        public abstract void Update(NPC npc, GameTime gameTime);
+        public virtual void Update(NPC npc, GameTime gameTime)
+        {
+            switch (State)
+            {
+                case NPCState.Idle:
+                    // Do nothing.
+                    break;
+                case NPCState.Walking:
+                    // Do nothing.
+                    break;
+                case NPCState.Talking:
+                    // Do nothing.
+                    break;
+            }
+        }
 
         /// <summary>
         /// Called after the NPC was pushed out of another entity. <paramref name="horizontal"/>

@@ -20,16 +20,33 @@ namespace Ashenveil.Core.Entities
 
         public override void Update(NPC npc, GameTime gameTime)
         {
-            //chance to change direction every second
-            if (Random.Shared.NextDouble() < gameTime.ElapsedGameTime.TotalSeconds)
+            switch (State)
             {
-                // 10% chance to change direction on this second. 
-                if (Random.Shared.NextDouble() < 0.1)
-                {
-                    float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
-                    npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
-                }
+                case NPCState.Idle:
+                    // Do nothing.
+                    break;
+                case NPCState.Walking:
+                    //chance to change direction every second
+                    if (Random.Shared.NextDouble() < gameTime.ElapsedGameTime.TotalSeconds)
+                    {
+                        // 10% chance to change direction on this second. 
+                        if (Random.Shared.NextDouble() < 0.1)
+                        {
+                            float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+                            npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                        }
+                    }
+                    break;
+                case NPCState.Talking:
+                    // TODO: maybe have them face the player and just stop moving
+                    break;
             }
+            if (State != NPCState.Walking)
+            {
+
+            }
+
+
         }
 
         // Flip the heading on the pushed axis, so a wanderer turns away instead of
