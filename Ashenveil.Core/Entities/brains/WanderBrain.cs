@@ -41,12 +41,6 @@ namespace Ashenveil.Core.Entities
                     // TODO: maybe have them face the player and just stop moving
                     break;
             }
-            if (State != NPCState.Walking)
-            {
-
-            }
-
-
         }
 
         // Flip the heading on the pushed axis, so a wanderer turns away instead of

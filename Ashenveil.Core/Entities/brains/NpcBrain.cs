@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.Entities
@@ -10,6 +11,7 @@ namespace Ashenveil.Core.Entities
     /// </summary>
     public abstract class NpcBrain
     {
+        public Entity target { get; set; } = null; //use for later AI, like following the player or attacking them
         //State machine for NPCs
         public enum NPCState
         {
@@ -20,6 +22,20 @@ namespace Ashenveil.Core.Entities
         public NPCState State { get; protected set; } = NPCState.Idle;
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         public virtual void Start(NPC npc) {}
+
+        public virtual void StartTalking(NPC npc)
+        {
+            State = NPCState.Talking;
+            //face the player
+            npc.Direction = Vector2.Zero;
+        }
+        public virtual void StopTalking(NPC npc)
+        {
+            State = NPCState.Walking;
+            float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+            npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+            
+        }
 
         public virtual void Update(NPC npc, GameTime gameTime)
         {
