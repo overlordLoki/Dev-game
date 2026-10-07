@@ -13,8 +13,10 @@ namespace Ashenveil.Core.Entities
         protected NpcBrain Brain { get; }
         public string Name { get; }
         public string Portrait { get; set; }
-        // What they say when the player talks to them, one box per line.
-        public string[] Script { get; set; } = { "..." };
+        // The persona seeds who the NPC is; the greeting is their fixed opening line.
+        // The LLM generates everything said after the greeting (see World.StartConversation).
+        public string Persona { get; set;} = "A generic NPC.";
+        public string Greeting { get; set; } = "Hello, traveller.";
         protected NPC(Vector2 position, int id, string name) : base(position, id)
         {
             Brain = new WanderBrain();

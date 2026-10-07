@@ -74,11 +74,18 @@ namespace Ashenveil.Core.Screens.Chat
         {
             int index = _conversation.CurrentLineIndex;
             _text.Text = _conversation.Lines[index];
-            _next.Text = index == _conversation.Lines.Length - 1 ? "Close" : "Next";
+            bool lastLine = index == _conversation.Lines.Length - 1;
+            // On the last line: "..." if the LLM is still writing more, else "Close".
+            _next.Text = _conversation.IsLoading && lastLine ? "..." : lastLine ? "Close" : "Next";
         }
 
         private void Advance()
         {
+            // Still waiting on the LLM and sitting on the last line we have (the greeting):
+            // there's nothing to advance to yet, so don't let the player close it early.
+            if (_conversation.IsLoading && _conversation.CurrentLineIndex >= _conversation.Lines.Length - 1)
+                return;
+
             _conversation.CurrentLineIndex++;
             if (_conversation.IsFinished) _onClose();
             else Show();
@@ -93,6 +100,11 @@ namespace Ashenveil.Core.Screens.Chat
 
         public void Update(GameTime gameTime)
         {
+            // Lines can grow under us while the LLM replies, so re-sync the box each frame
+            // (cheap: two string assignments). This is what turns "..." into "Next" once the
+            // generated lines arrive, with no event wiring.
+            Show();
+
             var mouse = Mouse.GetState();
             foreach (var w in Widgets) w.Update(mouse, prevMouse);
             prevMouse = mouse;

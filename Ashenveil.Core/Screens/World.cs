@@ -109,10 +109,32 @@ namespace Ashenveil.Core.Screens
         /// The one place a conversation begins, whoever starts it. Only the player's
         /// conversations get the chat box; the rest just live in the list.
         /// </summary>
-        public Conversation StartConversation(Entity from, NPC to)
+        public Conversation StartConversation(Entity from, params NPC[] others)
         {
-            var convo = new Conversation(new Entity[] { from, to }, to.Script, location);
-            to.StartTalking();
+            // Everyone in the room, initiator first (matches your "first one started it" rule).
+            var everyone = new Entity[others.Length + 1];
+            everyone[0] = from;
+            others.CopyTo(everyone, 1);
+
+            var convo = new Conversation(everyone, new[] { "..." }, location);
+
+            var req = new ConversationRequestDto {
+                participants = new List<ParticipantDto>(),
+                location = location.Name,
+                // The opener is already "said"; the LLM continues from it.
+                history = new List<string> { $"{others[0].Name}: {others[0].Greeting}" },
+                max_lines = 4,
+            };
+            // The initiator is present but listening (your player drives, doesn't get lines).
+            req.participants.Add(new ParticipantDto {
+                name = (from as NPC)?.Name ?? "Traveller", speaks = false });
+            // Every NPC is a speaker, with their persona.
+            foreach (var npc in others)
+                req.participants.Add(new ParticipantDto { name = npc.Name, persona = npc.Persona });
+
+            convo.StartLoading(DialogueApi.RequestAsync(req), others[0].Greeting);
+
+            foreach (var npc in others) npc.StartTalking();
             _conversations.Add(convo);
             if (from == player) _onTalk(convo);
             return convo;
@@ -206,18 +228,6 @@ namespace Ashenveil.Core.Screens
         private void OnMouseAction()
         {
             var mouse = Mouse.GetState();
-            // if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
-            // {
-            //     // fired once on the frame the button goes down
-            //     int clickX = mouse.X;
-            //     int clickY = mouse.Y;
-            //     //print
-            //     Console.WriteLine($"Mouse position: {mouse.X}, {mouse.Y}");
-            //     int id = NPCs.Count;
-            //     //create a new npc at the location. //(Vector2 pos, int id, string name)
-            //     Knight npc = new(new Vector2(mouse.X, mouse.Y), id, "Sir Bently");
-            //     NPCs.Add(npc);
-            // }
             _prevMouse = mouse;  // always save at the end of Update
         }
         private void OnKeyAction()
