@@ -185,5 +185,28 @@ namespace Ashenveil.Core.Entities
             // Debug: outline the collision body (only shows with Debug.SHOWBOUNDS).
             Debug.DrawRect(spriteBatch, Bounds, Color.Black);
         }
+        //get the nearest entity within a certain range of this entity, used for AI
+        public Entity GetNearestEntityInRange(IEnumerable<Entity> entities, float maxDistance)
+        {
+            Entity nearest = null;
+            float closestDistance = float.MaxValue;
+            // Measured body to body: Position is the frame's top-left corner, which sits
+            // further from the body the bigger the sprite is.
+            Vector2 me = Bounds.Center.ToVector2();
+
+            foreach (var entity in entities)
+            {
+                if (entity == this) continue;
+
+                float distance = Vector2.Distance(me, entity.Bounds.Center.ToVector2());
+                if (distance < maxDistance && distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    nearest = entity;
+                }
+            }
+
+            return nearest;
+        }
     }
 }

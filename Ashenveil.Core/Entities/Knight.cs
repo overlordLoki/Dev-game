@@ -17,7 +17,7 @@ namespace Ashenveil.Core.Entities
         {
             Portrait = Assets.KnightPortrait;
             Speed = 100f;
-            Dialogue = new[]
+            Script = new[]
             {
                 $"Halt, traveller. I am {name}, sworn to guard these meadows.",
                 "The roads have grown dangerous since the ash began to fall. Wolves, bandits, and worse things that walk at night.",

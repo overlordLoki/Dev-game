@@ -14,7 +14,7 @@ namespace Ashenveil.Core.Entities
         public string Name { get; }
         public string Portrait { get; set; }
         // What they say when the player talks to them, one box per line.
-        public string[] Dialogue { get; set; } = { "..." };
+        public string[] Script { get; set; } = { "..." };
         protected NPC(Vector2 position, int id, string name) : base(position, id)
         {
             Brain = new WanderBrain();
@@ -29,6 +29,10 @@ namespace Ashenveil.Core.Entities
             Brain.Update(this, gameTime);
             base.Update(gameTime);
         }
+
+        // The brain is private to the NPC, so the World starts and ends talking through these.
+        public void StartTalking() => Brain.StartTalking(this);
+        public void StopTalking() => Brain.StopTalking(this);
 
         /// <summary>
         /// Push out of another entity, then let the brain decide how to react (a

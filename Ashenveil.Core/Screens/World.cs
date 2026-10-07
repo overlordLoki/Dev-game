@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Ashenveil.Core.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Screens.Locations;
@@ -24,6 +25,8 @@ namespace Ashenveil.Core.Screens
         private MouseState _prevMouse;
         private Texture2D _pixel;
         private Action _onPause;
+        private Action<Conversation> _onTalk;
+        private List<Conversation> _conversations = new List<Conversation>();
         private KeyboardState _prevKb;
         private int _viewWidth, _viewHeight;
 
@@ -35,11 +38,12 @@ namespace Ashenveil.Core.Screens
         // The world draws in world coordinates; the camera shifts it onto the screen.
         public Matrix Transform => camera.View;
 
-        public World(Texture2D pixel, Action onPause)
+        public World(Texture2D pixel, Action onPause, Action<Conversation> onTalk)
         {
             this.player = new Player(new Vector2(100, 100), 0);
             this._pixel = pixel;
             this._onPause = onPause;
+            this._onTalk = onTalk;
             SetLocation(new Location("Medows"));
         }
 
@@ -102,6 +106,30 @@ namespace Ashenveil.Core.Screens
         }
 
         /// <summary>
+        /// The one place a conversation begins, whoever starts it. Only the player's
+        /// conversations get the chat box; the rest just live in the list.
+        /// </summary>
+        public Conversation StartConversation(Entity from, NPC to)
+        {
+            var convo = new Conversation(new Entity[] { from, to }, to.Script, location);
+            to.StartTalking();
+            _conversations.Add(convo);
+            if (from == player) _onTalk(convo);
+            return convo;
+        }
+
+        // Lets everyone in a finished conversation go back to what they were doing.
+        private void EndFinishedConversations()
+        {
+            foreach (var convo in _conversations.Where(c => c.IsFinished).ToList())
+            {
+                foreach (var entity in convo.Participants)
+                    if (entity is NPC npc) npc.StopTalking();
+                _conversations.Remove(convo);
+            }
+        }
+
+        /// <summary>
         /// Which cell the player is standing in, measured from their feet - the bottom
         /// centre of the collision box, not the sprite, which has transparent padding
         /// and would report the cell above.
@@ -142,6 +170,7 @@ namespace Ashenveil.Core.Screens
 
         public void Update(GameTime gameTime)
         {
+            EndFinishedConversations();
             player.Update(gameTime);
             worldBounds.Clamp(player);
             foreach (var npc in NPCs)
@@ -202,9 +231,15 @@ namespace Ashenveil.Core.Screens
             // otherwise bounce the player in and out of the door every frame.
             if (kb.IsKeyDown(Keys.E) && _prevKb.IsKeyUp(Keys.E))
             {
-                var (col, row) = PlayerCell();
-                var exit = location.ExitAt(col, row);
-                if (exit != null) UseExit(exit);
+                // Talking wins over doors when an NPC is within reach.
+                var npc = player.GetNearestEntityInRange(NPCs, Layout.CellWidth * 1.5f) as NPC;
+                if (npc != null) StartConversation(player, npc);
+                else
+                {
+                    var (col, row) = PlayerCell();
+                    var exit = location.ExitAt(col, row);
+                    if (exit != null) UseExit(exit);
+                }
             }
             _prevKb = kb;
         }
