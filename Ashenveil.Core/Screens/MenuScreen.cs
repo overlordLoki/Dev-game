@@ -30,7 +30,7 @@ namespace Ashenveil.Core.Screens
 
         public void Update(GameTime gameTime)
         {
-            var mouse = Mouse.GetState();
+            var mouse = AshenveilGame.Input.Mouse;
             foreach (var w in widgets) w.Update(mouse, prevMouse);
             prevMouse = mouse;
         }

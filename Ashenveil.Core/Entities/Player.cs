@@ -23,7 +23,7 @@ namespace Ashenveil.Core.Entities
         protected override void Move(GameTime gameTime)
         {
             float delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            var kb = Keyboard.GetState();
+            var kb = AshenveilGame.Input.Keyboard;
 
             if (kb.IsKeyDown(Keys.Right)) Position = new Vector2(Position.X + Speed * delta, Position.Y);
             if (kb.IsKeyDown(Keys.Left))  Position = new Vector2(Position.X - Speed * delta, Position.Y);

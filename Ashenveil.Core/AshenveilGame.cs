@@ -10,6 +10,7 @@ using Ashenveil.Core.Screens;
 using Ashenveil.Core.Screens.Chat;
 using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
+using Ashenveil.Core.Utility.Input;
 namespace Ashenveil.Core
 {
     /// <summary>
@@ -33,6 +34,7 @@ namespace Ashenveil.Core
         // Resources for drawing.
         private GraphicsDeviceManager graphicsDeviceManager;
         public static TextureAtlas UiAtlas { get; private set; }
+        public static IInput Input { get; set; } = new LiveInput();
 
         /// <summary>
         /// Indicates if the game is running on a mobile platform.
@@ -154,7 +156,7 @@ namespace Ashenveil.Core
         protected override void Update(GameTime gameTime)
         {
             // Toggle the pause menu with the Back button (GamePad) or Escape key (Keyboard).
-            var kb = Keyboard.GetState();
+            var kb = Input.Keyboard;
             var padBack = GamePad.GetState(PlayerIndex.One).Buttons.Back;
             bool pausePressed = (kb.IsKeyDown(Keys.Escape) && !_prevKb.IsKeyDown(Keys.Escape))
                 || (padBack == ButtonState.Pressed && _prevPadBack == ButtonState.Released);

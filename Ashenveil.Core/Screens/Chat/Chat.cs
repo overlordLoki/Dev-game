@@ -53,8 +53,8 @@ namespace Ashenveil.Core.Screens.Chat
 
             // Start from what's held right now, so the click or key that opened the chat
             // isn't also read as a press on our first frame.
-            prevMouse = Mouse.GetState();
-            prevKb = Keyboard.GetState();
+            prevMouse = AshenveilGame.Input.Mouse;
+            prevKb = AshenveilGame.Input.Keyboard;
 
             // Box along the bottom. Portrait and name on its left; to the right the transcript,
             // with the input row (text field, Send, Leave) underneath it.
@@ -120,11 +120,11 @@ namespace Ashenveil.Core.Screens.Chat
             // The world isn't updating while we're on top, so collecting the LLM's reply is our job.
             _conversation.Poll();
 
-            var mouse = Mouse.GetState();
+            var mouse = AshenveilGame.Input.Mouse;
             foreach (var w in Widgets) w.Update(mouse, prevMouse);
             prevMouse = mouse;
 
-            var kb = Keyboard.GetState();
+            var kb = AshenveilGame.Input.Keyboard;
             if (_waitForRelease && kb.IsKeyUp(Keys.E)) _waitForRelease = false;
             if (Pressed(kb, Keys.Escape)) Close();
             prevKb = kb;

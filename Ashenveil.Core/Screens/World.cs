@@ -226,12 +226,12 @@ namespace Ashenveil.Core.Screens
         }
         private void OnMouseAction()
         {
-            var mouse = Mouse.GetState();
+            var mouse = AshenveilGame.Input.Mouse;
             _prevMouse = mouse;  // always save at the end of Update
         }
         private void OnKeyAction()
         {
-            var kb = Keyboard.GetState();
+            var kb = AshenveilGame.Input.Keyboard;
             if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
             {
                 _onPause();
