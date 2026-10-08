@@ -1,4 +1,5 @@
 using System;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.Entities
@@ -11,6 +12,7 @@ namespace Ashenveil.Core.Entities
     /// </summary>
     public abstract class NpcBrain
     {
+        public Memory[] Memories { get; set; } = new Memory[0];
         public Entity target { get; set; } = null; //use for later AI, like following the player or attacking them
         //State machine for NPCs
         public enum NPCState
