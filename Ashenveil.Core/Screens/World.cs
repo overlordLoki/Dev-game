@@ -20,7 +20,7 @@ namespace Ashenveil.Core.Screens
         public WorldBounds worldBounds;
         public Player player;
         public Camera camera = new Camera();
-        public List<NPC> NPCs = new List<NPC>();
+        public List<NPC> NPCs;
         public List<Widget> Widgets { get; set; } = new List<Widget>();
         private MouseState _prevMouse;
         private Texture2D _pixel;
@@ -29,6 +29,11 @@ namespace Ashenveil.Core.Screens
         private List<Conversation> _conversations = new List<Conversation>();
         private KeyboardState _prevKb;
         private int _viewWidth, _viewHeight;
+        // Every level's NPCs, kept alive across level changes so returning to a level
+        // gives back the same instances (and later, their accumulated memory).
+        private Dictionary<string, List<NPC>> _npcsByLevel = new();
+        // Which levels have already had their first-visit spawn run, so we don't respawn on return.
+        private HashSet<string> _populated = new();
 
         /// The area currently being played. Only ever one: entering a building swaps
         /// this rather than stacking a second screen, so the player, camera and pause
@@ -52,14 +57,8 @@ namespace Ashenveil.Core.Screens
         /// </summary>
         public void Init()
         {
-            // spawn the player at the level's spawn point, which is a named point of interest
-            var player_spawn_point = location.Poi("Player_spawn");
             Spawn(player, "Player_spawn");
-
-            // add a knight npc to the world
-            var knight = new Knight(new Vector2(200, 200), 1, "Sir Lancelot");
-            Spawn(knight, "Knight_spawn");
-            NPCs.Add(knight);
+            EnsurePopulated();   // Layout is ready by now (LoadContent calls UpdateLayout first)
         }
 
         public void Spawn(Entity entity, String poi_name)
@@ -87,6 +86,37 @@ namespace Ashenveil.Core.Screens
         {
             location = next;
             worldBounds = new WorldBounds(next.tileMap);
+
+            // Point NPCs at this level's bucket, creating an empty one on first visit.
+            // No spawning here — Layout may not be ready yet (we're called from the ctor).
+            if (!_npcsByLevel.TryGetValue(next.Name, out var bucket))
+            {
+                bucket = new List<NPC>();
+                _npcsByLevel[next.Name] = bucket;
+            }
+            NPCs = bucket;
+        }
+        // First-visit spawn for the current level. Safe to call every time you enter a
+        // level — it only does work the first time. Must run after Layout is ready.
+        private void EnsurePopulated()
+        {
+            if (_populated.Contains(location.Name)) return;
+            _populated.Add(location.Name);
+            SpawnLevelNpcs(location.Name);
+        }
+
+        // What NPCs each level starts with. Hardcoded per level for now; later this reads
+        // from the level's JSON the same way POIs and exits already do.
+        private void SpawnLevelNpcs(string levelName)
+        {
+            switch (levelName)
+            {
+                case "Medows":
+                    var knight = new Knight(new Vector2(200, 200), NPCs.Count, "Sir Lancelot");
+                    Spawn(knight, "Knight_spawn");
+                    NPCs.Add(knight);
+                    break;
+            }
         }
 
         /// <summary>
@@ -97,6 +127,7 @@ namespace Ashenveil.Core.Screens
         public void UseExit(ExitData exit)
         {
             SetLocation(new Location(exit.to));
+            EnsurePopulated();          // NEW: first visit spawns, return visit reuses
 
             // Centre the player in the spawn cell rather than at its corner, so they
             // don't start half-inside whatever is standing on the neighbouring tile.
