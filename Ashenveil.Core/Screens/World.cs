@@ -34,6 +34,10 @@ namespace Ashenveil.Core.Screens
         private Dictionary<string, List<NPC>> _npcsByLevel = new();
         // Which levels have already had their first-visit spawn run, so we don't respawn on return.
         private HashSet<string> _populated = new();
+        // Hands out NPC ids. Only ever counts up, so ids stay unique across levels and
+        // despawns for the whole session. 0 is the player; NPCs start at 1.
+        private int _nextNpcId = 1;
+        private int NextId() => _nextNpcId++;
 
         /// The area currently being played. Only ever one: entering a building swaps
         /// this rather than stacking a second screen, so the player, camera and pause
@@ -112,12 +116,19 @@ namespace Ashenveil.Core.Screens
             switch (levelName)
             {
                 case "Medows":
-                    var knight = new Knight(new Vector2(200, 200), NPCs.Count, "Sir Lancelot");
+                    var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot");
                     Spawn(knight, "Knight_spawn");
                     NPCs.Add(knight);
                     break;
             }
         }
+
+        /// <summary>
+        /// Finds an NPC by id across every level, not just the current one, so a lookup
+        /// works even while the player is somewhere else. Null if no NPC has that id.
+        /// </summary>
+        public NPC FindNpc(int id) =>
+            _npcsByLevel.Values.SelectMany(bucket => bucket).FirstOrDefault(npc => npc.Id == id);
 
         /// <summary>
         /// Walks through a doorway: loads the target level and stands the player on its
