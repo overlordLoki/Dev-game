@@ -116,23 +116,22 @@ namespace Ashenveil.Core.Screens
             everyone[0] = from;
             others.CopyTo(everyone, 1);
 
-            var convo = new Conversation(everyone, new[] { "..." }, location);
-
             var req = new ConversationRequestDto {
                 participants = new List<ParticipantDto>(),
                 location = location.Name,
-                // The opener is already "said"; the LLM continues from it.
-                history = new List<string> { $"{others[0].Name}: {others[0].Greeting}" },
-                max_lines = 4,
+                // One reply per thing said, so it reads as a back-and-forth.
+                max_lines = others.Length,
             };
             // The initiator is present but listening (your player drives, doesn't get lines).
             req.participants.Add(new ParticipantDto {
-                name = (from as NPC)?.Name ?? "Traveller", speaks = false });
+                name = (from as NPC)?.Name ?? Conversation.PlayerName, speaks = false });
             // Every NPC is a speaker, with their persona.
             foreach (var npc in others)
                 req.participants.Add(new ParticipantDto { name = npc.Name, persona = npc.Persona });
 
-            convo.StartLoading(DialogueApi.RequestAsync(req), others[0].Greeting);
+            var convo = new Conversation(everyone, location, req, DialogueApi.RequestAsync);
+            // The opener is already "said"; the LLM continues from it once the player answers.
+            convo.Add(others[0].Name, others[0].Greeting);
 
             foreach (var npc in others) npc.StartTalking();
             _conversations.Add(convo);

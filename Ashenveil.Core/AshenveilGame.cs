@@ -121,7 +121,7 @@ namespace Ashenveil.Core
             this.world = new World(_pixel,
                 () => _screenManager.Push(_pause),
                 // Built fresh each time, from the window as it is now, so the box fits after a resize.
-                convo => _screenManager.Push(new ChatScreen(font, convo,
+                convo => _screenManager.Push(new ChatScreen(font, convo, Window,
                     () => _screenManager.Pop(),
                     GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height)));
             this.world.UpdateLayout(w, h);   // set initial cell size before the first frame
