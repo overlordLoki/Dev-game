@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- Core references MonoGame with PrivateAssets=All, so it doesn't flow through the
+         project reference: the tests need their own copy for Rectangle / Vector2. -->
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ashenveil.Core\Ashenveil.Core.csproj" />
+  </ItemGroup>
+
+  <!-- MapLoader and BoundsStore read from Content/ next to the running assembly, so the
+       data has to sit in the test output folder the same way it sits next to the exe. -->
+  <ItemGroup>
+    <!-- The real shipped levels, for the "every level still loads" tests. -->
+    <None Include="..\Ashenveil.Core\Content\levels\**\*.json" Link="Content\levels\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- The tests' OWN bounds.json (one full-frame box for TestEntity), not the game's,
+         so re-tuning a box in the editor can't break a collision test. -->
+    <None Update="Content\bounds.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
