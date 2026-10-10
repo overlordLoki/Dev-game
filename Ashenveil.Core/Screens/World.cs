@@ -15,7 +15,7 @@ using Microsoft.Xna.Framework.Input;
 
 namespace Ashenveil.Core.Screens
 {
-    public class World : IScreen
+    public class World
     {
         public WorldBounds worldBounds;
         public Player player;

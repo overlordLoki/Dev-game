@@ -25,6 +25,7 @@ namespace Ashenveil.Core
         private SpriteBatch _spriteBatch;
         private Texture2D _pixel;
         public World world;
+        private GameplayScreen _gameplayScreen;
         private Menu _menu;
         private SettingsScreen _settings;
         private Pause _pause;
@@ -130,6 +131,8 @@ namespace Ashenveil.Core
             this.world.Init();  // spawn the player and set up the level on first load
             Debug.Pixel = _pixel;
 
+            _gameplayScreen = new GameplayScreen(world);
+
             // create screens first
             _settings = new SettingsScreen(font, () => _screenManager.Pop(), w, h);
 
@@ -138,8 +141,8 @@ namespace Ashenveil.Core
 
             _menu = new Menu(
                 font,
-                () => _screenManager.Push(world),      // New Game
-                () => _screenManager.Push(_settings),  // Settings
+                () => _screenManager.Push(_gameplayScreen),  // New Game
+                () => _screenManager.Push(_settings),        // Settings
                 w, h);
 
             // start on the menu
@@ -164,7 +167,7 @@ namespace Ashenveil.Core
             {
                 if (_screenManager.Current == _pause)
                     _screenManager.Pop();
-                else if (_screenManager.Current == world)
+                else if (_screenManager.Current == _gameplayScreen)
                     _screenManager.Push(_pause);
             }
             _prevKb = kb;
