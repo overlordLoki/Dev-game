@@ -12,11 +12,15 @@ using Ashenveil.Core.Utility.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using GameDate = Ashenveil.Core.Utility.GameDate;
 
 namespace Ashenveil.Core.Screens
 {
     public class World
     {
+        private static readonly string[] Seasons = { "Spring", "Summer", "Fall", "Winter" };
+        private const float SecondsPerDay = 600f; // 10 real minutes = 1 game day
+
         public WorldBounds worldBounds;
         public Player player;
         public Camera camera = new Camera();
@@ -29,6 +33,17 @@ namespace Ashenveil.Core.Screens
         private List<Conversation> _conversations = new List<Conversation>();
         private KeyboardState _prevKb;
         private int _viewWidth, _viewHeight;
+
+        // Time tracking: 10 real minutes = 1 game day
+        private float _elapsedSeconds;
+        public GameDate CurrentDate { get; private set; } = new GameDate();
+
+        public int TotalDays => CurrentDate.TotalDays;
+        public int Year => CurrentDate.Year;
+        public int Day => CurrentDate.Day;
+        public int Season => CurrentDate.Season;
+        public string SeasonName => Seasons[Season];
+        public string DateDisplay => $"{SeasonName} {Day}, Year {Year}";
         // Every level's NPCs, kept alive across level changes so returning to a level
         // gives back the same instances (and later, their accumulated memory).
         private Dictionary<string, List<NPC>> _npcsByLevel = new();
@@ -192,6 +207,18 @@ namespace Ashenveil.Core.Screens
             }
         }
 
+        // Advance game time: 10 real minutes = 1 game day
+        private void AdvanceTime(GameTime gameTime)
+        {
+            _elapsedSeconds += (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            while (_elapsedSeconds >= SecondsPerDay)
+            {
+                _elapsedSeconds -= SecondsPerDay;
+                CurrentDate.AdvanceDay();
+            }
+        }
+
         /// <summary>
         /// Which cell the player is standing in, measured from their feet - the bottom
         /// centre of the collision box, not the sprite, which has transparent padding
@@ -233,6 +260,7 @@ namespace Ashenveil.Core.Screens
 
         public void Update(GameTime gameTime)
         {
+            AdvanceTime(gameTime);
             EndFinishedConversations();
             player.Update(gameTime);
             worldBounds.Clamp(player);
