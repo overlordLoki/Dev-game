@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Ashenveil.Core.Entities.brains.Memorys;
+using Ashenveil.Core.Entities.brains.Task;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.Entities
@@ -20,7 +22,9 @@ namespace Ashenveil.Core.Entities
             Idle,
             Walking,
             Talking,
+            Tasked, //for future AI, like following the player or going to a specific location
         }
+        public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
         public NPCState State { get; protected set; } = NPCState.Idle;
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         public virtual void Start(NPC npc) {}
