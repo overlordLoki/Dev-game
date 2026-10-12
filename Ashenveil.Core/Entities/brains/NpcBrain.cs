@@ -14,7 +14,7 @@ namespace Ashenveil.Core.Entities
     /// </summary>
     public abstract class NpcBrain
     {
-        public Memory[] Memories { get; set; } = new Memory[0];
+        public List<Memory> Memories { get; } = new List<Memory>();
         public Entity target { get; set; } = null; //use for later AI, like following the player or attacking them
         //State machine for NPCs
         public enum NPCState
@@ -55,6 +55,22 @@ namespace Ashenveil.Core.Entities
                     break;
                 case NPCState.Talking:
                     // Do nothing.
+                    break;
+                case NPCState.Tasked:
+                    if (TaskQueue.Count > 0)
+                    {
+                        ITask currentTask = TaskQueue.Peek();
+                        if (currentTask.State == ITask.TaskState.Inactive)
+                        {
+                            currentTask.State = ITask.TaskState.Active;
+                        }
+                        currentTask.Execute(npc);
+                        if (currentTask.State == ITask.TaskState.Completed)
+                        {
+                            TaskQueue.Dequeue();
+                        }
+
+                    }
                     break;
             }
         }
