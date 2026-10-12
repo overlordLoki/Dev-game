@@ -64,7 +64,12 @@ namespace Ashenveil.Core.Entities
                         {
                             currentTask.State = ITask.TaskState.Active;
                         }
-                        currentTask.Execute(npc);
+                        currentTask.Execute(new TaskContext
+                        {
+                            Owner = npc,
+                            Blackboard = new Blackboard(),
+                            DeltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds
+                        });
                         if (currentTask.State == ITask.TaskState.Completed)
                         {
                             TaskQueue.Dequeue();
