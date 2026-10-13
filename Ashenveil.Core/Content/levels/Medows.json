@@ -405,6 +405,16 @@
       "name": "Player_spawn",
       "x": 1,
       "y": 1
+    },
+    {
+      "name": "checkpoint",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "name": "entry",
+      "x": 3,
+      "y": 7
     }
   ]
 }
