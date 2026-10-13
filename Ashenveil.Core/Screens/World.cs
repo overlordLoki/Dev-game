@@ -135,7 +135,7 @@ namespace Ashenveil.Core.Screens
                     var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot");
                     Spawn(knight, "Knight_spawn");
                     NPCs.Add(knight);
-                    knight.GiveTask(new GoToTask(new Vector2(400, 400)));
+                    knight.GiveTask(new GoToTask(location.Poi("entry").ToPixel()));
                     knight.GiveTask(new WaitTask(3f));
                     knight.GiveTask(new GoToTask(location.Poi("Knight_spawn").ToPixel()));
                     break;

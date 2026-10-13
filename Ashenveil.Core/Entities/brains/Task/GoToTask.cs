@@ -13,7 +13,10 @@ namespace Ashenveil.Core.Entities.brains.Task
         public void Execute(TaskContext context)
         {
             var npc = (NPC)context.Owner;
-            Vector2 toTarget = _target - npc.Position;
+            // Position is the frame's top-left, so aim the sprite's centre at the target -
+            // the same reference point World.Spawn places a POI entity by.
+            Vector2 centre = npc.Position + new Vector2(npc.Width / 2f, npc.Height / 2f);
+            Vector2 toTarget = _target - centre;
 
             if (toTarget.Length() <= ArriveRadius)
             {
