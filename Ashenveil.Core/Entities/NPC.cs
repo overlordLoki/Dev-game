@@ -55,5 +55,9 @@ namespace Ashenveil.Core.Entities
 
             Brain.OnBlocked(this, horizontal);
         }
+        public void GiveTask(brains.Task.ITask task)
+        {
+            Brain.Enqueue(task);
+        }
     }
 }

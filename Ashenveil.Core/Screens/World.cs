@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Dialogue;
 using Ashenveil.Core.Entities;
+using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Screens.Locations;
 using Ashenveil.Core.Tiles;
@@ -134,6 +135,9 @@ namespace Ashenveil.Core.Screens
                     var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot");
                     Spawn(knight, "Knight_spawn");
                     NPCs.Add(knight);
+                    knight.GiveTask(new GoToTask(new Vector2(400, 400)));
+                    knight.GiveTask(new WaitTask(3f));
+                    knight.GiveTask(new GoToTask(location.Poi("Knight_spawn").ToPixel()));
                     break;
             }
         }
