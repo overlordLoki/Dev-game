@@ -18,28 +18,18 @@ namespace Ashenveil.Core.Entities
             npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
         }
 
-        public override void Update(NPC npc, GameTime gameTime)
+        // The base runs this for Idle/Walking; Talking and Tasked are handled by the base.
+        protected override void UpdateDefault(NPC npc, GameTime gameTime)
         {
-            switch (State)
+            //chance to change direction every second
+            if (Random.Shared.NextDouble() < gameTime.ElapsedGameTime.TotalSeconds)
             {
-                case NPCState.Idle:
-                    // Do nothing.
-                    break;
-                case NPCState.Walking:
-                    //chance to change direction every second
-                    if (Random.Shared.NextDouble() < gameTime.ElapsedGameTime.TotalSeconds)
-                    {
-                        // 10% chance to change direction on this second. 
-                        if (Random.Shared.NextDouble() < 0.1)
-                        {
-                            float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
-                            npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
-                        }
-                    }
-                    break;
-                case NPCState.Talking:
-                    // TODO: maybe have them face the player and just stop moving
-                    break;
+                // 10% chance to change direction on this second.
+                if (Random.Shared.NextDouble() < 0.1)
+                {
+                    float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+                    npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                }
             }
         }
 

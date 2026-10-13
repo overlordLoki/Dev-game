@@ -26,8 +26,19 @@ namespace Ashenveil.Core.Entities
         }
         public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
         public NPCState State { get; protected set; } = NPCState.Idle;
+        // One blackboard per NPC, reused across every tick and every task, so tasks can
+        // share scratch state (a GoTo's target cell, "have I started") between frames.
+        private readonly Blackboard _blackboard = new();
+
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         public virtual void Start(NPC npc) {}
+
+        /// <summary>Hand the NPC a task to run; switches it into the Tasked state.</summary>
+        public void Enqueue(ITask task)
+        {
+            TaskQueue.Enqueue(task);
+            State = NPCState.Tasked;
+        }
 
         public virtual void StartTalking(NPC npc)
         {
@@ -37,47 +48,62 @@ namespace Ashenveil.Core.Entities
         }
         public virtual void StopTalking(NPC npc)
         {
-            State = NPCState.Walking;
-            float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
-            npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
-            
+            // Resume an interrupted errand if one is waiting; otherwise go back to wandering.
+            State = TaskQueue.Count > 0 ? NPCState.Tasked : NPCState.Walking;
+            if (State == NPCState.Walking)
+            {
+                float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+                npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+            }
         }
 
-        public virtual void Update(NPC npc, GameTime gameTime)
+        /// <summary>
+        /// The fixed per-frame flow, shared by every brain: talking stands still, a tasked
+        /// NPC ticks its queue, and anything else defers to the subclass's default behaviour.
+        /// Subclasses override <see cref="UpdateDefault"/>, not this, so the task machinery
+        /// can never be accidentally shadowed.
+        /// </summary>
+        public void Update(NPC npc, GameTime gameTime)
         {
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             switch (State)
             {
-                case NPCState.Idle:
-                    // Do nothing.
-                    break;
-                case NPCState.Walking:
-                    // Do nothing.
-                    break;
                 case NPCState.Talking:
-                    // Do nothing.
+                    // Stand still while talking.
                     break;
                 case NPCState.Tasked:
-                    if (TaskQueue.Count > 0)
-                    {
-                        ITask currentTask = TaskQueue.Peek();
-                        if (currentTask.State == ITask.TaskState.Inactive)
-                        {
-                            currentTask.State = ITask.TaskState.Active;
-                        }
-                        currentTask.Execute(new TaskContext
-                        {
-                            Owner = npc,
-                            Blackboard = new Blackboard(),
-                            DeltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds
-                        });
-                        if (currentTask.State == ITask.TaskState.Completed)
-                        {
-                            TaskQueue.Dequeue();
-                        }
-
-                    }
+                    TickTasks(npc, dt);
+                    break;
+                default: // Idle / Walking
+                    UpdateDefault(npc, gameTime);
                     break;
             }
+        }
+
+        /// <summary>A brain's own idle/wander behaviour. Base does nothing; WanderBrain walks.</summary>
+        protected virtual void UpdateDefault(NPC npc, GameTime gameTime) { }
+
+        // Runs the task at the front of the queue until it reports Completed, then moves on.
+        // A task may take many ticks; Peek (not Dequeue) keeps it at the front until it's done.
+        private void TickTasks(NPC npc, float dt)
+        {
+            if (TaskQueue.Count == 0)
+            {
+                State = NPCState.Walking;   // nothing left to do -> back to the default loop
+                return;
+            }
+
+            ITask task = TaskQueue.Peek();
+            if (task.State == ITask.TaskState.Inactive) task.State = ITask.TaskState.Active;
+
+            task.Execute(new TaskContext
+            {
+                Owner = npc,
+                Blackboard = _blackboard,
+                DeltaTime = dt,
+            });
+
+            if (task.State == ITask.TaskState.Completed) TaskQueue.Dequeue();
         }
 
         /// <summary>
