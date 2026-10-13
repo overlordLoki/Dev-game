@@ -4,7 +4,7 @@ namespace Ashenveil.Core.Entities.brains.Task
 {
     public class GoToTask : ITask
     {
-        public ITask.TaskState State { get; set; } = ITask.TaskState.Inactive;
+        public TaskState State { get; set; } = TaskState.Inactive;
         private Vector3 targetPosition;
         private NPC npc;
 

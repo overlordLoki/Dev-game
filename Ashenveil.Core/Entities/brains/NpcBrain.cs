@@ -94,7 +94,7 @@ namespace Ashenveil.Core.Entities
             }
 
             ITask task = TaskQueue.Peek();
-            if (task.State == ITask.TaskState.Inactive) task.State = ITask.TaskState.Active;
+            if (task.State == TaskState.Inactive) task.State = TaskState.Active;
 
             task.Execute(new TaskContext
             {
@@ -103,7 +103,7 @@ namespace Ashenveil.Core.Entities
                 DeltaTime = dt,
             });
 
-            if (task.State == ITask.TaskState.Completed) TaskQueue.Dequeue();
+            if (task.State == TaskState.Completed) TaskQueue.Dequeue();
         }
 
         /// <summary>

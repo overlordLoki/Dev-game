@@ -3,14 +3,14 @@ using System.Collections.Generic;
 
 namespace Ashenveil.Core.Entities.brains.Task
 {
+    public enum TaskState
+    {
+        Inactive,
+        Active,
+        Completed,
+    }
     public interface ITask
     {
-        public enum TaskState
-        {
-            Inactive,
-            Active,
-            Completed,
-        }
         TaskState State { get; set; }
         void Execute(TaskContext context);
         
