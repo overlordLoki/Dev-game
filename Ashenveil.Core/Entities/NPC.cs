@@ -17,9 +17,9 @@ namespace Ashenveil.Core.Entities
         // The LLM generates everything said after the greeting (see World.StartConversation).
         public string Persona { get; set;} = "A generic NPC.";
         public string Greeting { get; set; } = "Hello, traveller.";
-        protected NPC(Vector2 position, int id, string name) : base(position, id)
+        protected NPC(Vector2 position, int id, string name, NpcBrain brain) : base(position, id)
         {
-            Brain = new WanderBrain();
+            Brain = brain;
             this.Name = name;
             Brain.Start(this);
         }

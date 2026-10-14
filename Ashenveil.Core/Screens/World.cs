@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Dialogue;
 using Ashenveil.Core.Entities;
+using Ashenveil.Core.Entities.brains;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Screens.Locations;
@@ -132,7 +133,7 @@ namespace Ashenveil.Core.Screens
             switch (levelName)
             {
                 case "Medows":
-                    var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot");
+                    var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot", new KnightBrain());
                     Spawn(knight, "Knight_spawn");
                     NPCs.Add(knight);
                     knight.GiveTask(new GoToTask(location.Poi("entry").ToPixel()));

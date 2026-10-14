@@ -13,7 +13,7 @@ namespace Ashenveil.Core.Entities
         // padding. Tune this, then retune the "Knight" boxes in the editor to match.
         protected override float SizeInCells => 1.2f;
         
-        public Knight(Vector2 position, int id, string name) : base(position, id, name)
+        public Knight(Vector2 position, int id, string name, NpcBrain brain) : base(position, id, name, brain)
         {
             Portrait = Assets.KnightPortrait;
             Speed = 100f;

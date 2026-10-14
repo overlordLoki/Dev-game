@@ -407,7 +407,7 @@
       "y": 1
     },
     {
-      "name": "checkpoint",
+      "name": "point1",
       "x": 2,
       "y": 1
     },
@@ -415,6 +415,11 @@
       "name": "entry",
       "x": 3,
       "y": 7
+    },
+    {
+      "name": "point2",
+      "x": 5,
+      "y": 9
     }
   ]
 }
