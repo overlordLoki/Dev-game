@@ -23,7 +23,6 @@ namespace Ashenveil.Core.Entities
             Walking,
             Talking,
             Tasked, //for future AI, like following the player or going to a specific location
-            Combat,
         }
         public Journal Journal { get; } = new Journal();
         public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
@@ -108,30 +107,8 @@ namespace Ashenveil.Core.Entities
             if (task.State == TaskState.Completed) TaskQueue.Dequeue();
         }
 
-        /// <summary>
-        /// Enemy is within range, set the target to the enemy and change the state to Combat.
-        /// </summary>
-        /// <param name="npc"></param>
-        public virtual void OnEnemyInRange(NPC npc, Entity enemy)
-        {
-            State = NPCState.Combat;
-            Target = enemy;
-            //TODO: Add combat logic here, like attacking the enemy or moving towards them.
-        }
-        /// <summary>
-        /// check if any enemies are in range
-        /// </summary>
-        public virtual void CheckForEnemies(NPC npc, List<Entity> enemies)
-        {
-            foreach (var enemy in enemies)
-            {
-                if (Vector2.Distance(npc.Position, enemy.Position) < npc.AttackRange)
-                {
-                    OnEnemyInRange(npc, enemy);
-                    break;
-                }
-            }
-        }
+        // TODO (separate feature): combat — enemy detection, targeting, a Combat state.
+        // Parked until the memory/task feature (docs/npc-memory-plan.md) is done.
 
         /// <summary>
         /// Called after the NPC was pushed out of another entity. <paramref name="horizontal"/>
