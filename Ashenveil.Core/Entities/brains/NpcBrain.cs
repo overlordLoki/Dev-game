@@ -24,6 +24,7 @@ namespace Ashenveil.Core.Entities
             Talking,
             Tasked, //for future AI, like following the player or going to a specific location
         }
+        public Journal Journal { get; } = new Journal();
         public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
         public NPCState State { get; protected set; } = NPCState.Idle;
         // One blackboard per NPC, reused across every tick and every task, so tasks can

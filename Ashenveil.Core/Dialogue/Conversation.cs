@@ -93,5 +93,17 @@ namespace Ashenveil.Core.Dialogue
 
         // Walking away: the world lets everyone go back to what they were doing.
         public void End() => IsFinished = true;
+        // Summarizes the current conversation for the journal for each NPC involved in the conversation.
+        public string Summarize()
+        {
+            string summary = "";
+            foreach (var message in Messages)
+            {
+                summary += $"{message.Speaker}: {message.Text}\n";
+            }
+            return summary;
+        }
     }
+    
+    
 }

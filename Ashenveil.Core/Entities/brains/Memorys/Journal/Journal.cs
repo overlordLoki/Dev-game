@@ -15,6 +15,10 @@ namespace Ashenveil.Core.Entities.brains.Memorys
     }
     public class Journal
     {
-        
+        public List<JournalEntry> Entries { get; set; } = new List<JournalEntry>();
+        public void AddEntry(string summary, List<Conversation> conversations)
+        {
+            Entries.Add(new JournalEntry(summary, conversations));
+        }
     }
 }

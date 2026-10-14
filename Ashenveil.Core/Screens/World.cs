@@ -211,6 +211,20 @@ namespace Ashenveil.Core.Screens
                 _conversations.Remove(convo);
             }
         }
+        private string SummarizeConversations(List<Conversation> conversations)
+        {
+            var summaries = new List<string>();
+            foreach (var convo in conversations)
+            {
+                var summary = $"Conversation at {convo.Location} with {string.Join(", ", convo.Participants.Select(p => p is NPC npc ? npc.Name : Conversation.PlayerName))}:";
+                foreach (var message in convo.Messages)
+                {
+                    summary += $"\n{message.Speaker}: {message.Text}";
+                }
+                summaries.Add(summary);
+            }
+            return string.Join("\n\n", summaries);
+        }
 
         // Advance game time: 10 real minutes = 1 game day
         private void AdvanceTime(GameTime gameTime)
