@@ -30,7 +30,11 @@ public class TestEntity : Entity
 /// <summary>Same 100x100 body as <see cref="TestEntity"/>, but with an NPC's brain attached.</summary>
 public class TestNpc : NPC
 {
-    public TestNpc(float x, float y) : base(new Vector2(x, y), 0, "Test", new WanderBrain()) { }
+    public TestNpc(float x, float y) : this(x, y, new WanderBrain()) { }
+
+    // Inject the brain so a test can keep a reference and drive it directly
+    // (NPC.Brain is protected, so this is the only way in from the test side).
+    public TestNpc(float x, float y, NpcBrain brain) : base(new Vector2(x, y), 0, "Test", brain) { }
 
     protected override float SizeInCells => 1f;
     protected override string BoundsKey => nameof(TestEntity);
