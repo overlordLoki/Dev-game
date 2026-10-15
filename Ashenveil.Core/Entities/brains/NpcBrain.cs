@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
@@ -131,8 +132,42 @@ namespace Ashenveil.Core.Entities
 
         public void ApplyDecision(NpcDecisionDto decision, Location location)
         {
-            
+            if (decision == null) return;
 
+            // 1. Remember: one journal entry (summary + any facts), skipping an empty one.
+            var facts = (decision.memories ?? Array.Empty<string>())
+                .Where(m => !string.IsNullOrWhiteSpace(m))
+                .Take(5)
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(decision.summary) || facts.Count > 0)
+                Journal.AddEntry(decision.summary ?? "", facts);
+
+            // 2. Optionally drop whatever the NPC was doing.
+            if (decision.clear_current_tasks) TaskQueue.Clear();
+
+            // 3. Turn each spec into a real task, dropping anything we can't honour.
+            foreach (var spec in decision.tasks ?? Array.Empty<TaskSpecDto>())
+            {
+                ITask task = spec.type switch
+                {
+                    "go_to" => MakeGoTo(spec, location),
+                    "wait"  => new WaitTask(Math.Clamp(spec.seconds, 0f, 600f)),
+                    _       => null,                    // unknown type -> ignore
+                };
+                if (task != null) Enqueue(task);
+            }
+
+            // 4. Resulting state: queued work always wins; otherwise honour the mood.
+            State = TaskQueue.Count > 0 ? NPCState.Tasked
+                : decision.behaviour == "idle" ? NPCState.Idle
+                : NPCState.Walking;
+        }
+
+        // A go_to survives only if its target names a real POI in this level.
+        private ITask MakeGoTo(TaskSpecDto spec, Location location)
+        {
+            var poi = location?.Poi(spec.target);
+            return poi == null ? null : new GoToTask(poi.ToPixel());
         }
 
 
