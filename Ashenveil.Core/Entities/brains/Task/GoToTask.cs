@@ -27,5 +27,10 @@ namespace Ashenveil.Core.Entities.brains.Task
 
             npc.Direction = Vector2.Normalize(toTarget);  // head straight at it; Entity.Move steps
         }
+        //TODO: Implement A* pathfinding for NPCs to navigate around obstacles and find the best path to the target.
+        private void AStar()
+        {
+            
+        }
     }
 }
