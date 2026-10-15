@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Ashenveil.Core.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.Entities
@@ -15,6 +17,8 @@ namespace Ashenveil.Core.Entities
     public abstract class NpcBrain
     {
         public List<Memory> Memories { get; } = new List<Memory>();
+        /// <summary>The NPC this brain controls. Set once by <see cref="Attach"/> when the NPC is built.</summary>
+        public NPC Npc { get; private set; }
         public Entity target { get; set; } = null; //use for later AI, like following the player or attacking them
         //State machine for NPCs
         public enum NPCState
@@ -24,6 +28,16 @@ namespace Ashenveil.Core.Entities
             Talking,
             Tasked, //for future AI, like following the player or going to a specific location
         }
+        /// <summary>
+        /// Binds this brain to its NPC and runs <see cref="Start"/>. Called from the NPC
+        /// constructor; a brain belongs to exactly one NPC, so attaching twice throws.
+        /// </summary>
+        internal void Attach(NPC npc)
+        {
+            if (Npc != null) throw new InvalidOperationException("This brain is already attached to an NPC.");
+            Npc = npc ?? throw new ArgumentNullException(nameof(npc));
+            Start();
+        }
         public Journal Journal { get; } = new Journal();
         public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
         public NPCState State { get; protected set; } = NPCState.Idle;
@@ -32,7 +46,7 @@ namespace Ashenveil.Core.Entities
         private readonly Blackboard _blackboard = new();
 
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
-        public virtual void Start(NPC npc) {}
+        protected virtual void Start() {}
 
         /// <summary>Hand the NPC a task to run; switches it into the Tasked state.</summary>
         public void Enqueue(ITask task)
@@ -41,20 +55,20 @@ namespace Ashenveil.Core.Entities
             State = NPCState.Tasked;
         }
 
-        public virtual void StartTalking(NPC npc)
+        public virtual void StartTalking()
         {
             State = NPCState.Talking;
             //face the player
-            npc.Direction = Vector2.Zero;
+            Npc.Direction = Vector2.Zero;
         }
-        public virtual void StopTalking(NPC npc)
+        public virtual void StopTalking()
         {
             // Resume an interrupted errand if one is waiting; otherwise go back to wandering.
             State = TaskQueue.Count > 0 ? NPCState.Tasked : NPCState.Walking;
             if (State == NPCState.Walking)
             {
                 float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
-                npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                Npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
             }
         }
 
@@ -64,7 +78,7 @@ namespace Ashenveil.Core.Entities
         /// Subclasses override <see cref="UpdateDefault"/>, not this, so the task machinery
         /// can never be accidentally shadowed.
         /// </summary>
-        public void Update(NPC npc, GameTime gameTime)
+        public void Update(GameTime gameTime)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             switch (State)
@@ -73,20 +87,20 @@ namespace Ashenveil.Core.Entities
                     // Stand still while talking.
                     break;
                 case NPCState.Tasked:
-                    TickTasks(npc, dt);
+                    TickTasks(dt);
                     break;
                 default: // Idle / Walking
-                    UpdateDefault(npc, gameTime);
+                    UpdateDefault(gameTime);
                     break;
             }
         }
 
         /// <summary>A brain's own idle/wander behaviour. Base does nothing; WanderBrain walks.</summary>
-        protected virtual void UpdateDefault(NPC npc, GameTime gameTime) { }
+        protected virtual void UpdateDefault(GameTime gameTime) { }
 
         // Runs the task at the front of the queue until it reports Completed, then moves on.
         // A task may take many ticks; Peek (not Dequeue) keeps it at the front until it's done.
-        private void TickTasks(NPC npc, float dt)
+        private void TickTasks(float dt)
         {
             if (TaskQueue.Count == 0)
             {
@@ -99,7 +113,7 @@ namespace Ashenveil.Core.Entities
 
             task.Execute(new TaskContext
             {
-                Owner = npc,
+                Owner = Npc,
                 Blackboard = _blackboard,
                 DeltaTime = dt,
             });
@@ -114,6 +128,14 @@ namespace Ashenveil.Core.Entities
         /// Called after the NPC was pushed out of another entity. <paramref name="horizontal"/>
         /// is true when the push was along X. Default: do nothing, just stay pushed out.
         /// </summary>
-        public virtual void OnBlocked(NPC npc, bool horizontal) { }
+        public virtual void OnBlocked(bool horizontal) { }
+
+        public void ApplyDecision(NpcDecisionDto decision, Location location)
+        {
+            
+
+        }
+
+
     }
 }

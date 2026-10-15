@@ -21,20 +21,20 @@ namespace Ashenveil.Core.Entities
         {
             Brain = brain;
             this.Name = name;
-            Brain.Start(this);
+            Brain.Attach(this);
         }
 
         public override void Update(GameTime gameTime)
         {
             // TODO: NPC AI logic. Subclasses register at least "idle" and "walk".
             Play(Direction == Vector2.Zero ? "idle" : "walk");
-            Brain.Update(this, gameTime);
+            Brain.Update(gameTime);
             base.Update(gameTime);
         }
 
         // The brain is private to the NPC, so the World starts and ends talking through these.
-        public void StartTalking() => Brain.StartTalking(this);
-        public void StopTalking() => Brain.StopTalking(this);
+        public void StartTalking() => Brain.StartTalking();
+        public void StopTalking() => Brain.StopTalking();
 
         /// <summary>
         /// Push out of another entity, then let the brain decide how to react (a
@@ -53,7 +53,7 @@ namespace Ashenveil.Core.Entities
             else
                 Position = new Vector2(Position.X, Position.Y + pushY);
 
-            Brain.OnBlocked(this, horizontal);
+            Brain.OnBlocked(horizontal);
         }
         public void GiveTask(brains.Task.ITask task)
         {

@@ -10,7 +10,7 @@ namespace Ashenveil.Core.Entities.brains
         {
             this.State = NPCState.Idle;
         }
-        protected override void UpdateDefault(NPC npc, GameTime gameTime)
+        protected override void UpdateDefault(GameTime gameTime)
         {
             
         }

@@ -12,14 +12,14 @@ namespace Ashenveil.Core.Entities
         {
             this.State = NPCState.Walking;
         }
-        public override void Start(NPC npc)
+        protected override void Start()
         {
             float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
-            npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+            Npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
         }
 
         // The base runs this for Idle/Walking; Talking and Tasked are handled by the base.
-        protected override void UpdateDefault(NPC npc, GameTime gameTime)
+        protected override void UpdateDefault(GameTime gameTime)
         {
             //chance to change direction every second
             if (Random.Shared.NextDouble() < gameTime.ElapsedGameTime.TotalSeconds)
@@ -28,18 +28,18 @@ namespace Ashenveil.Core.Entities
                 if (Random.Shared.NextDouble() < 0.1)
                 {
                     float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
-                    npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                    Npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
                 }
             }
         }
 
         // Flip the heading on the pushed axis, so a wanderer turns away instead of
         // pressing into whatever it hit.
-        public override void OnBlocked(NPC npc, bool horizontal)
+        public override void OnBlocked(bool horizontal)
         {
-            npc.Direction = horizontal
-                ? new Vector2(-npc.Direction.X, npc.Direction.Y)
-                : new Vector2(npc.Direction.X, -npc.Direction.Y);
+            Npc.Direction = horizontal
+                ? new Vector2(-Npc.Direction.X, Npc.Direction.Y)
+                : new Vector2(Npc.Direction.X, -Npc.Direction.Y);
         }
     }
 }
