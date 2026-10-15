@@ -45,5 +45,14 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
             // A 200 with no turns comes back as empty, which Conversation.Poll treats as "no answer".
             return body?.turns?.Select(t => new ChatMessage(t.speaker, t.text)).ToArray() ?? Array.Empty<ChatMessage>();
         }
+
+        // Asked for once when a conversation ends: what the NPC remembers and does next.
+        // Null on a 200 with an empty body; ApplyDecision treats null as "nothing changed".
+        public static async Task<NpcDecisionDto> RequestDecisionAsync(DecisionRequestDto req)
+        {
+            var res = await _http.PostAsJsonAsync("/decision", req);
+            res.EnsureSuccessStatusCode();
+            return await res.Content.ReadFromJsonAsync<NpcDecisionDto>();
+        }
     }
 }
