@@ -1,24 +1,24 @@
 using System.Collections.Generic;
+using System.Linq;
 using Ashenveil.Core.Dialogue;
 
 namespace Ashenveil.Core.Entities.brains.Memorys
 {
     public class JournalEntry
     {
-        public string Summary { get; set; }
-        public List<Conversation> Conversations { get; set; } = new List<Conversation>();
-        public JournalEntry(string summary, List<Conversation> conversations)
+        public string Summary { get; }
+        public IReadOnlyList<string> Facts { get; }
+        public JournalEntry(string summary, IReadOnlyList<string> facts)
         {
             Summary = summary;
-            Conversations = conversations;
+            Facts = facts;
         }
     }
+
     public class Journal
     {
-        public List<JournalEntry> Entries { get; set; } = new List<JournalEntry>();
-        public void AddEntry(string summary, List<Conversation> conversations)
-        {
-            Entries.Add(new JournalEntry(summary, conversations));
-        }
+        public List<JournalEntry> Entries { get; } = new();
+        public void AddEntry(string summary, IEnumerable<string> facts) =>
+            Entries.Add(new JournalEntry(summary, facts?.ToList() ?? new List<string>()));
     }
 }

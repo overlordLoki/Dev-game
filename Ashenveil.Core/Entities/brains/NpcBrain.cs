@@ -16,7 +16,6 @@ namespace Ashenveil.Core.Entities
     /// </summary>
     public abstract class NpcBrain
     {
-        public List<Memory> Memories { get; } = new List<Memory>();
         /// <summary>The NPC this brain controls. Set once by <see cref="Attach"/> when the NPC is built.</summary>
         public NPC Npc { get; private set; }
         public Entity target { get; set; } = null; //use for later AI, like following the player or attacking them
