@@ -30,7 +30,7 @@ public class TestEntity : Entity
 /// <summary>Same 100x100 body as <see cref="TestEntity"/>, but with an NPC's brain attached.</summary>
 public class TestNpc : NPC
 {
-    public TestNpc(float x, float y) : base(new Vector2(x, y), 0, "Test") { }
+    public TestNpc(float x, float y) : base(new Vector2(x, y), 0, "Test", new WanderBrain()) { }
 
     protected override float SizeInCells => 1f;
     protected override string BoundsKey => nameof(TestEntity);

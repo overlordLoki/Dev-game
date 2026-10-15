@@ -1,5 +1,5 @@
 using Ashenveil.Core;
-using Ashenveil.Core.Dialogue;
+using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Microsoft.Xna.Framework;
 
