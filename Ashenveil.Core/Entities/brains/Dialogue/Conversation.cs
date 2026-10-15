@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Ashenveil.Core.Entities;
 using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
-namespace Ashenveil.Core.Dialogue
+namespace Ashenveil.Core.Entities.brains.Dialogue
 {
     /// <summary>One entry in the transcript. A null Speaker is a note from the game, not something anyone said.</summary>
     public record ChatMessage(string Speaker, string Text);

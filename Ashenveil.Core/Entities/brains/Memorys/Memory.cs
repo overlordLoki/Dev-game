@@ -1,4 +1,4 @@
-using Ashenveil.Core.Dialogue;
+using Ashenveil.Core.Entities.brains.Dialogue;
 
 namespace Ashenveil.Core.Entities.brains.Memorys
 {

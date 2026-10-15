@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Ashenveil.Core.Dialogue;
+using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains;
 using Ashenveil.Core.Entities.brains.Task;

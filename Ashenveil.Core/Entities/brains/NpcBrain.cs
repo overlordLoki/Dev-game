@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Ashenveil.Core.Dialogue;
+using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Screens;

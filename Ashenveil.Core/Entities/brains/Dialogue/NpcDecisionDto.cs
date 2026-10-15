@@ -1,5 +1,5 @@
 
-namespace Ashenveil.Core.Dialogue
+namespace Ashenveil.Core.Entities.brains.Dialogue
 {
     public class NpcDecisionDto
     {

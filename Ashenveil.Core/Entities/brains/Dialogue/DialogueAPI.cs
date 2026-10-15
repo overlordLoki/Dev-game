@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 
-namespace Ashenveil.Core.Dialogue
+namespace Ashenveil.Core.Entities.brains.Dialogue
 {
     // Mirrors main.py's ConversationRequest / ConversationResponse.
     public class ParticipantDto
