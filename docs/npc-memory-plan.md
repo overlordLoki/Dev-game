@@ -171,9 +171,39 @@ extensible so conversation facts and world events flow through the same pipe.
 
 ## Phase 6 — Later / optional
 
-- **Cold-tier transcript store** — persist full conversation transcripts keyed by
-  conversation (participants, day, lines). The thing heuristic retrieval *and* a future
-  `recall` tool both query.
+- **Cold-tier transcript store** — `Journal` holds a list of `Transcript` records
+  alongside its `Memory` list. Started; to finish:
+  - **A record, not a `Conversation`.** `Transcript { Id, Location (name), Participants
+    (names), Lines ("Speaker: text") }` — plain, serialisable data. Never keep the live
+    `Conversation` (it pins entities, a whole `Location`, a `Task` and a `Func`).
+  - Give `Transcript` a constructor (its get-only props are currently unfillable), and
+    wrap the list like `Memories`: private list, `IReadOnlyList`, `Add`.
+  - **Unique ids** from a monotonic counter in `World` (like NPC ids).
+  - **Written in `FireDecision`**, which already builds the `"Speaker: text"` lines.
+  - **Linked**: each fact `Memory` carries `SourceId` = its transcript's id, so recall can
+    go fact → `SourceId` → full transcript. Event memories have no source.
+  - Cold means cold: transcripts are never injected by default. Heuristic retrieval or a
+    future `recall` tool fetches them when detail is needed.
+
+---
+
+## Phase 7 — Event log & daily reflection
+
+**Goal:** NPCs learn from the world, not just conversations.
+
+1. **Structured `EventLog`** — `GameEvent { Day, Location, Actor, Text }` ("Loki killed 2
+   zombies at the well"). Game systems post to it. The **console is one consumer** that
+   prints it; NPCs are another. Build the data first, not console text.
+2. **Perception** — each NPC only receives events near it (same location, maybe a range).
+   Without this every NPC knows everything, which breaks the illusion.
+3. **Hot during the day** — an NPC's recent witnessed events flow into the same framed
+   memory channel as facts (`MemoryKind.Event`). No LLM call per event.
+4. **Cold at day end** — on `GameDate.AdvanceDay()`, each NPC makes one reflection call:
+   summarise the day's events into the cold store (a daily entry, alongside transcripts).
+5. **Stagger the day-end calls** — every NPC wants a call at once; queue them through
+   fire-and-poll with one or two in flight, not a stampede.
+6. **`Memory.Day`** — events give memories a real timestamp; add it here (deferred until
+   now), which also unlocks recency/decay for consolidation.
 - **LLM tool-calling recall** — `recall(query)` as a real tool, once on a tool-capable
   model; multi-round-trip, decision-step first. Rails are laid by the cold store above.
 - **Persistence (disk)** — serialize each NPC's journal + tasks, keyed by a **stable
