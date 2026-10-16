@@ -280,10 +280,14 @@ def build_decision_prompt(req: DecisionRequest) -> str:
         parts.append("Places you can go: " + ", ".join(req.poi_names))
 
     parts.append(
-        f"\nSummarise the conversation in one sentence. List up to {req.max_memories} facts "
-        "worth remembering (or none). Choose a behaviour: resume (carry on as before), idle "
-        f"(stand still), or do_tasks (then give up to {req.max_tasks} tasks). Set "
-        "clear_current_tasks true only to drop what you were already doing."
+        f"\nSummarise the conversation in one sentence. Then extract the concrete facts worth "
+        "remembering long-term - names, promises, requests, and anything notable about who you "
+        f"spoke to - as up to {req.max_memories} short standalone statements in `memories` "
+        '(for example "The traveller\'s name is Loki"). Put each fact in `memories`, not only '
+        "in the summary. "
+        "Choose a behaviour: resume (carry on as before), idle (stand still), or do_tasks "
+        f"(then give up to {req.max_tasks} tasks). Set clear_current_tasks true only to drop "
+        "what you were already doing."
     )
     return "\n".join(parts)
 

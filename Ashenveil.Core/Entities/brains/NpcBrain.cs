@@ -134,13 +134,14 @@ namespace Ashenveil.Core.Entities
         {
             if (decision == null) return;
 
-            // 1. Remember: one journal entry (summary + any facts), skipping an empty one.
-            var facts = (decision.memories ?? Array.Empty<string>())
-                .Where(m => !string.IsNullOrWhiteSpace(m))
-                .Take(5)
-                .ToList();
-            if (!string.IsNullOrWhiteSpace(decision.summary) || facts.Count > 0)
-                Journal.AddEntry(decision.summary ?? "", facts);
+            // 1. Remember: each extracted fact becomes a discrete Memory (the hot tier).
+            // The prose summary is for the debug log, not stored - the facts are the memory.
+            foreach (var fact in (decision.memories ?? Array.Empty<string>())
+                         .Where(m => !string.IsNullOrWhiteSpace(m))
+                         .Take(5))
+            {
+                Journal.Add(new Memory(fact, MemoryKind.Conversation));
+            }
 
             // 2. Optionally drop whatever the NPC was doing.
             if (decision.clear_current_tasks) TaskQueue.Clear();

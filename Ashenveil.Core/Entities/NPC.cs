@@ -68,13 +68,9 @@ namespace Ashenveil.Core.Entities
             Brain.ApplyDecision(decision, location);
         }
 
-        // The last few journal entries as prompt lines, so a new conversation can open with
-        // the NPC remembering past ones. Summary, with any facts folded in.
+        // The last few remembered facts as prompt lines, so a new conversation can open
+        // with the NPC remembering past ones.
         public IEnumerable<string> RecentMemories(int count) =>
-            Brain.Journal.Entries
-                .TakeLast(count)
-                .Select(e => e.Facts.Count > 0
-                    ? $"{e.Summary} ({string.Join("; ", e.Facts)})"
-                    : e.Summary);
+            Brain.Journal.Recent(count).Select(m => m.Text);
     }
 }

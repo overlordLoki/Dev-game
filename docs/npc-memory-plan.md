@@ -112,21 +112,81 @@ journal, invalid input is dropped safely.
 **Done when:** asking the knight in-game to do something makes him do it, and he
 remembers the exchange next time.
 
+> **Status (built so far):** Phases 1–4 are implemented and test-covered (tasks,
+> `NpcDecisionDto` + `ApplyDecision`, the `/decision` endpoint, fire-and-poll on
+> conversation end, and recent-memory injection into `StartConversation`). A live test
+> surfaced the gap Phase 5 fixes: the model put a stated name in the prose `summary`,
+> `memories` came back empty, and the injected memory (buried in `history`) didn't get
+> used — the knight stayed coy. Extraction + injection *work*; facts + framing don't yet.
+
 ---
 
-## Phase 5 — Later / optional
+## Memory architecture — tiered (the shape to build toward)
 
-- **Persistence (disk)** — serialize each NPC's journal + current tasks, keyed by a
-  **stable string id** (`"medows_knight"`), not the runtime int. Survives restart.
-  This is really a save-system feature; design the journal as save data.
+Memory is **tiered**, because you can't put every past conversation in every prompt
+(context, latency, noise):
+
+- **Hot tier** — discrete `Memory` objects: facts ("the traveller is Loki"), summaries,
+  and later events ("killed 2 zombies by the well"). Small, always available to inject.
+- **Cold tier** — full conversation transcripts, stored but *not* in every prompt.
+  Retrieved only when detail is actually needed.
+
+**Recall has two mechanisms, and we do the cheap one first:**
+- **Heuristic retrieval (now)** — *our code* picks which hot memories (and optionally a
+  cold transcript) are relevant and injects them. No tool-calling, works on any model.
+- **LLM tool-calling (later milestone)** — the model calls `recall(query)` itself,
+  mid-generation, to pull from the cold store. Powerful, but gated on a tool-capable
+  model (gemma4:e4b is unreliable at it) and multi-round-trip latency — best suited to
+  the decision step, not live dialogue. The data model below is the same either way, so
+  deferring the tool costs nothing: a future tool queries the exact store we build now.
+
+**Hidden thinking** — Ollama's `think` flag lets the model reason in a field we don't
+display. Cheap win on the **decision step** (may improve fact extraction); keep it
+**off** for live dialogue, where it's just latency.
+
+`Memory` is the unit of the hot tier: `{ Text, Kind (Conversation | Event | …) }`,
+extensible so conversation facts and world events flow through the same pipe.
+
+---
+
+## Phase 5 — Facts & framed memory (current)
+
+**Goal:** the knight actually uses what he remembers.
+
+1. **`Memory` class** (`{ Text, MemoryKind }`) + `MemoryKind { Conversation, Event }`.
+   `Journal` becomes `List<Memory>`. `ApplyDecision` turns each extracted fact into a
+   `Memory(fact, Conversation)`; `RecentMemories` returns `Memory.Text`.
+2. **Decision prompt (Python)** — *insist* on discrete facts in `memories` (names,
+   promises, requests), not just a prose `summary`. This is the root fix.
+3. **Framed injection** — send memories in their own `memories` field (C#
+   `ConversationRequestDto` + `World`), and render them under **"What you remember:"**
+   in `build_prompt`, not buried in "Already said:".
+4. **System-prompt nudge** — "use what you remember; don't be evasive about things you
+   know" — to stop the persona deflecting.
+5. Optional: `think: True` on the decision step, compare extraction quality.
+
+**Done when:** tell him your name, come back, ask — he answers it.
+
+---
+
+## Phase 6 — Later / optional
+
+- **Cold-tier transcript store** — persist full conversation transcripts keyed by
+  conversation (participants, day, lines). The thing heuristic retrieval *and* a future
+  `recall` tool both query.
+- **LLM tool-calling recall** — `recall(query)` as a real tool, once on a tool-capable
+  model; multi-round-trip, decision-step first. Rails are laid by the cold store above.
+- **Persistence (disk)** — serialize each NPC's journal + tasks, keyed by a **stable
+  string id** (`"medows_knight"`), not the runtime int. Survives restart; design the
+  journal as save data.
 - **Returning greeting** — generated at decision time (nobody's waiting) and stored,
   so the next opener is instant *and* personalised. Keep the live greeting instant.
-- **Disposition** — `friendly|neutral|wary|hostile` enum on the decision; the hook
-  for the knight warming to / souring on the player.
-- **Memory consolidation** — dedupe/merge journal facts (itself an LLM job) and
-  relevance-select the top-N to inject, once the journal grows large.
-- **More task types / behaviours** — `patrol`, `talk_to`, `follow`; each is one enum
-  value + one `switch` arm. Grows by addition.
+- **Disposition** — `friendly|neutral|wary|hostile` on the decision; the hook for the
+  knight warming to / souring on the player.
+- **Memory consolidation** — dedupe/merge facts (an LLM job) and relevance-select the
+  top-N to inject, once journals grow large.
+- **More task types / behaviours** — `patrol`, `talk_to`, `follow`; one enum value +
+  one `switch` arm each.
 - **TaskContext as struct** — if NPC crowds appear, avoid per-tick heap allocation.
 
 ---

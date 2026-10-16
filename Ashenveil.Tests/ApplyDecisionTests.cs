@@ -1,5 +1,7 @@
+using System.Linq;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 
 namespace Ashenveil.Tests;
@@ -60,15 +62,16 @@ public class ApplyDecisionTests
     {
         var brain = NewBrain();
         var decision = new NpcDecisionDto(
-            "Chatted about the roads.", System.Array.Empty<string>(),
+            "Chatted about the roads.", new[] { "the traveller asked about the roads" },
             "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>());
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
         Assert.Empty(brain.TaskQueue);
         Assert.NotEqual(NpcBrain.NPCState.Tasked, brain.State);
-        Assert.Single(brain.Journal.Entries);
-        Assert.Equal("Chatted about the roads.", brain.Journal.Entries[0].Summary);
+        var memory = Assert.Single(brain.Journal.Memories);
+        Assert.Equal("the traveller asked about the roads", memory.Text);
+        Assert.Equal(MemoryKind.Conversation, memory.Kind);
     }
 
     [Fact]
@@ -95,14 +98,14 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        var entry = Assert.Single(brain.Journal.Entries);
-        Assert.Equal(2, entry.Facts.Count);                 // the two blanks were filtered out
-        Assert.Contains("name is Aldric", entry.Facts);
-        Assert.Contains("headed north", entry.Facts);
+        var texts = brain.Journal.Memories.Select(m => m.Text).ToList();
+        Assert.Equal(2, texts.Count);                       // the two blanks were filtered out
+        Assert.Contains("name is Aldric", texts);
+        Assert.Contains("headed north", texts);
     }
 
     [Fact]
-    public void An_empty_summary_with_no_facts_writes_no_journal_entry()
+    public void No_facts_means_no_memories_are_stored()
     {
         var brain = NewBrain();
         var decision = new NpcDecisionDto(
@@ -110,7 +113,7 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Empty(brain.Journal.Entries);
+        Assert.Empty(brain.Journal.Memories);
     }
 
     // --------------------------------------------------------------- distrusting input
@@ -149,7 +152,7 @@ public class ApplyDecisionTests
         brain.ApplyDecision(null, TestLevels.Location(Level));   // must not throw
 
         Assert.Empty(brain.TaskQueue);
-        Assert.Empty(brain.Journal.Entries);
+        Assert.Empty(brain.Journal.Memories);
     }
 
     // --------------------------------------------------------------- clearing the queue
