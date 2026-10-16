@@ -180,6 +180,154 @@ async def conversation(req: ConversationRequest):
     return ConversationResponse(lines=[t.text.strip() for t in turns], turns=turns, model=OLLAMA_MODEL)
 
 
+# --------------------------------------------------------------- NPC decision
+# Produced once, when a conversation ends: what the NPC remembers and does next.
+# Mirrors Ashenveil's NpcDecisionDto. The enums keep the model to tasks, places and
+# behaviours the game actually knows about.
+
+# The task vocabulary, single-sourced: feeds BOTH the schema enum (the hard limit) and
+# the prompt (so the model knows what each task means). C#'s ApplyDecision must know the
+# same type names.
+TASK_TYPES = {
+    "go_to": "walk to a named place (needs a target place)",
+    "wait": "stand still for a while (needs seconds)",
+}
+BEHAVIOURS = ["resume", "idle", "do_tasks"]
+
+
+class DecisionRequest(BaseModel):
+    npc_name: str
+    persona: str | None = None
+    location: str | None = None
+    # The conversation so far, one "Name: line" per entry.
+    transcript: list[str] = []
+    # The places a go_to may target - the current level's points of interest.
+    poi_names: list[str] = []
+    max_tasks: int = Field(default=4, ge=0, le=8)
+    max_memories: int = Field(default=5, ge=0, le=10)
+
+
+class TaskSpec(BaseModel):
+    type: str
+    target: str | None = None
+    seconds: float = 0.0
+
+
+class DecisionResponse(BaseModel):
+    # Drops straight into NpcDecisionDto (the game ignores the extra `model` field).
+    summary: str
+    memories: list[str] = []
+    behaviour: str = "resume"
+    clear_current_tasks: bool = False
+    tasks: list[TaskSpec] = []
+    model: str
+
+
+DECISION_SYSTEM_PROMPT = (
+    "You are the mind of an NPC in Ashenveil, a top-down fantasy RPG, reflecting after a "
+    "conversation. Decide what the character remembers and what they do next. Stay in "
+    "character and grounded in the setting. Only use the tasks, places and behaviours you "
+    'are given. If nothing has changed, choose behaviour "resume" and give no tasks.'
+)
+
+
+def decision_schema(poi_names: list[str]) -> dict:
+    """JSON schema Ollama is held to. The enums stop the model inventing tasks or places."""
+    # A go_to target is constrained to real POIs when the game sends them.
+    target = {"type": "string", "enum": poi_names} if poi_names else {"type": "string"}
+    return {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string"},
+            "memories": {"type": "array", "items": {"type": "string"}},
+            "behaviour": {"type": "string", "enum": BEHAVIOURS},
+            "clear_current_tasks": {"type": "boolean"},
+            "tasks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string", "enum": list(TASK_TYPES)},
+                        "target": target,
+                        "seconds": {"type": "number"},
+                    },
+                    "required": ["type"],
+                },
+            },
+        },
+        "required": ["summary", "behaviour"],
+    }
+
+
+def build_decision_prompt(req: DecisionRequest) -> str:
+    parts = [f"You are {req.npc_name}."]
+    if req.persona:
+        parts.append(req.persona)
+    if req.location:
+        parts.append(f"Location: {req.location}")
+
+    parts.append("\nThe conversation that just happened:")
+    if req.transcript:
+        parts.extend(f"  {line}" for line in req.transcript)
+    else:
+        parts.append("  (nothing was said)")
+
+    parts.append("\nTasks you can give yourself:")
+    for name, desc in TASK_TYPES.items():
+        parts.append(f"  {name}: {desc}")
+    if req.poi_names:
+        parts.append("Places you can go: " + ", ".join(req.poi_names))
+
+    parts.append(
+        f"\nSummarise the conversation in one sentence. List up to {req.max_memories} facts "
+        "worth remembering (or none). Choose a behaviour: resume (carry on as before), idle "
+        f"(stand still), or do_tasks (then give up to {req.max_tasks} tasks). Set "
+        "clear_current_tasks true only to drop what you were already doing."
+    )
+    return "\n".join(parts)
+
+
+@app.post("/decision", response_model=DecisionResponse)
+async def decision(req: DecisionRequest):
+    body = {
+        "model": OLLAMA_MODEL,
+        "stream": False,
+        "think": False,
+        "format": decision_schema(req.poi_names),
+        "messages": [
+            {"role": "system", "content": DECISION_SYSTEM_PROMPT},
+            {"role": "user", "content": build_decision_prompt(req)},
+        ],
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            res = await client.post(f"{OLLAMA_URL}/api/chat", json=body)
+            res.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise fastapi.HTTPException(502, f"Ollama error: {e.response.text}")
+    except httpx.HTTPError as e:
+        raise fastapi.HTTPException(503, f"Ollama not reachable at {OLLAMA_URL}: {e}")
+
+    try:
+        raw = json.loads(res.json()["message"]["content"])
+    except (KeyError, ValueError, TypeError) as e:
+        raise fastapi.HTTPException(502, f"Ollama returned something unusable: {e}")
+
+    # The schema guarantees the shape; we still trim to the caps the game asked for and
+    # drop blank memories (the game does this too, but cheap to do here as well).
+    memories = [m.strip() for m in raw.get("memories", []) if m.strip()][: req.max_memories]
+    tasks = [TaskSpec(**t) for t in raw.get("tasks", [])][: req.max_tasks]
+    return DecisionResponse(
+        summary=raw.get("summary", "").strip(),
+        memories=memories,
+        behaviour=raw.get("behaviour", "resume"),
+        clear_current_tasks=bool(raw.get("clear_current_tasks", False)),
+        tasks=tasks,
+        model=OLLAMA_MODEL,
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", reload=True)

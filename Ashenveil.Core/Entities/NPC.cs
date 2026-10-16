@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.Entities
@@ -59,5 +61,20 @@ namespace Ashenveil.Core.Entities
         {
             Brain.Enqueue(task);
         }
+
+        // The brain is protected, so the World hands an end-of-conversation decision in here.
+        public void ApplyDecision(brains.Dialogue.NpcDecisionDto decision, Screens.Location location)
+        {
+            Brain.ApplyDecision(decision, location);
+        }
+
+        // The last few journal entries as prompt lines, so a new conversation can open with
+        // the NPC remembering past ones. Summary, with any facts folded in.
+        public IEnumerable<string> RecentMemories(int count) =>
+            Brain.Journal.Entries
+                .TakeLast(count)
+                .Select(e => e.Facts.Count > 0
+                    ? $"{e.Summary} ({string.Join("; ", e.Facts)})"
+                    : e.Summary);
     }
 }

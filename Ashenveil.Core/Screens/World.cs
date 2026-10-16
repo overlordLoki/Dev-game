@@ -33,6 +33,12 @@ namespace Ashenveil.Core.Screens
         private Action _onPause;
         private Action<Conversation> _onTalk;
         private List<Conversation> _conversations = new List<Conversation>();
+        // Decisions in flight: an end-of-conversation LLM call per NPC, with the level it
+        // was had in (so a go_to resolves against the right POIs even if the player wanders
+        // off). We hold the Task so it isn't GC'd, and apply the result on the main thread.
+        private List<(NPC npc, Location level, System.Threading.Tasks.Task<NpcDecisionDto> task)> _pendingDecisions = new();
+        // How many past-conversation memories to feed into a new conversation's prompt.
+        private const int MaxInjectedMemories = 5;
         private KeyboardState _prevKb;
         private int _viewWidth, _viewHeight;
 
@@ -191,6 +197,11 @@ namespace Ashenveil.Core.Screens
             foreach (var npc in others)
                 req.participants.Add(new ParticipantDto { name = npc.Name, persona = npc.Persona });
 
+            // Seed the prompt with what the NPCs remember of past conversations, so this one
+            // opens knowing the player. Goes into history only (not the on-screen transcript).
+            foreach (var npc in others)
+                req.history.AddRange(npc.RecentMemories(MaxInjectedMemories));
+
             var convo = new Conversation(everyone, location, req, DialogueApi.RequestAsync);
             // The opener is already "said"; the LLM continues from it once the player answers.
             convo.Add(others[0].Name, others[0].Greeting);
@@ -201,14 +212,52 @@ namespace Ashenveil.Core.Screens
             return convo;
         }
 
-        // Lets everyone in a finished conversation go back to what they were doing.
+        // Lets everyone in a finished conversation go back to what they were doing, and asks
+        // the LLM, per NPC, what they now remember and want to do next.
         private void EndFinishedConversations()
         {
             foreach (var convo in _conversations.Where(c => c.IsFinished).ToList())
             {
                 foreach (var entity in convo.Participants)
-                    if (entity is NPC npc) npc.StopTalking();
+                    if (entity is NPC npc)
+                    {
+                        npc.StopTalking();
+                        FireDecision(npc, convo);
+                    }
                 _conversations.Remove(convo);
+            }
+        }
+
+        // Kicks off the end-of-conversation decision for one NPC. Fire-and-hold: we keep the
+        // Task so it isn't collected, and PollDecisions applies it when it lands.
+        private void FireDecision(NPC npc, Conversation convo)
+        {
+            var req = new DecisionRequestDto
+            {
+                npc_name = npc.Name,
+                persona = npc.Persona,
+                location = convo.Location?.Name,
+                // Skip the "(no answer)" notes (null speaker); send only what was actually said.
+                transcript = convo.Messages
+                    .Where(m => m.Speaker != null)
+                    .Select(m => $"{m.Speaker}: {m.Text}")
+                    .ToArray(),
+                poi_names = convo.Location?.pointsOfInterest.Keys.ToArray() ?? Array.Empty<string>(),
+            };
+            _pendingDecisions.Add((npc, convo.Location, DialogueApi.RequestDecisionAsync(req)));
+        }
+
+        // Apply any decisions that have come back. Runs on the main thread (from Update), so
+        // mutating the NPC's brain here is safe. A failed call is dropped - the NPC just
+        // doesn't learn from that conversation.
+        private void PollDecisions()
+        {
+            for (int i = _pendingDecisions.Count - 1; i >= 0; i--)
+            {
+                var (npc, level, task) = _pendingDecisions[i];
+                if (!task.IsCompleted) continue;
+                if (task.IsCompletedSuccessfully) npc.ApplyDecision(task.Result, level);
+                _pendingDecisions.RemoveAt(i);
             }
         }
         private string SummarizeConversations(List<Conversation> conversations)
@@ -281,6 +330,7 @@ namespace Ashenveil.Core.Screens
         {
             AdvanceTime(gameTime);
             EndFinishedConversations();
+            PollDecisions();
             player.Update(gameTime);
             worldBounds.Clamp(player);
             foreach (var npc in NPCs)
