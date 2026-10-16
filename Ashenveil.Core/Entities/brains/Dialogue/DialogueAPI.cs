@@ -11,8 +11,9 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
     public class ParticipantDto
     {
         public string name { get; set; }
-        public string persona { get; set; } 
-        public bool speaks { get; set; } = true; 
+        public string persona { get; set; }
+        public bool speaks { get; set; } = true;
+        public List<string> memories { get; set; } = new();  // what they remember from before
     }
     public class ConversationRequestDto
     {

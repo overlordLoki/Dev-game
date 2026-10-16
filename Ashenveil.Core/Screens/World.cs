@@ -193,14 +193,15 @@ namespace Ashenveil.Core.Screens
             // The initiator is present but listening (your player drives, doesn't get lines).
             req.participants.Add(new ParticipantDto {
                 name = (from as NPC)?.Name ?? Conversation.PlayerName, speaks = false });
-            // Every NPC is a speaker, with their persona.
+            // Every NPC is a speaker, with their persona and what they remember of past
+            // conversations - attached to them, so the prompt frames it as their knowledge.
             foreach (var npc in others)
-                req.participants.Add(new ParticipantDto { name = npc.Name, persona = npc.Persona });
-
-            // Seed the prompt with what the NPCs remember of past conversations, so this one
-            // opens knowing the player. Goes into history only (not the on-screen transcript).
-            foreach (var npc in others)
-                req.history.AddRange(npc.RecentMemories(MaxInjectedMemories));
+                req.participants.Add(new ParticipantDto
+                {
+                    name = npc.Name,
+                    persona = npc.Persona,
+                    memories = npc.RecentMemories(MaxInjectedMemories).ToList(),
+                });
 
             var convo = new Conversation(everyone, location, req, DialogueApi.RequestAsync);
             // The opener is already "said"; the LLM continues from it once the player answers.

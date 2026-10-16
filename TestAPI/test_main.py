@@ -18,9 +18,11 @@ import main
 from main import (
     BEHAVIOURS,
     TASK_TYPES,
+    ConversationRequest,
     DecisionRequest,
     app,
     build_decision_prompt,
+    build_prompt,
     decision_schema,
 )
 
@@ -74,6 +76,29 @@ def test_prompt_mentions_npc_persona_transcript_and_places():
 
 
 # ------------------------------------------------------- integration: endpoints
+
+def test_prompt_frames_memories_as_knowledge_not_history():
+    req = ConversationRequest(
+        participants=[
+            {"name": "Traveller", "speaks": False},
+            {"name": "Sir Lancelot", "memories": ["The traveller's name is Loki"]},
+        ],
+        history=["Traveller: what is my name?"],
+    )
+    prompt = build_prompt(req)
+
+    assert "What Sir Lancelot remembers from before:" in prompt
+    # The memory sits under its own heading, before (not inside) the "Already said" block.
+    assert prompt.index("The traveller's name is Loki") < prompt.index("Already said:")
+
+
+def test_listeners_memories_are_not_rendered():
+    req = ConversationRequest(participants=[
+        {"name": "Traveller", "speaks": False, "memories": ["should not appear"]},
+        {"name": "Sir Lancelot"},
+    ])
+    assert "should not appear" not in build_prompt(req)
+
 
 @needs_ollama
 def test_health_reports_the_model_is_installed():
@@ -138,3 +163,26 @@ def test_decision_remembers_a_name_said_in_the_chat():
     assert "aldric" in haystack, \
         f"name not remembered: summary={d['summary']!r} memories={d['memories']}"
 
+
+
+@needs_ollama
+def test_npc_uses_a_remembered_name_when_asked():
+    """The in-game bug as a test: the knight remembers the name from an earlier
+    conversation and the player asks for it. He should answer, not deflect."""
+    r = client.post("/conversation", json={
+        "participants": [
+            {"name": "Traveller", "speaks": False},
+            {"name": "Sir Lancelot",
+             "persona": "A noble knight sworn to protect the realm.",
+             "memories": ["The traveller's name is Loki"]},
+        ],
+        "location": "Medows",
+        "history": [
+            "Sir Lancelot: Halt, traveller. The roads have grown dangerous since the ash began to fall.",
+            "Traveller: Do you remember my name?",
+        ],
+        "max_lines": 1,
+    })
+    assert r.status_code == 200
+    reply = " ".join(r.json()["lines"]).lower()
+    assert "loki" in reply, f"knight did not use the remembered name: {reply!r}"

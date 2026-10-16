@@ -30,6 +30,9 @@ class Participant(BaseModel):
     persona: str | None = None
     # False for anyone who is in the conversation but shouldn't be given lines (the player).
     speaks: bool = True
+    # Facts this participant remembers from earlier conversations ("The traveller's name is
+    # Loki"). Rendered as things they know, separate from what was said in this one.
+    memories: list[str] = []
 
 
 class ConversationRequest(BaseModel):
@@ -65,7 +68,9 @@ SYSTEM_PROMPT = (
     "You write short in-game dialogue for Ashenveil, a top-down fantasy RPG. "
     "Stay in character, keep it grounded in the setting, and never mention being an AI. "
     "Each line is shown in its own small text box, so keep lines short and spoken, "
-    "with no stage directions, no speaker prefixes and no quotation marks."
+    "with no stage directions, no speaker prefixes and no quotation marks. "
+    "If a character remembers facts about who they are speaking to, they use them "
+    "naturally and never pretend not to know something they remember."
 )
 
 
@@ -81,6 +86,13 @@ def build_prompt(req: ConversationRequest) -> str:
         role = "" if p.speaks else " (listening, give them no lines)"
         persona = f" - {p.persona}" if p.persona else ""
         parts.append(f"  {p.name}{persona}{role}")
+
+    # What each speaker already knows, kept apart from "Already said" so the model treats it
+    # as reliable knowledge rather than lines drifting past in the history.
+    for p in speakers:
+        if p.memories:
+            parts.append(f"What {p.name} remembers from before:")
+            parts.extend(f"  - {m}" for m in p.memories)
 
     if req.topic:
         parts.append(f"Topic: {req.topic}")
