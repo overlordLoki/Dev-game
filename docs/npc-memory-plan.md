@@ -112,12 +112,11 @@ journal, invalid input is dropped safely.
 **Done when:** asking the knight in-game to do something makes him do it, and he
 remembers the exchange next time.
 
-> **Status (built so far):** Phases 1–4 are implemented and test-covered (tasks,
+> **Status (built so far):** Phases 1–5 are implemented and test-covered (tasks,
 > `NpcDecisionDto` + `ApplyDecision`, the `/decision` endpoint, fire-and-poll on
-> conversation end, and recent-memory injection into `StartConversation`). A live test
-> surfaced the gap Phase 5 fixes: the model put a stated name in the prose `summary`,
-> `memories` came back empty, and the injected memory (buried in `history`) didn't get
-> used — the knight stayed coy. Extraction + injection *work*; facts + framing don't yet.
+> conversation end, and memory carried into the next conversation). Verified live: tell
+> the knight your name, start a new conversation, ask — he answers it. Next up is
+> Phase 6 (the cold transcript store), which has been started.
 
 ---
 
@@ -149,23 +148,28 @@ extensible so conversation facts and world events flow through the same pipe.
 
 ---
 
-## Phase 5 — Facts & framed memory (current)
+## Phase 5 — Facts & framed memory ✅ done
 
-**Goal:** the knight actually uses what he remembers.
+**Goal:** the knight actually uses what he remembers. **Verified live.**
 
-1. **`Memory` class** (`{ Text, MemoryKind }`) + `MemoryKind { Conversation, Event }`.
-   `Journal` becomes `List<Memory>`. `ApplyDecision` turns each extracted fact into a
+1. **`Memory` class** (`{ Text, Kind, SourceId? }`) + `MemoryKind { Conversation, Event }`.
+   `Journal` holds a `List<Memory>`. `ApplyDecision` turns each extracted fact into a
    `Memory(fact, Conversation)`; `RecentMemories` returns `Memory.Text`.
-2. **Decision prompt (Python)** — *insist* on discrete facts in `memories` (names,
-   promises, requests), not just a prose `summary`. This is the root fix.
-3. **Framed injection** — send memories in their own `memories` field (C#
-   `ConversationRequestDto` + `World`), and render them under **"What you remember:"**
-   in `build_prompt`, not buried in "Already said:".
-4. **System-prompt nudge** — "use what you remember; don't be evasive about things you
-   know" — to stop the persona deflecting.
-5. Optional: `think: True` on the decision step, compare extraction quality.
+2. **Decision prompt** insists on discrete facts in `memories` (names, promises,
+   requests) and says to record only what's *new* — never the NPC's own background,
+   persona or greeting (those were crowding real facts out).
+3. **Memories framed per participant** — `ParticipantDto.memories`, rendered by
+   `build_prompt` under "What {name} remembers from before:", ahead of "Already said:".
+   Per-participant so group conversations keep each NPC's knowledge attributed.
+4. **System-prompt nudge** — characters use what they remember and never pretend not to.
+5. **Duplicate check** in `ApplyDecision` — a fact already in the journal (case- and
+   edge-whitespace-insensitive) isn't stored again, so repeats don't push real memories
+   out of the 5-memory injection window. Reworded duplicates still slip through
+   (consolidation, Phase 6).
+6. **No decision for an empty chat** — `FireDecision` skips conversations where nobody but
+   the NPCs spoke; otherwise the model invents filler ("the traveller was present").
 
-**Done when:** tell him your name, come back, ask — he answers it.
+Not done (still optional): `think: True` on the decision step to compare extraction quality.
 
 ---
 

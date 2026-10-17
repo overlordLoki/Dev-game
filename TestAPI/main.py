@@ -154,10 +154,6 @@ async def health():
 
 @app.post("/conversation", response_model=ConversationResponse)
 async def conversation(req: ConversationRequest):
-    print(f"[DEBUG conversation] history received: {req.history}")  # TEMP
-    for p in req.participants:                                         # TEMP
-        if p.memories:
-            print(f"[DEBUG conversation] {p.name} remembers: {p.memories}")
     speakers = [p.name for p in req.participants if p.speaks]
     if not speakers:
         raise fastapi.HTTPException(422, "At least one participant must have speaks=true")
@@ -335,9 +331,6 @@ async def decision(req: DecisionRequest):
         raw = json.loads(res.json()["message"]["content"])
     except (KeyError, ValueError, TypeError) as e:
         raise fastapi.HTTPException(502, f"Ollama returned something unusable: {e}")
-
-    print(f"[DEBUG decision] {req.npc_name} transcript={req.transcript}")  # TEMP
-    print(f"[DEBUG decision] raw={raw}")                                    # TEMP
 
     # The schema guarantees the shape; we still trim to the caps the game asked for and
     # drop blank memories (the game does this too, but cheap to do here as well).

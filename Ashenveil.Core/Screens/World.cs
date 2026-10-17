@@ -233,6 +233,12 @@ namespace Ashenveil.Core.Screens
         // Task so it isn't collected, and PollDecisions applies it when it lands.
         private void FireDecision(NPC npc, Conversation convo)
         {
+            // Opened and closed without anyone else saying a word - nothing to learn, and
+            // asking anyway gets filler memories ("the traveller was present") and a wasted call.
+            var npcNames = convo.Participants.OfType<NPC>().Select(n => n.Name).ToHashSet();
+            bool anyoneElseSpoke = convo.Messages.Any(m => m.Speaker != null && !npcNames.Contains(m.Speaker));
+            if (!anyoneElseSpoke) return;
+
             var req = new DecisionRequestDto
             {
                 npc_name = npc.Name,
