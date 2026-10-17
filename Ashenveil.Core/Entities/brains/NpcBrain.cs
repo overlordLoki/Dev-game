@@ -136,11 +136,17 @@ namespace Ashenveil.Core.Entities
 
             // 1. Remember: each extracted fact becomes a discrete Memory (the hot tier).
             // The prose summary is for the debug log, not stored - the facts are the memory.
+            // Facts already in the journal (ignoring case and edge whitespace) are skipped, so
+            // repeats don't push real memories out of the injected window. Reworded duplicates
+            // still get through; merging those is the consolidation pass (plan, Phase 6).
             foreach (var fact in (decision.memories ?? Array.Empty<string>())
                          .Where(m => !string.IsNullOrWhiteSpace(m))
+                         .Select(m => m.Trim())
                          .Take(5))
             {
-                Journal.Add(new Memory(fact, MemoryKind.Conversation));
+                bool known = Journal.Memories.Any(m =>
+                    string.Equals(m.Text, fact, StringComparison.OrdinalIgnoreCase));
+                if (!known) Journal.Add(new Memory(fact, MemoryKind.Conversation));
             }
 
             // 2. Optionally drop whatever the NPC was doing.

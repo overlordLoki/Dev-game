@@ -116,6 +116,38 @@ public class ApplyDecisionTests
         Assert.Empty(brain.Journal.Memories);
     }
 
+    [Fact]
+    public void A_fact_already_remembered_is_not_stored_again()
+    {
+        var brain = NewBrain();
+        var level = TestLevels.Location(Level);
+        brain.ApplyDecision(new NpcDecisionDto(
+            "x", new[] { "The traveller's name is Loki." },
+            "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()), level);
+
+        // Same fact next conversation, different case and stray whitespace, plus a new one.
+        brain.ApplyDecision(new NpcDecisionDto(
+            "x", new[] { "  the traveller's name is loki. ", "The traveller is headed north." },
+            "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()), level);
+
+        var texts = brain.Journal.Memories.Select(m => m.Text).ToList();
+        Assert.Equal(2, texts.Count);
+        Assert.Contains("The traveller's name is Loki.", texts);   // the original wording kept
+        Assert.Contains("The traveller is headed north.", texts);
+    }
+
+    [Fact]
+    public void Duplicates_within_one_decision_are_stored_once()
+    {
+        var brain = NewBrain();
+        brain.ApplyDecision(new NpcDecisionDto(
+            "x", new[] { "Loki is a traveller.", "LOKI IS A TRAVELLER." },
+            "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            TestLevels.Location(Level));
+
+        Assert.Single(brain.Journal.Memories);
+    }
+
     // --------------------------------------------------------------- distrusting input
 
     [Fact]
