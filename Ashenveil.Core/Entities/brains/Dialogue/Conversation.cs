@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
 namespace Ashenveil.Core.Entities.brains.Dialogue
@@ -92,17 +94,19 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
 
         // Walking away: the world lets everyone go back to what they were doing.
         public void End() => IsFinished = true;
-        // Summarizes the current conversation for the journal for each NPC involved in the conversation.
-        public string Summarize()
-        {
-            string summary = "";
-            foreach (var message in Messages)
-            {
-                summary += $"{message.Speaker}: {message.Text}\n";
-            }
-            return summary;
-        }
+
+        /// <summary>
+        /// A plain-data snapshot of this conversation for the cold tier of memory. Copies
+        /// the lines, so later messages don't change it. Game notes like "(no answer)" (null
+        /// speaker) are left out - only what was actually said is kept.
+        /// </summary>
+        public Transcript ToTranscript(int id, int day) => new Transcript(
+            id,
+            day,
+            Location?.Name,
+            Participants.Select(p => p is NPC npc ? npc.Name : PlayerName).ToList(),
+            Messages.Where(m => m.Speaker != null)
+                    .Select(m => $"{m.Speaker}: {m.Text}")
+                    .ToList());
     }
-    
-    
 }

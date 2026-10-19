@@ -33,6 +33,9 @@ class Participant(BaseModel):
     # Facts this participant remembers from earlier conversations ("The traveller's name is
     # Loki"). Rendered as things they know, separate from what was said in this one.
     memories: list[str] = []
+    # One-line recaps of earlier conversations with the others present, oldest first
+    # ("2 days ago, at Medows: ..."). The cold tier of memory, summarised.
+    past_conversations: list[str] = []
 
 
 class ConversationRequest(BaseModel):
@@ -93,6 +96,9 @@ def build_prompt(req: ConversationRequest) -> str:
         if p.memories:
             parts.append(f"What {p.name} remembers from before:")
             parts.extend(f"  - {m}" for m in p.memories)
+        if p.past_conversations:
+            parts.append(f"Earlier conversations {p.name} had with them:")
+            parts.extend(f"  - {c}" for c in p.past_conversations)
 
     if req.topic:
         parts.append(f"Topic: {req.topic}")

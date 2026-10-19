@@ -5,6 +5,7 @@ using System.Linq;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Screens.Locations;
@@ -36,9 +37,16 @@ namespace Ashenveil.Core.Screens
         // Decisions in flight: an end-of-conversation LLM call per NPC, with the level it
         // was had in (so a go_to resolves against the right POIs even if the player wanders
         // off). We hold the Task so it isn't GC'd, and apply the result on the main thread.
-        private List<(NPC npc, Location level, System.Threading.Tasks.Task<NpcDecisionDto> task)> _pendingDecisions = new();
+        // Each one also carries the conversation's transcript, so the decision's summary and
+        // facts can be tied back to it when it lands.
+        private List<(NPC npc, Location level, Transcript transcript, System.Threading.Tasks.Task<NpcDecisionDto> task)> _pendingDecisions = new();
+        // Hands out transcript ids. Only counts up, so a Memory.SourceId always points at the
+        // right conversation.
+        private int _nextTranscriptId = 1;
         // How many past-conversation memories to feed into a new conversation's prompt.
         private const int MaxInjectedMemories = 5;
+        // How many earlier conversations (as one-line summaries) to recall into a new one.
+        private const int MaxRecalledConversations = 3;
         private KeyboardState _prevKb;
         private int _viewWidth, _viewHeight;
 
@@ -191,8 +199,8 @@ namespace Ashenveil.Core.Screens
                 max_lines = others.Length,
             };
             // The initiator is present but listening (your player drives, doesn't get lines).
-            req.participants.Add(new ParticipantDto {
-                name = (from as NPC)?.Name ?? Conversation.PlayerName, speaks = false });
+            string initiator = (from as NPC)?.Name ?? Conversation.PlayerName;
+            req.participants.Add(new ParticipantDto { name = initiator, speaks = false });
             // Every NPC is a speaker, with their persona and what they remember of past
             // conversations - attached to them, so the prompt frames it as their knowledge.
             foreach (var npc in others)
@@ -201,6 +209,8 @@ namespace Ashenveil.Core.Screens
                     name = npc.Name,
                     persona = npc.Persona,
                     memories = npc.RecentMemories(MaxInjectedMemories).ToList(),
+                    past_conversations = npc.PastConversationsWith(
+                        initiator, MaxRecalledConversations, CurrentDate.TotalDays).ToList(),
                 });
 
             var convo = new Conversation(everyone, location, req, DialogueApi.RequestAsync);
@@ -219,39 +229,47 @@ namespace Ashenveil.Core.Screens
         {
             foreach (var convo in _conversations.Where(c => c.IsFinished).ToList())
             {
-                foreach (var entity in convo.Participants)
-                    if (entity is NPC npc)
-                    {
-                        npc.StopTalking();
-                        FireDecision(npc, convo);
-                    }
+                var npcs = convo.Participants.OfType<NPC>().ToList();
+                foreach (var npc in npcs) npc.StopTalking();
+
+                // One transcript per conversation, shared by everyone in it; then each NPC
+                // asks what it learned. Skipped entirely if there was nothing to learn.
+                var transcript = RecordConversation(convo, npcs);
+                if (transcript != null)
+                    foreach (var npc in npcs) FireDecision(npc, convo, transcript);
+
                 _conversations.Remove(convo);
             }
         }
 
+        // Snapshots a finished conversation and files it in the cold-tier memory of every NPC
+        // that took part. Null when nobody but the NPCs spoke (opened and closed the chat):
+        // there's nothing to remember, and asking the LLM anyway gets filler memories
+        // ("the traveller was present") and a wasted call.
+        private Transcript RecordConversation(Conversation convo, List<NPC> npcs)
+        {
+            var npcNames = npcs.Select(n => n.Name).ToHashSet();
+            bool anyoneElseSpoke = convo.Messages.Any(m => m.Speaker != null && !npcNames.Contains(m.Speaker));
+            if (!anyoneElseSpoke) return null;
+
+            var transcript = convo.ToTranscript(_nextTranscriptId++, CurrentDate.TotalDays);
+            foreach (var npc in npcs) npc.RememberConversation(transcript);
+            return transcript;
+        }
+
         // Kicks off the end-of-conversation decision for one NPC. Fire-and-hold: we keep the
         // Task so it isn't collected, and PollDecisions applies it when it lands.
-        private void FireDecision(NPC npc, Conversation convo)
+        private void FireDecision(NPC npc, Conversation convo, Transcript transcript)
         {
-            // Opened and closed without anyone else saying a word - nothing to learn, and
-            // asking anyway gets filler memories ("the traveller was present") and a wasted call.
-            var npcNames = convo.Participants.OfType<NPC>().Select(n => n.Name).ToHashSet();
-            bool anyoneElseSpoke = convo.Messages.Any(m => m.Speaker != null && !npcNames.Contains(m.Speaker));
-            if (!anyoneElseSpoke) return;
-
             var req = new DecisionRequestDto
             {
                 npc_name = npc.Name,
                 persona = npc.Persona,
-                location = convo.Location?.Name,
-                // Skip the "(no answer)" notes (null speaker); send only what was actually said.
-                transcript = convo.Messages
-                    .Where(m => m.Speaker != null)
-                    .Select(m => $"{m.Speaker}: {m.Text}")
-                    .ToArray(),
+                location = transcript.Location,
+                transcript = transcript.Lines.ToArray(),   // already only what was actually said
                 poi_names = convo.Location?.pointsOfInterest.Keys.ToArray() ?? Array.Empty<string>(),
             };
-            _pendingDecisions.Add((npc, convo.Location, DialogueApi.RequestDecisionAsync(req)));
+            _pendingDecisions.Add((npc, convo.Location, transcript, DialogueApi.RequestDecisionAsync(req)));
         }
 
         // Apply any decisions that have come back. Runs on the main thread (from Update), so
@@ -261,25 +279,11 @@ namespace Ashenveil.Core.Screens
         {
             for (int i = _pendingDecisions.Count - 1; i >= 0; i--)
             {
-                var (npc, level, task) = _pendingDecisions[i];
+                var (npc, level, transcript, task) = _pendingDecisions[i];
                 if (!task.IsCompleted) continue;
-                if (task.IsCompletedSuccessfully) npc.ApplyDecision(task.Result, level);
+                if (task.IsCompletedSuccessfully) npc.ApplyDecision(task.Result, level, transcript);
                 _pendingDecisions.RemoveAt(i);
             }
-        }
-        private string SummarizeConversations(List<Conversation> conversations)
-        {
-            var summaries = new List<string>();
-            foreach (var convo in conversations)
-            {
-                var summary = $"Conversation at {convo.Location} with {string.Join(", ", convo.Participants.Select(p => p is NPC npc ? npc.Name : Conversation.PlayerName))}:";
-                foreach (var message in convo.Messages)
-                {
-                    summary += $"\n{message.Speaker}: {message.Text}";
-                }
-                summaries.Add(summary);
-            }
-            return string.Join("\n\n", summaries);
         }
 
         // Advance game time: 10 real minutes = 1 game day

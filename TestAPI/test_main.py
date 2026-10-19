@@ -14,6 +14,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+import judge
 import main
 from main import (
     BEHAVIOURS,
@@ -37,6 +38,7 @@ def ollama_up() -> bool:
 
 
 needs_ollama = pytest.mark.skipif(not ollama_up(), reason="Ollama not reachable")
+needs_claude = pytest.mark.skipif(not judge.available(), reason="claude CLI not on PATH")
 
 
 # ----------------------------------------------------------------- unit: schema
@@ -90,6 +92,21 @@ def test_prompt_frames_memories_as_knowledge_not_history():
     assert "What Sir Lancelot remembers from before:" in prompt
     # The memory sits under its own heading, before (not inside) the "Already said" block.
     assert prompt.index("The traveller's name is Loki") < prompt.index("Already said:")
+
+
+def test_prompt_lists_earlier_conversations_under_their_own_heading():
+    req = ConversationRequest(
+        participants=[
+            {"name": "Traveller", "speaks": False},
+            {"name": "Sir Lancelot",
+             "past_conversations": ["Yesterday, at Medows: Loki asked about the wolves."]},
+        ],
+        history=["Traveller: what did we talk about last time?"],
+    )
+    prompt = build_prompt(req)
+
+    assert "Earlier conversations Sir Lancelot had with them:" in prompt
+    assert prompt.index("Loki asked about the wolves.") < prompt.index("Already said:")
 
 
 def test_listeners_memories_are_not_rendered():
@@ -186,3 +203,57 @@ def test_npc_uses_a_remembered_name_when_asked():
     assert r.status_code == 200
     reply = " ".join(r.json()["lines"]).lower()
     assert "loki" in reply, f"knight did not use the remembered name: {reply!r}"
+
+
+@pytest.mark.judge
+@needs_claude
+@needs_ollama
+def test_npc_recalls_what_an_earlier_conversation_was_about():
+    """Phase 6's live check: the knight recalls the topic of an earlier chat, not just a fact."""
+    r = client.post("/conversation", json={
+        "participants": [
+            {"name": "Traveller", "speaks": False},
+            {"name": "Sir Lancelot",
+             "persona": "A noble knight sworn to protect the realm.",
+             "memories": ["The traveller's name is Loki"],
+             "past_conversations": [
+                 "Yesterday, at Medows: Loki asked where to buy a sword, and I sent him to the blacksmith."
+             ]},
+        ],
+        "location": "Medows",
+        "history": [
+            "Sir Lancelot: Halt, traveller.",
+            "Traveller: What did I ask you about yesterday?",
+        ],
+        "max_lines": 1,
+    })
+    assert r.status_code == 200
+    reply = " ".join(r.json()["lines"])
+    # The model paraphrases ("you sought a blade from the smith"), so a stronger model grades
+    # the meaning rather than us guessing which words it will use.
+    verdict = judge.judge(RECALL_CONTEXT, RECALL_QUESTION, reply, RECALL_EXPECTATION)
+    assert verdict.passed, f"knight did not recall the earlier chat: {reply!r} - judge: {verdict.reason}"
+
+
+# ------------------------------------------------------------- judge: is the grader sound?
+# Before trusting the judge on the model's replies, check it against hand-written ones
+# where we already know the right answer. A judge that passes everything looks like
+# coverage and isn't - these are what tell us the green ticks mean something.
+
+RECALL_CONTEXT = "Yesterday the traveller, Loki, asked where to buy a sword, and the knight sent him to the blacksmith."
+RECALL_QUESTION = "What did I ask you about yesterday?"
+RECALL_EXPECTATION = "the reply recalls that the player asked about getting a sword (or another word for one), or that he was sent to the blacksmith"
+
+
+@pytest.mark.judge
+@needs_claude
+@pytest.mark.parametrize("reply, should_pass", [
+    ("You sought a blade from the smith.", True),                               # paraphrase
+    ("You asked where to find a sword, and I sent you to the blacksmith.", True),
+    ("You asked me about the weather.", False),                                 # wrong topic
+    ("Names and days are fleeting things in the face of shadow.", False),       # dodge
+    ("You asked about a horse, and I sent you to the stables.", False),         # confidently wrong
+])
+def test_judge_grades_known_replies_correctly(reply, should_pass):
+    verdict = judge.judge(RECALL_CONTEXT, RECALL_QUESTION, reply, RECALL_EXPECTATION)
+    assert verdict.passed == should_pass, f"judge got {reply!r} wrong: {verdict.reason}"

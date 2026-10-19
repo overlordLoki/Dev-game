@@ -62,15 +62,39 @@ namespace Ashenveil.Core.Entities
             Brain.Enqueue(task);
         }
 
-        // The brain is protected, so the World hands an end-of-conversation decision in here.
-        public void ApplyDecision(brains.Dialogue.NpcDecisionDto decision, Screens.Location location)
+        // Files a finished conversation in this NPC's cold-tier memory. The same transcript
+        // is shared by every NPC that took part.
+        public void RememberConversation(brains.Memorys.Transcript transcript)
         {
-            Brain.ApplyDecision(decision, location);
+            Brain.Journal.Add(transcript);
+        }
+
+        // The brain is protected, so the World hands an end-of-conversation decision in here.
+        public void ApplyDecision(brains.Dialogue.NpcDecisionDto decision, Screens.Location location,
+                                  brains.Memorys.Transcript transcript = null)
+        {
+            Brain.ApplyDecision(decision, location, transcript);
         }
 
         // The last few remembered facts as prompt lines, so a new conversation can open
         // with the NPC remembering past ones.
         public IEnumerable<string> RecentMemories(int count) =>
             Brain.Journal.Recent(count).Select(m => m.Text);
+
+        // Recall from the cold tier: one line per earlier conversation with `person`, oldest
+        // first, the last `count` of them ("2 days ago, at Medows: ..."). Transcripts without
+        // a summary (the decision never came back) are skipped - there's nothing to say.
+        public IEnumerable<string> PastConversationsWith(string person, int count, int today) =>
+            Brain.Journal.Transcripts
+                .Where(t => t.Summary != null && t.Participants.Contains(person))
+                .TakeLast(count)
+                .Select(t => $"{DaysAgo(today - t.Day)}{(t.Location != null ? $", at {t.Location}" : "")}: {t.Summary}");
+
+        private static string DaysAgo(int days) => days switch
+        {
+            <= 0 => "Today",
+            1 => "Yesterday",
+            _ => $"{days} days ago",
+        };
     }
 }

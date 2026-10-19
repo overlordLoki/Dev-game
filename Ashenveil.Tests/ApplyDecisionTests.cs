@@ -148,6 +148,80 @@ public class ApplyDecisionTests
         Assert.Single(brain.Journal.Memories);
     }
 
+    // --------------------------------------------------------------- the transcript link
+
+    private static Transcript NewTranscript(int id = 4) =>
+        new(id, day: 1, "Medows", new[] { "Traveller", "Test" }, new[] { "Traveller: my name is Loki" });
+
+    [Fact]
+    public void The_decision_summary_labels_the_transcript()
+    {
+        var brain = NewBrain();
+        var transcript = NewTranscript();
+
+        brain.ApplyDecision(new NpcDecisionDto(
+            "  Met a traveller named Loki.  ", null,
+            "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            TestLevels.Location(Level), transcript);
+
+        Assert.Equal("Met a traveller named Loki.", transcript.Summary);
+    }
+
+    [Fact]
+    public void New_facts_point_back_to_the_transcript_they_came_from()
+    {
+        var brain = NewBrain();
+
+        brain.ApplyDecision(new NpcDecisionDto(
+            "x", new[] { "The traveller's name is Loki." },
+            "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            TestLevels.Location(Level), NewTranscript(id: 9));
+
+        Assert.Equal(9, Assert.Single(brain.Journal.Memories).SourceId);
+    }
+
+    [Fact]
+    public void Without_a_transcript_facts_have_no_source()
+    {
+        var brain = NewBrain();
+
+        brain.ApplyDecision(new NpcDecisionDto(
+            "x", new[] { "Something happened." },
+            "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            TestLevels.Location(Level));
+
+        Assert.Null(Assert.Single(brain.Journal.Memories).SourceId);
+    }
+
+    [Fact]
+    public void A_blank_summary_leaves_the_transcript_unlabelled()
+    {
+        var transcript = NewTranscript();
+
+        NewBrain().ApplyDecision(new NpcDecisionDto(
+            "   ", null, "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            TestLevels.Location(Level), transcript);
+
+        Assert.Null(transcript.Summary);
+    }
+
+    [Fact]
+    public void In_a_shared_transcript_the_first_summary_sticks()
+    {
+        // Two NPCs were in the same conversation; both decisions land on one transcript.
+        var transcript = NewTranscript();
+        var level = TestLevels.Location(Level);
+
+        NewBrain().ApplyDecision(new NpcDecisionDto(
+            "First.", null, "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            level, transcript);
+        NewBrain().ApplyDecision(new NpcDecisionDto(
+            "Second.", null, "resume", clear_current_tasks: false, System.Array.Empty<TaskSpecDto>()),
+            level, transcript);
+
+        Assert.Equal("First.", transcript.Summary);
+    }
+
     // --------------------------------------------------------------- distrusting input
 
     [Fact]

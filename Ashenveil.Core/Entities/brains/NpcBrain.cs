@@ -130,12 +130,19 @@ namespace Ashenveil.Core.Entities
         /// </summary>
         public virtual void OnBlocked(bool horizontal) { }
 
-        public void ApplyDecision(NpcDecisionDto decision, Location location)
+        /// <param name="transcript">The conversation this decision came from, if any. Its summary is
+        /// filled in here, and every new fact is stamped with its id so it can be traced back.</param>
+        public void ApplyDecision(NpcDecisionDto decision, Location location, Transcript transcript = null)
         {
             if (decision == null) return;
 
-            // 1. Remember: each extracted fact becomes a discrete Memory (the hot tier).
-            // The prose summary is for the debug log, not stored - the facts are the memory.
+            // 0. Label the conversation in the cold tier. The transcript is shared by everyone in
+            // the conversation, so the first NPC's summary sticks rather than each one overwriting it.
+            if (transcript != null && transcript.Summary == null && !string.IsNullOrWhiteSpace(decision.summary))
+                transcript.Summary = decision.summary.Trim();
+
+            // 1. Remember: each extracted fact becomes a discrete Memory (the hot tier), stamped
+            // with the transcript it came from.
             // Facts already in the journal (ignoring case and edge whitespace) are skipped, so
             // repeats don't push real memories out of the injected window. Reworded duplicates
             // still get through; merging those is the consolidation pass (plan, Phase 6).
@@ -146,7 +153,7 @@ namespace Ashenveil.Core.Entities
             {
                 bool known = Journal.Memories.Any(m =>
                     string.Equals(m.Text, fact, StringComparison.OrdinalIgnoreCase));
-                if (!known) Journal.Add(new Memory(fact, MemoryKind.Conversation));
+                if (!known) Journal.Add(new Memory(fact, MemoryKind.Conversation) { SourceId = transcript?.Id });
             }
 
             // 2. Optionally drop whatever the NPC was doing.
