@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.GameWorld.Locations;
 namespace Ashenveil.Core.Entities.brains.Dialogue
 {
     /// <summary>One entry in the transcript. A null Speaker is a note from the game, not something anyone said.</summary>

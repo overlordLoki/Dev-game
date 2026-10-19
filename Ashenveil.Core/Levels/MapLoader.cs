@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Ashenveil.Core.Objects;
-using Ashenveil.Core.Screens.Locations;
+using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
 
 namespace Ashenveil.Core.Levels

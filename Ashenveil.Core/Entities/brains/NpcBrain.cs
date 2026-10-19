@@ -6,6 +6,7 @@ using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.GameWorld.Locations;
 
 namespace Ashenveil.Core.Entities
 {

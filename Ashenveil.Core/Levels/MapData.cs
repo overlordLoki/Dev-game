@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Ashenveil.Core.Screens.Locations;
+using Ashenveil.Core.GameWorld.Locations;
 
 namespace Ashenveil.Core.Levels
 {

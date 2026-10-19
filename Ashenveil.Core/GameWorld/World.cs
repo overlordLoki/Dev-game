@@ -8,16 +8,15 @@ using Ashenveil.Core.Entities.brains;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Levels;
-using Ashenveil.Core.Screens.Locations;
+using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
 using Ashenveil.Core.Utility.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using GameDate = Ashenveil.Core.Utility.GameDate;
 
-namespace Ashenveil.Core.Screens
+namespace Ashenveil.Core.GameWorld
 {
     public class World
     {

@@ -1,6 +1,6 @@
 using Microsoft.Xna.Framework;
 
-namespace Ashenveil.Core.Screens.Locations
+namespace Ashenveil.Core.GameWorld.Locations
 {
     /// <summary>
     /// A named point on a location's grid — a spawn cell, a shop counter, where an NPC

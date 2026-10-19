@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Ashenveil.Core.Utility.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Ashenveil.Core.GameWorld;
 
 namespace Ashenveil.Core.Screens
 {

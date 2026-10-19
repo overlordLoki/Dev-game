@@ -70,7 +70,7 @@ namespace Ashenveil.Core.Entities
         }
 
         // The brain is protected, so the World hands an end-of-conversation decision in here.
-        public void ApplyDecision(brains.Dialogue.NpcDecisionDto decision, Screens.Location location,
+        public void ApplyDecision(brains.Dialogue.NpcDecisionDto decision, GameWorld.Locations.Location location,
                                   brains.Memorys.Transcript transcript = null)
         {
             Brain.ApplyDecision(decision, location, transcript);

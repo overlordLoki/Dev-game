@@ -19,7 +19,7 @@ public class TranscriptTests
 
     // The player (a plain entity) talking to one named NPC. Every reply the "API" gives is
     // whatever `reply` says, so a test can make it answer or fail.
-    private static Conversation NewConversation(Task<ChatMessage[]> reply, Ashenveil.Core.Screens.Location level = null) =>
+    private static Conversation NewConversation(Task<ChatMessage[]> reply, Ashenveil.Core.GameWorld.Locations.Location level = null) =>
         new(new Entity[] { new TestEntity(0, 0), new TestNpc(100, 0) }, level,
             new ConversationRequestDto { participants = new() }, _ => reply);
 

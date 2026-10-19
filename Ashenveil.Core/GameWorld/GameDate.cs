@@ -1,5 +1,5 @@
 
-namespace Ashenveil.Core.Utility
+namespace Ashenveil.Core.GameWorld
 {
     public class GameDate
     {

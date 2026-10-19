@@ -2,7 +2,7 @@ using Ashenveil.Core.Entities;
 using Ashenveil.Core.Tiles;
 using Microsoft.Xna.Framework;
 
-namespace Ashenveil.Core.Screens
+namespace Ashenveil.Core.GameWorld
 {
     /// <summary>
     /// The edges of the playable map, in world space. Replaces the old Gamebox, which

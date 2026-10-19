@@ -2,10 +2,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Objects;
-using Ashenveil.Core.Screens.Locations;
+using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
 
-namespace Ashenveil.Core.Screens
+namespace Ashenveil.Core.GameWorld.Locations
 {
     /// <summary>
     /// One playable area, built straight from its level file. This used to be an

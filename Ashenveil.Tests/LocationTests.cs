@@ -1,5 +1,5 @@
 using Ashenveil.Core;
-using Ashenveil.Core.Screens.Locations;
+using Ashenveil.Core.GameWorld.Locations;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Tests;

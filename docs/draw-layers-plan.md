@@ -23,9 +23,9 @@ the bottom of their sprite instead of their feet.
 - **Sort keys:**
   - `GameObject.SortY = (Row + 1) * Layout.CellHeight` — the bottom of the object's cell
     (a tree's base). Good.
-  - `Entity.SortY = Position.Y + Height` — the bottom of the **sprite**. Sprites like the
-    knight have transparent padding below the feet, so he sorts as if standing lower than he
-    is. **This is a bug**: he can draw in front of a tree he's actually behind.
+  - `Entity.SortY` — was the bottom of the **sprite**, which made padded sprites like the
+    knight sort as if standing lower than they are. **Fixed (step 1):** now the bottom of the
+    collision box, the feet.
 - A tree is one sprite (trunk + canopy) in the World layer. Its collision boxes
   (`bounds.json`) cover the trunk only.
 
@@ -54,9 +54,9 @@ the bottom of their sprite instead of their feet.
 
 ## Steps
 
-1. **Fix the sort key** — `Entity.SortY` from `Position.Y + Height` to `Bounds.Bottom`.
-   Walk around trees and the well; the knight and player should go behind and in front at
-   the right moment. Small, standalone, worth doing now.
+1. ✅ **Fix the sort key** — done. `Entity.SortY` is now `Bounds.Bottom` (the feet), falling
+   back to the sprite bottom when an entity has no boxes in `bounds.json`. Tested in
+   `SortYTests` (padded sprite, no boxes, full-frame box unchanged).
 2. **`Layer` on `IDrawable`** (default World) and a three-pass draw in `World.Draw`: Ground
    items, sorted World items, Overhead items.
 3. **Fade** for Overhead items when the player's feet are inside their area.
