@@ -35,8 +35,18 @@ namespace Ashenveil.Core.Entities
             }
         }
 
-        // Depth-sort key: the feet = bottom of the entity's box.
-        public int SortY => (int)(Position.Y + Height);
+        // Depth-sort key: the feet, i.e. the bottom of the collision box. Not the sprite's
+        // bottom - sprites have transparent padding under the feet, which made entities sort
+        // as if they stood lower than they do (drawn in front of a tree they're behind).
+        // No boxes in bounds.json -> fall back to the sprite's bottom.
+        public int SortY
+        {
+            get
+            {
+                Rectangle feet = Bounds;
+                return feet.IsEmpty ? (int)(Position.Y + Height) : feet.Bottom;
+            }
+        }
 
         protected Dictionary<string, Animation> Animations { get; } = new();
         protected string CurrentAnim { get; private set; } = "idle";

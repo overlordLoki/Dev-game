@@ -51,19 +51,22 @@ place that converts to pixels — when drawing. This must land **before the save
 
 ---
 
-## The z question (open)
+## The z question — settled: positions stay x/y
 
-"x, y, z" could mean three very different things:
+"z" meant **layers** — things like tree canopies drawing over the player. That's a
+**draw-order** question, not a third coordinate, so this refactor keeps positions as x/y
+(`Vector2` in cells). Layers are their own small rendering feature: see
+[draw-layers-plan.md](draw-layers-plan.md).
 
-| Meaning | What it is | Status |
-|---|---|---|
-| **Draw order** | What's drawn in front of what | Already handled by `SortY`. |
-| **Height above ground** | Jumping, flying, raised platforms | Knight has a jump animation. Would be a `Z` (or `Height`) on entities, drawn as a y-offset and shadow; collision mostly ignores it. |
-| **Floor / layer** | Upstairs/downstairs, bridges | Each level would have layers; entities carry a layer index. Much bigger. |
+For the record, the other meanings of z, neither needed now:
 
-**Recommendation:** keep positions x/y for this refactor, but use a `Vector2`-based
-`WorldPos` type (or just `Vector2` with a clear "in cells" rule) that could gain a height
-later without touching movement code. Decide which z you mean before building it.
+| Meaning | What it would be |
+|---|---|
+| **Height above ground** | Jumping/flying: a `Height` drawn as a y-offset plus shadow. |
+| **Floors** | Upstairs/downstairs, bridges you walk on: a layer index per entity. Much bigger. |
+
+Keeping position in one clearly-named place ("in cells") means a height could be added later
+without touching movement code.
 
 ---
 
