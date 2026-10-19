@@ -116,7 +116,7 @@ remembers the exchange next time.
 > `NpcDecisionDto` + `ApplyDecision`, the `/decision` endpoint, fire-and-poll on
 > conversation end, and memory carried into the next conversation). Verified live: tell
 > the knight your name, start a new conversation, ask — he answers it. Next up is
-> Phase 6 (the cold transcript store), which has been started.
+> Phase 6 (the cold transcript store and recall).
 
 ---
 
@@ -173,25 +173,64 @@ Not done (still optional): `think: True` on the decision step to compare extract
 
 ---
 
-## Phase 6 — Later / optional
+## Phase 6 — Transcript store & recall (current)
 
-- **Cold-tier transcript store** — `Journal` holds a list of `Transcript` records
-  alongside its `Memory` list. Started; to finish:
-  - **A record, not a `Conversation`.** `Transcript { Id, Location (name), Participants
-    (names), Lines ("Speaker: text") }` — plain, serialisable data. Never keep the live
-    `Conversation` (it pins entities, a whole `Location`, a `Task` and a `Func`).
-  - Give `Transcript` a constructor (its get-only props are currently unfillable), and
-    wrap the list like `Memories`: private list, `IReadOnlyList`, `Add`.
-  - **Unique ids** from a monotonic counter in `World` (like NPC ids).
-  - **Written in `FireDecision`**, which already builds the `"Speaker: text"` lines.
-  - **Linked**: each fact `Memory` carries `SourceId` = its transcript's id, so recall can
-    go fact → `SourceId` → full transcript. Event memories have no source.
-  - Cold means cold: transcripts are never injected by default. Heuristic retrieval or a
-    future `recall` tool fetches them when detail is needed.
+**Goal:** the NPC keeps every conversation it was in, and opens a new one remembering
+what you talked about last time - not just isolated facts.
+
+**Decisions (agreed):**
+- **Recall level (a):** inject short summaries of past conversations *with the same
+  person*. Full-transcript retrieval comes later via embeddings (see Phase 7+), not
+  keyword triggers.
+- **One shared `Transcript` per conversation**, the same object added to each
+  participating NPC's journal. Only participants get it (built-in perception).
+- **The decision `summary` moves onto the transcript** instead of being thrown away.
+- **Player identity stays the name `"Traveller"`** for now; a stable player id comes with
+  the save system.
+
+**Steps:**
+1. **`Transcript`** — `{ Id, Day, Location, Participants, Lines, Summary }`, with a
+   constructor. `Summary` is filled in later (it arrives with the decision).
+   **`Journal`** — both tiers wrapped the same way (private list, `IReadOnlyList`, `Add`)
+   and labelled: class comment explains hot vs cold, each field says which it is.
+2. **`Conversation.ToTranscript(id, day)`** — pure conversion of the conversation's data,
+   so it's unit-testable without a `World`.
+3. **`World`** — a monotonic transcript-id counter. `EndFinishedConversations` runs the
+   empty-chat guard, builds **one** transcript (today's `TotalDays`), adds it to each NPC's
+   journal (via an `NPC` passthrough, the brain is protected), then fires a decision per
+   NPC. The pending list carries the transcript.
+4. **`ApplyDecision`** takes the transcript: sets `transcript.Summary`, and stamps
+   `SourceId` on each new fact so it traces back to its conversation.
+5. **Recall** — `NPC` returns its last few transcript summaries with a given person
+   (`"Day 3, Medows: ..."`, newest first, skipping transcripts with no summary, e.g. when
+   the API was down). `ParticipantDto` / Python `Participant` gain `past_conversations`;
+   `build_prompt` renders them under their own heading next to "remembers from before".
+6. **Tests** — `ToTranscript`, `ApplyDecision` setting summary + `SourceId`, the recall
+   selection, and Python prompt rendering. Then the live check: talk about something
+   specific, start a new chat, ask "what did we talk about last time?".
 
 ---
 
-## Phase 7 — Event log & daily reflection
+## Phase 7 — Later / optional
+
+- **LLM tool-calling recall** — `recall(query)` as a real tool, once on a tool-capable
+  model; multi-round-trip, decision-step first. Rails are laid by the cold store above.
+- **Persistence (disk)** — serialize each NPC's journal + tasks, keyed by a **stable
+  string id** (`"medows_knight"`), not the runtime int. Survives restart; design the
+  journal as save data.
+- **Returning greeting** — generated at decision time (nobody's waiting) and stored,
+  so the next opener is instant *and* personalised. Keep the live greeting instant.
+- **Disposition** — `friendly|neutral|wary|hostile` on the decision; the hook for the
+  knight warming to / souring on the player.
+- **Memory consolidation** — dedupe/merge facts (an LLM job) and relevance-select the
+  top-N to inject, once journals grow large.
+- **More task types / behaviours** — `patrol`, `talk_to`, `follow`; one enum value +
+  one `switch` arm each.
+- **TaskContext as struct** — if NPC crowds appear, avoid per-tick heap allocation.
+
+---
+
+## Phase 8 — Event log & daily reflection
 
 **Goal:** NPCs learn from the world, not just conversations.
 
@@ -208,20 +247,6 @@ Not done (still optional): `think: True` on the decision step to compare extract
    fire-and-poll with one or two in flight, not a stampede.
 6. **`Memory.Day`** — events give memories a real timestamp; add it here (deferred until
    now), which also unlocks recency/decay for consolidation.
-- **LLM tool-calling recall** — `recall(query)` as a real tool, once on a tool-capable
-  model; multi-round-trip, decision-step first. Rails are laid by the cold store above.
-- **Persistence (disk)** — serialize each NPC's journal + tasks, keyed by a **stable
-  string id** (`"medows_knight"`), not the runtime int. Survives restart; design the
-  journal as save data.
-- **Returning greeting** — generated at decision time (nobody's waiting) and stored,
-  so the next opener is instant *and* personalised. Keep the live greeting instant.
-- **Disposition** — `friendly|neutral|wary|hostile` on the decision; the hook for the
-  knight warming to / souring on the player.
-- **Memory consolidation** — dedupe/merge facts (an LLM job) and relevance-select the
-  top-N to inject, once journals grow large.
-- **More task types / behaviours** — `patrol`, `talk_to`, `follow`; one enum value +
-  one `switch` arm each.
-- **TaskContext as struct** — if NPC crowds appear, avoid per-tick heap allocation.
 
 ---
 
