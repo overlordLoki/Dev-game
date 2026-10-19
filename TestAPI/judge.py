@@ -6,8 +6,9 @@ from the smith" is a correct recall of "asked where to buy a sword". Keyword che
 tell that apart from a wrong answer that happens to share a word, so for tests about
 *meaning* we ask a much stronger model to grade the reply instead.
 
-Dev-only: the game itself never calls this. Needs `claude` on PATH (tests skip without it).
+Dev-only: the game itself never calls this. Needs the claude CLI (tests skip without it).
 
+    CLAUDE_CLI     full path to the claude executable (default: PATH, then ~/.local/bin)
     JUDGE_MODEL    model name passed to `claude --model` (default: the CLI's default)
     JUDGE_TIMEOUT  seconds to wait for a verdict (default 120)
 """
@@ -23,8 +24,35 @@ JUDGE_MODEL = os.getenv("JUDGE_MODEL")
 JUDGE_TIMEOUT = float(os.getenv("JUDGE_TIMEOUT", "120"))
 
 
+def find_cli() -> str | None:
+    """Where the claude CLI lives: CLAUDE_CLI if set, then PATH, then the native installer's
+    default folder (~/.local/bin), which often isn't on PATH for venv or IDE shells."""
+    override = os.getenv("CLAUDE_CLI")
+    if override:
+        return override if os.path.exists(override) else None
+    on_path = shutil.which("claude")
+    if on_path:
+        return on_path
+    for name in ("claude.exe", "claude"):
+        default = os.path.join(os.path.expanduser("~"), ".local", "bin", name)
+        if os.path.exists(default):
+            return default
+    return None
+
+
+def unavailable_reason() -> str | None:
+    """Why the judge can't run here, or None if it can."""
+    if find_cli() is None:
+        return "claude CLI not found (set CLAUDE_CLI to its full path)"
+    # The CLI refuses to start inside another Claude Code session (e.g. a terminal opened
+    # from the Claude app), and forcing past that check can crash both sessions.
+    if os.getenv("CLAUDECODE"):
+        return "running inside a Claude Code session - run pytest from a normal terminal"
+    return None
+
+
 def available() -> bool:
-    return shutil.which("claude") is not None
+    return unavailable_reason() is None
 
 
 @dataclass
@@ -56,7 +84,7 @@ refuses, changes the subject, or states something that contradicts what the NPC 
 def judge(context: str, question: str, reply: str, expectation: str) -> Verdict:
     prompt = PROMPT.format(context=context, question=question, reply=reply, expectation=expectation)
 
-    cmd = [shutil.which("claude"), "-p", "--output-format", "json"]
+    cmd = [find_cli(), "-p", "--output-format", "json"]
     if JUDGE_MODEL:
         cmd += ["--model", JUDGE_MODEL]
 

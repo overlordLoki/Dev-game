@@ -38,7 +38,7 @@ def ollama_up() -> bool:
 
 
 needs_ollama = pytest.mark.skipif(not ollama_up(), reason="Ollama not reachable")
-needs_claude = pytest.mark.skipif(not judge.available(), reason="claude CLI not on PATH")
+needs_claude = pytest.mark.skipif(not judge.available(), reason=judge.unavailable_reason() or "")
 
 
 # ----------------------------------------------------------------- unit: schema
