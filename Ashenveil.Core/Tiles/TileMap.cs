@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Ashenveil.Core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Ashenveil.Core.Graphics;
 namespace Ashenveil.Core.Tiles
 {
     public class TileMap

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.Entities
 {
@@ -9,7 +10,7 @@ namespace Ashenveil.Core.Entities
     /// class, where subclasses can override it properly instead of hiding a default
     /// interface method.
     /// </summary>
-    public interface IEntity : IDrawable
+    public interface IEntity : IWorldDrawable
     {
         int Id { get; }
         Vector2 Position { get; set; }
@@ -20,7 +21,7 @@ namespace Ashenveil.Core.Entities
         IReadOnlyList<Rectangle> Boxes { get; }   // tight collision boxes (not the whole sprite)
         Rectangle Bounds { get; }                 // union of Boxes, the mover's body box
 
-        // Draw and SortY come from IDrawable
+        // Draw and SortY come from IWorldDrawable
         void Update(GameTime gameTime);
         void CheckEntityCollision(IEntity other);
         void ResolveCollision(IReadOnlyList<Rectangle> others);

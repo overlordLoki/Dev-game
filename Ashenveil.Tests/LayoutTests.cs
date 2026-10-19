@@ -1,4 +1,5 @@
 using Ashenveil.Core;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Tests;
 

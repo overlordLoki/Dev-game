@@ -1,6 +1,6 @@
 using System;
 
-namespace Ashenveil.Core
+namespace Ashenveil.Core.Graphics
 {
     /// <summary>
     /// Single source of truth for tile-cell size. Everything that sits on the

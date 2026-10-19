@@ -5,10 +5,12 @@ using System.Text;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Utility;
-using Ashenveil.Core.Utility.Widgets;
+using Ashenveil.Core.UI.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Ashenveil.Core.UI;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.Screens.Chat
 {
@@ -145,7 +147,7 @@ namespace Ashenveil.Core.Screens.Chat
         {
             var messages = _conversation.Messages;
             while (_wrapped.Count < messages.Count)
-                _wrapped.Add(UI.WrapText(font, Printable(Format(messages[_wrapped.Count])), _log.Width));
+                _wrapped.Add(UIDraw.WrapText(font, Printable(Format(messages[_wrapped.Count])), _log.Width));
 
             float y = _log.Bottom;
 

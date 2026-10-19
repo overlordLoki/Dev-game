@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     public class Button : Widget
     {
@@ -30,7 +30,7 @@ namespace Ashenveil.Core.Utility.Widgets
         public override void Draw(SpriteBatch spriteBatch, SpriteFont font)
         {
             if (!Visible) return;
-            UI.DrawButton(spriteBatch, Bounds, _text, _sprite, font, Color.Black, Hovered);
+            UIDraw.DrawButton(spriteBatch, Bounds, _text, _sprite, font, Color.Black, Hovered);
         }
     }
 }

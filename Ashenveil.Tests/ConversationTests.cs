@@ -2,6 +2,7 @@ using Ashenveil.Core;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Tests;
 

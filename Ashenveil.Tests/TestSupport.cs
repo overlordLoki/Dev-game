@@ -5,6 +5,7 @@ using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Ashenveil.Core.GameWorld.Locations;
+using Ashenveil.Core.Graphics;
 
 // Layout, Textures and BoundsStore are static, so two test classes running at once
 // would trample each other's cell size. Run everything on one thread instead.

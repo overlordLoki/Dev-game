@@ -11,10 +11,11 @@ using Ashenveil.Core.Levels;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
-using Ashenveil.Core.Utility.Widgets;
+using Ashenveil.Core.UI.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.GameWorld
 {
@@ -323,7 +324,7 @@ namespace Ashenveil.Core.GameWorld
             location.tileMap.Draw(spriteBatch);
 
             // 2. collect everything that stands up (player, NPCs, objects)
-            var drawables = new List<IDrawable>();
+            var drawables = new List<IWorldDrawable>();
             drawables.Add(player);
             drawables.AddRange(NPCs);
             drawables.AddRange(location.objects);

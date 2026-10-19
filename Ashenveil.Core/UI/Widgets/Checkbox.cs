@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     /// <summary>
     /// A tick box with its text to the right. The box is a square the height of Bounds; clicking

@@ -1,6 +1,7 @@
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Tiles;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.GameWorld
 {

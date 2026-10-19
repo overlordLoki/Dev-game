@@ -2,7 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     /// <summary>
     /// A UI element a screen owns — a button today, a label or panel later. A screen keeps

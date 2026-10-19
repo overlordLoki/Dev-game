@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     /// <summary>
     /// A draggable 0..1 value (volume, brightness). A progress bar with a handle: press on it and
@@ -49,7 +49,7 @@ namespace Ashenveil.Core.Utility.Widgets
         public override void Draw(SpriteBatch spriteBatch, SpriteFont font)
         {
             if (!Visible) return;
-            UI.DrawProgressBar(spriteBatch, Bounds, _colour, Value);
+            UIDraw.DrawProgressBar(spriteBatch, Bounds, _colour, Value);
 
             // Handle: a scrollbar nub a bit taller than the bar, centred on the value point.
             Rectangle src = AshenveilGame.UiAtlas[_handle];

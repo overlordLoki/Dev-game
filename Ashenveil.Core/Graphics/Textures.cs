@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace Ashenveil.Core
+namespace Ashenveil.Core.Graphics
 {
     /// <summary>
     /// Thin shared accessor over MonoGame's ContentManager for textures.

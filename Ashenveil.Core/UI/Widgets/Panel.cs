@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     /// <summary>
     /// A nine-sliced background (panel_*, round_*, banner_* ...). Ignores input — add it to the
@@ -24,7 +24,7 @@ namespace Ashenveil.Core.Utility.Widgets
         public override void Draw(SpriteBatch spriteBatch, SpriteFont font)
         {
             if (!Visible) return;
-            UI.DrawNineSlice(spriteBatch, AshenveilGame.UiAtlas, _sprite, Bounds, _border, _scale, Color.White);
+            UIDraw.DrawNineSlice(spriteBatch, AshenveilGame.UiAtlas, _sprite, Bounds, _border, _scale, Color.White);
         }
     }
 }

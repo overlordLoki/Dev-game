@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.Objects
 {
-    public interface IObject : IDrawable
+    public interface IObject : IWorldDrawable
     {
         int Col { get; }              // grid position — pixels are derived at draw time
         int Row { get; }
@@ -15,6 +16,6 @@ namespace Ashenveil.Core.Objects
         // at draw/collision time; Bounds is their union, kept for cheap broad-phase work.
         IReadOnlyList<Rectangle> Boxes { get; }
         Rectangle Bounds { get; }
-        // Draw and SortY come from IDrawable. Drawing is shared in GameObject now.
+        // Draw and SortY come from IWorldDrawable. Drawing is shared in GameObject now.
     }
 }

@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     /// <summary>
     /// Text in a box. One line: centred by default, or left-aligned (vertically centred either
@@ -30,7 +30,7 @@ namespace Ashenveil.Core.Utility.Widgets
             if (_wrap)
             {
                 float y = Bounds.Y;
-                foreach (string line in UI.WrapText(font, Text, Bounds.Width))
+                foreach (string line in UIDraw.WrapText(font, Text, Bounds.Width))
                 {
                     spriteBatch.DrawString(font, line, new Vector2(Bounds.X, (int)y), Color);
                     y += font.LineSpacing;

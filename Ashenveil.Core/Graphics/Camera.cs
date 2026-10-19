@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
 
-namespace Ashenveil.Core.Utility
+namespace Ashenveil.Core.Graphics
 {
     /// <summary>
     /// A scrolling view onto the world. Holds the world-space point that sits at the

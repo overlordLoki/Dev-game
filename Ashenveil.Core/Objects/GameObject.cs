@@ -3,6 +3,7 @@ using Ashenveil.Core.Collision;
 using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.Objects
 {

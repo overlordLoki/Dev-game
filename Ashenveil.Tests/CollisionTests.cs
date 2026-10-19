@@ -1,6 +1,7 @@
 using Ashenveil.Core;
 using Ashenveil.Core.Collision;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Tests;
 

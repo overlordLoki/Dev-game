@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Ashenveil.Core.Utility.Widgets;
+using Ashenveil.Core.UI.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;

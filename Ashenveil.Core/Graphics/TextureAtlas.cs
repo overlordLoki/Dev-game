@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace Ashenveil.Core
+namespace Ashenveil.Core.Graphics
 {
     // One texture plus named rectangles on it. Nothing is cut up; you draw
     // part of the texture by passing a sourceRectangle to SpriteBatch.Draw.

@@ -17,9 +17,9 @@ the bottom of their sprite instead of their feet.
 
 - `World.Draw` already does two of the three layers:
   1. tiles first (`location.tileMap.Draw`) — effectively the **Ground** layer;
-  2. the player, NPCs and objects collected as `IDrawable`, sorted by `SortY`, drawn in
+  2. the player, NPCs and objects collected as `IWorldDrawable`, sorted by `SortY`, drawn in
      order — the **World** layer.
-- `IDrawable` = `SortY` + `Draw`. Nothing says which layer a thing belongs in.
+- `IWorldDrawable` = `SortY` + `Draw`. Nothing says which layer a thing belongs in.
 - **Sort keys:**
   - `GameObject.SortY = (Row + 1) * Layout.CellHeight` — the bottom of the object's cell
     (a tree's base). Good.
@@ -41,7 +41,7 @@ the bottom of their sprite instead of their feet.
    | **World** | Entities, trunks, wells, bushes | Sorted by `SortY` |
    | **Overhead** | Canopies, roofs, archways, bridge tops | Last, always on top |
 
-2. **A `Layer` on `IDrawable`**, defaulting to World, so existing objects don't change.
+2. **A `Layer` on `IWorldDrawable`**, defaulting to World, so existing objects don't change.
 3. **Sort by feet, not sprite.** `Entity.SortY` uses the collision box's bottom
    (`Bounds.Bottom`) — the same "feet" the game already uses for `PlayerCell()`.
 4. **Big trees split into two sprites only when needed:** trunk (World, collides, sorts) +
@@ -57,7 +57,7 @@ the bottom of their sprite instead of their feet.
 1. ✅ **Fix the sort key** — done. `Entity.SortY` is now `Bounds.Bottom` (the feet), falling
    back to the sprite bottom when an entity has no boxes in `bounds.json`. Tested in
    `SortYTests` (padded sprite, no boxes, full-frame box unchanged).
-2. **`Layer` on `IDrawable`** (default World) and a three-pass draw in `World.Draw`: Ground
+2. **`Layer` on `IWorldDrawable`** (default World) and a three-pass draw in `World.Draw`: Ground
    items, sorted World items, Overhead items.
 3. **Fade** for Overhead items when the player's feet are inside their area.
 4. **Split one tree** (the biggest canopy) into trunk + canopy as the first real Overhead
@@ -88,5 +88,5 @@ the bottom of their sprite instead of their feet.
 ## Depends on / feeds into
 
 - Independent; the `SortY` fix can be done any time.
-- Touches `World.Draw` and `IDrawable`, which the world-units refactor also touches — easier
+- Touches `World.Draw` and `IWorldDrawable`, which the world-units refactor also touches — easier
   to do the layer split after world units, or before it, but not in the middle.

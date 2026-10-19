@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace Ashenveil.Core.Utility.Widgets
+namespace Ashenveil.Core.UI.Widgets
 {
     /// <summary>
     /// A horizontal fill bar (health, loading, XP). Set Value 0..1 from whatever it shows.
@@ -28,7 +28,7 @@ namespace Ashenveil.Core.Utility.Widgets
         public override void Draw(SpriteBatch spriteBatch, SpriteFont font)
         {
             if (!Visible) return;
-            UI.DrawProgressBar(spriteBatch, Bounds, _colour, _value);
+            UIDraw.DrawProgressBar(spriteBatch, Bounds, _colour, _value);
         }
     }
 }

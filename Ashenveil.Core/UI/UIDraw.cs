@@ -2,10 +2,15 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using Ashenveil.Core.Graphics;
 
-namespace Ashenveil.Core.Utility
+namespace Ashenveil.Core.UI
 {
-    public static class UI
+    /// <summary>
+    /// Static helper methods for drawing UI elements. The game has a single UI atlas, so
+    /// these methods don't need to be passed a texture.
+    /// </summary>
+    public static class UIDraw
     {
         public static void DrawButtonPixel(SpriteBatch spriteBatch, Rectangle button, String text, Color color, Texture2D pixel, SpriteFont font)
         {
