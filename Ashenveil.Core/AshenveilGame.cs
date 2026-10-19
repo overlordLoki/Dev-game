@@ -12,6 +12,7 @@ using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
 using Ashenveil.Core.Utility.Input;
 using Ashenveil.Core.GameWorld;
+using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Graphics;
 namespace Ashenveil.Core
 {
@@ -77,7 +78,7 @@ namespace Ashenveil.Core
             Settings.UpdateScale(GraphicsDevice.Viewport.Height);
             // WorldBounds recomputes itself from Layout, so a resize only needs the layout
             // refreshed - no bounds object to rebuild anymore.
-            this.world.UpdateLayout(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+            _gameplayScreen.UpdateLayout(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
         }
         /// <summary>
         /// Initializes the game, including setting up localization and adding the 
@@ -123,17 +124,17 @@ namespace Ashenveil.Core
                 Exit,                         // Quit to Desktop
                 w, h);
 
-            this.world = new World(_pixel,
+            // The game itself, then the screen that shows and plays it.
+            this.world = new World(new Location("Medows"));
+            _gameplayScreen = new GameplayScreen(world,
                 () => _screenManager.Push(_pause),
                 // Built fresh each time, from the window as it is now, so the box fits after a resize.
                 convo => _screenManager.Push(new ChatScreen(font, convo, Window,
                     () => _screenManager.Pop(),
                     GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height)));
-            this.world.UpdateLayout(w, h);   // set initial cell size before the first frame
+            _gameplayScreen.UpdateLayout(w, h);   // set initial cell size before the first frame
             this.world.Init();  // spawn the player and set up the level on first load
             Debug.Pixel = _pixel;
-
-            _gameplayScreen = new GameplayScreen(world);
 
             // create screens first
             _settings = new SettingsScreen(font, () => _screenManager.Pop(), w, h);

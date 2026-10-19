@@ -11,14 +11,17 @@ using Ashenveil.Core.Levels;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
 using Ashenveil.Core.Utility;
-using Ashenveil.Core.UI.Widgets;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.GameWorld
 {
+    /// <summary>
+    /// The game itself, with no screen attached: levels, NPCs, the player, the clock,
+    /// conversations and what NPCs learn from them. It knows nothing about input, the
+    /// camera, drawing or other screens - GameplayScreen handles those - so a test can
+    /// build a World from a level and step it forward like the game does.
+    /// </summary>
     public class World
     {
         private static readonly string[] Seasons = { "Spring", "Summer", "Fall", "Winter" };
@@ -26,13 +29,7 @@ namespace Ashenveil.Core.GameWorld
 
         public WorldBounds worldBounds;
         public Player player;
-        public Camera camera = new Camera();
         public List<NPC> NPCs;
-        public List<Widget> Widgets { get; set; } = new List<Widget>();
-        private MouseState _prevMouse;
-        private Texture2D _pixel;
-        private Action _onPause;
-        private Action<Conversation> _onTalk;
         private List<Conversation> _conversations = new List<Conversation>();
         // Decisions in flight: an end-of-conversation LLM call per NPC, with the level it
         // was had in (so a go_to resolves against the right POIs even if the player wanders
@@ -47,8 +44,17 @@ namespace Ashenveil.Core.GameWorld
         private const int MaxInjectedMemories = 5;
         // How many earlier conversations (as one-line summaries) to recall into a new one.
         private const int MaxRecalledConversations = 3;
-        private KeyboardState _prevKb;
-        private int _viewWidth, _viewHeight;
+
+        // How the world talks to the LLM backend. Handed in rather than called directly, so
+        // tests can pass fakes and never touch the network (same idea as Conversation's send).
+        private readonly Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> _sendChat;
+        private readonly Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> _requestDecision;
+
+        /// <summary>
+        /// Raised when a conversation the player is part of begins, so whoever is showing the
+        /// world (GameplayScreen) can open the chat box. The world itself never opens screens.
+        /// </summary>
+        public event Action<Conversation> PlayerConversationStarted;
 
         // Time tracking: 10 real minutes = 1 game day
         private float _elapsedSeconds;
@@ -75,25 +81,27 @@ namespace Ashenveil.Core.GameWorld
         /// stack all survive the transition untouched.
         public Location location;
 
-        // The world draws in world coordinates; the camera shifts it onto the screen.
-        public Matrix Transform => camera.View;
-
-        public World(Texture2D pixel, Action onPause, Action<Conversation> onTalk)
+        /// <param name="start">The level the game begins in.</param>
+        /// <param name="sendChat">How a chat reply is asked for. Defaults to the real API.</param>
+        /// <param name="requestDecision">How an end-of-conversation decision is asked for. Defaults to the real API.</param>
+        public World(Location start,
+                     Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> sendChat = null,
+                     Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
         {
+            _sendChat = sendChat ?? DialogueApi.RequestAsync;
+            _requestDecision = requestDecision ?? DialogueApi.RequestDecisionAsync;
             this.player = new Player(new Vector2(100, 100), 0);
-            this._pixel = pixel;
-            this._onPause = onPause;
-            this._onTalk = onTalk;
-            SetLocation(new Location("Medows"));
+            SetLocation(start);
         }
 
         /// <summary>
-        /// Called on first load of a new game, player is spawned here.
+        /// Called on first load of a new game, player is spawned here. Layout must already
+        /// have a cell size (the game sets it from the window; tests call Layout.Update).
         /// </summary>
         public void Init()
         {
             Spawn(player, "Player_spawn");
-            EnsurePopulated();   // Layout is ready by now (LoadContent calls UpdateLayout first)
+            EnsurePopulated();
         }
 
         public void Spawn(Entity entity, String poi_name)
@@ -111,6 +119,12 @@ namespace Ashenveil.Core.GameWorld
             entity.Position = poi.ToPixel() - new Vector2(entity.Width / 2f, entity.Height / 2f);
 
         }
+
+        /// <summary>
+        /// Puts an NPC in the current level. Level spawns use this, and so can tests (and a
+        /// future debug-console "spawn" command).
+        /// </summary>
+        public void AddNpc(NPC npc) => NPCs.Add(npc);
 
         /// <summary>
         /// Makes <paramref name="next"/> the active area and re-fences the world to its
@@ -149,7 +163,7 @@ namespace Ashenveil.Core.GameWorld
                 case "Medows":
                     var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot", new KnightBrain());
                     Spawn(knight, "Knight_spawn");
-                    NPCs.Add(knight);
+                    AddNpc(knight);
                     knight.GiveTask(new GoToTask(location.Poi("entry").ToPixel()));
                     knight.GiveTask(new WaitTask(3f));
                     knight.GiveTask(new GoToTask(location.Poi("Knight_spawn").ToPixel()));
@@ -165,6 +179,22 @@ namespace Ashenveil.Core.GameWorld
             _npcsByLevel.Values.SelectMany(bucket => bucket).FirstOrDefault(npc => npc.Id == id);
 
         /// <summary>
+        /// The player's "interact" action (the E key): talk to an NPC in reach, otherwise use
+        /// the exit underfoot. Returns the conversation it started, or null (an exit was used,
+        /// or there was nothing to do). Talking wins over doors when an NPC is within reach.
+        /// </summary>
+        public Conversation Interact()
+        {
+            var npc = player.GetNearestEntityInRange(NPCs, Layout.CellWidth * 1.5f) as NPC;
+            if (npc != null) return StartConversation(player, npc);
+
+            var (col, row) = PlayerCell();
+            var exit = location.ExitAt(col, row);
+            if (exit != null) UseExit(exit);
+            return null;
+        }
+
+        /// <summary>
         /// Walks through a doorway: loads the target level and stands the player on its
         /// spawn cell. The destination's own exit sits under that cell, which is what
         /// lets the player turn round and walk back out.
@@ -172,7 +202,7 @@ namespace Ashenveil.Core.GameWorld
         public void UseExit(ExitData exit)
         {
             SetLocation(new Location(exit.to));
-            EnsurePopulated();          // NEW: first visit spawns, return visit reuses
+            EnsurePopulated();          // first visit spawns, return visit reuses
 
             // Centre the player in the spawn cell rather than at its corner, so they
             // don't start half-inside whatever is standing on the neighbouring tile.
@@ -182,8 +212,8 @@ namespace Ashenveil.Core.GameWorld
         }
 
         /// <summary>
-        /// The one place a conversation begins, whoever starts it. Only the player's
-        /// conversations get the chat box; the rest just live in the list.
+        /// The one place a conversation begins, whoever starts it. Conversations the player
+        /// is in raise <see cref="PlayerConversationStarted"/>; the rest just live in the list.
         /// </summary>
         public Conversation StartConversation(Entity from, params NPC[] others)
         {
@@ -213,13 +243,13 @@ namespace Ashenveil.Core.GameWorld
                         initiator, MaxRecalledConversations, CurrentDate.TotalDays).ToList(),
                 });
 
-            var convo = new Conversation(everyone, location, req, DialogueApi.RequestAsync);
+            var convo = new Conversation(everyone, location, req, _sendChat);
             // The opener is already "said"; the LLM continues from it once the player answers.
             convo.Add(others[0].Name, others[0].Greeting);
 
             foreach (var npc in others) npc.StartTalking();
             _conversations.Add(convo);
-            if (from == player) _onTalk(convo);
+            if (from == player) PlayerConversationStarted?.Invoke(convo);
             return convo;
         }
 
@@ -269,7 +299,7 @@ namespace Ashenveil.Core.GameWorld
                 transcript = transcript.Lines.ToArray(),   // already only what was actually said
                 poi_names = convo.Location?.pointsOfInterest.Keys.ToArray() ?? Array.Empty<string>(),
             };
-            _pendingDecisions.Add((npc, convo.Location, transcript, DialogueApi.RequestDecisionAsync(req)));
+            _pendingDecisions.Add((npc, convo.Location, transcript, _requestDecision(req)));
         }
 
         // Apply any decisions that have come back. Runs on the main thread (from Update), so
@@ -309,34 +339,7 @@ namespace Ashenveil.Core.GameWorld
             return (body.Center.X / Layout.CellWidth, body.Bottom / Layout.CellHeight);
         }
 
-        // Recompute cell size from the window, and remember the window size so Update
-        // can scroll the camera. Call on load and whenever the window resizes.
-        public void UpdateLayout(int viewportWidth, int viewportHeight)
-        {
-            _viewWidth = viewportWidth;
-            _viewHeight = viewportHeight;
-            Layout.Update(viewportHeight);
-        }
-
-        public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
-        {
-            // 1. flat ground first — never occludes anything that stands up
-            location.tileMap.Draw(spriteBatch);
-
-            // 2. collect everything that stands up (player, NPCs, objects)
-            var drawables = new List<IWorldDrawable>();
-            drawables.Add(player);
-            drawables.AddRange(NPCs);
-            drawables.AddRange(location.objects);
-
-            // 3. sort by base Y — lower on screen (bigger Y) draws last = in front
-            drawables.Sort((a, b) => a.SortY.CompareTo(b.SortY));
-
-            // 4. draw in that order
-            foreach (var d in drawables)
-                d.Draw(spriteBatch);
-        }
-
+        /// <summary>One step of the game: time, conversations, decisions, movement, collision.</summary>
         public void Update(GameTime gameTime)
         {
             AdvanceTime(gameTime);
@@ -357,8 +360,6 @@ namespace Ashenveil.Core.GameWorld
                         npc.CheckEntityCollision(other);
                 }
             }
-            OnMouseAction();
-            OnKeyAction();
             foreach (var obj in location.objects)
             {
                 // Boxes is the object's full multi-box shape; the resolver picks the
@@ -367,40 +368,6 @@ namespace Ashenveil.Core.GameWorld
                 foreach (var npc in NPCs)
                     npc.ResolveCollision(obj.Boxes);
             }
-
-            // Last, so the view follows where the player actually ended up this frame
-            // rather than where they were before collisions pushed them back.
-            camera.Follow(
-                player.Position + new Vector2(player.Width / 2f, player.Height / 2f),
-                _viewWidth, _viewHeight, worldBounds.Bounds);
-        }
-        private void OnMouseAction()
-        {
-            var mouse = AshenveilGame.Input.Mouse;
-            _prevMouse = mouse;  // always save at the end of Update
-        }
-        private void OnKeyAction()
-        {
-            var kb = AshenveilGame.Input.Keyboard;
-            if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
-            {
-                _onPause();
-            }
-            // Edge-triggered, so one press is one transition - held down it would
-            // otherwise bounce the player in and out of the door every frame.
-            if (kb.IsKeyDown(Keys.E) && _prevKb.IsKeyUp(Keys.E))
-            {
-                // Talking wins over doors when an NPC is within reach.
-                var npc = player.GetNearestEntityInRange(NPCs, Layout.CellWidth * 1.5f) as NPC;
-                if (npc != null) StartConversation(player, npc);
-                else
-                {
-                    var (col, row) = PlayerCell();
-                    var exit = location.ExitAt(col, row);
-                    if (exit != null) UseExit(exit);
-                }
-            }
-            _prevKb = kb;
         }
     }
 }
