@@ -112,11 +112,12 @@ journal, invalid input is dropped safely.
 **Done when:** asking the knight in-game to do something makes him do it, and he
 remembers the exchange next time.
 
-> **Status (built so far):** Phases 1–5 are implemented and test-covered (tasks,
+> **Status (built so far):** Phases 1–6 are implemented and test-covered (tasks,
 > `NpcDecisionDto` + `ApplyDecision`, the `/decision` endpoint, fire-and-poll on
-> conversation end, and memory carried into the next conversation). Verified live: tell
-> the knight your name, start a new conversation, ask — he answers it. Next up is
-> Phase 6 (the cold transcript store and recall).
+> conversation end, facts carried into the next conversation, and a cold transcript store
+> with summaries recalled into later chats). Verified live: the knight remembers your name,
+> and what you talked about last time. Next candidates are in Phase 7 (later list) and
+> Phase 8 (event log).
 
 ---
 
@@ -173,7 +174,7 @@ Not done (still optional): `think: True` on the decision step to compare extract
 
 ---
 
-## Phase 6 — Transcript store & recall (current)
+## Phase 6 — Transcript store & recall ✅ done
 
 **Goal:** the NPC keeps every conversation it was in, and opens a new one remembering
 what you talked about last time - not just isolated facts.
@@ -206,9 +207,21 @@ what you talked about last time - not just isolated facts.
    the API was down). `ParticipantDto` / Python `Participant` gain `past_conversations`;
    `build_prompt` renders them under their own heading next to "remembers from before".
 6. **Tests** — `ToTranscript`, `ApplyDecision` setting summary + `SourceId`, the recall
-   selection, and Python prompt rendering. Then the live check: talk about something
-   specific, start a new chat, ask "what did we talk about last time?".
+   selection, and Python prompt rendering. The live recall check is graded by the
+   **LLM judge** (see Testing notes), since the model paraphrases.
 
+**As built, beyond the steps above:**
+- The empty-chat guard moved into `World.RecordConversation`: no transcript and no decision
+  when nobody but the NPCs spoke.
+- In a shared transcript the **first** NPC's summary sticks; later ones don't overwrite it.
+- Recall is worded relative to today ("Yesterday, at Medows: ..."), since the model doesn't
+  know the current day number. Last 3 conversations with that person, oldest first.
+- Old `Conversation.Summarize()` / `World.SummarizeConversations()` removed (replaced by
+  `ToTranscript`).
+
+**Known limitation:** summaries are written first-person by the NPC ("I warned Loki..."). In
+a group chat the other NPC inherits that "I". Fix if group chats matter: ask the decision
+prompt for a neutral third-person summary.
 ---
 
 ## Phase 7 — Later / optional
@@ -269,3 +282,15 @@ what you talked about last time - not just isolated facts.
   trick). Build these in `Ashenveil.Tests`.
 - The Python side gets its own `pytest` + FastAPI `TestClient`, mocking the Ollama
   call.
+- **LLM judge** (`TestAPI/judge.py`) — for live tests about *meaning*, a stronger model (the
+  Claude CLI, Sonnet by default) grades the local model's reply against a specific expectation
+  ("does it recall the sword conversation?"). Paraphrase passes; dodging or contradicting fails.
+  - Dev-only; the game never uses it. Marked `judge` in pytest: `pytest -m judge` /
+    `pytest -m "not judge"`. Skips if the CLI isn't found or pytest runs inside a Claude Code
+    session (the CLI refuses to nest).
+  - **Calibrated**: `test_judge_grades_known_replies_correctly` feeds it hand-written replies with
+    known verdicts (right, paraphrase, wrong topic, dodge, confidently wrong). If those fail, the
+    judge can't be trusted. Re-run them whenever `JUDGE_MODEL` changes.
+  - Cost: each call carries the CLI's agent context, so it's cents per test - fine occasionally,
+    don't run it in a tight loop.
+  - Use it for meaning, not exact facts: a remembered *name* is still a plain keyword check.
