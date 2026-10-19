@@ -9,7 +9,7 @@ tell that apart from a wrong answer that happens to share a word, so for tests a
 Dev-only: the game itself never calls this. Needs the claude CLI (tests skip without it).
 
     CLAUDE_CLI     full path to the claude executable (default: PATH, then ~/.local/bin)
-    JUDGE_MODEL    model name passed to `claude --model` (default: the CLI's default)
+    JUDGE_MODEL    model passed to `claude --model` (default: sonnet)
     JUDGE_TIMEOUT  seconds to wait for a verdict (default 120)
 """
 
@@ -20,7 +20,9 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 
-JUDGE_MODEL = os.getenv("JUDGE_MODEL")
+# Sonnet passes every known-answer check in test_main.py and costs a fraction of Opus.
+# Re-run `pytest -m judge` after changing this - those checks are what prove a model is good enough.
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "sonnet")
 JUDGE_TIMEOUT = float(os.getenv("JUDGE_TIMEOUT", "120"))
 
 
