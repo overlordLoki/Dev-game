@@ -49,13 +49,44 @@ public class ConversationSystemTests
     // ------------------------------------------------------------------ 1. start
 
     [Fact]
-    public void Starting_opens_with_the_NPCs_greeting_and_sets_them_talking()
+    public void Starting_sets_the_NPCs_talking()
     {
         var convo = StartWithPlayer();
 
-        Assert.Equal(_npc.Greeting, convo.Messages[0].Text);
         Assert.Equal(Ashenveil.Core.Entities.NpcBrain.NPCState.Talking, _brain.State);
         Assert.Contains(convo, _system.Active);
+    }
+
+    [Fact]
+    public void The_player_speaks_first_the_chat_opens_with_only_a_note()
+    {
+        var convo = StartWithPlayer();
+
+        var opening = Assert.Single(convo.Messages);
+        Assert.Null(opening.Speaker);                    // a game note, not a line anyone said
+        Assert.Equal("You approach Test.", opening.Text);
+        Assert.Empty(_chatsSent);                        // nothing asked of the LLM until the player speaks
+    }
+
+    [Fact]
+    public void The_opening_note_is_not_sent_to_the_LLM()
+    {
+        var convo = StartWithPlayer();
+
+        convo.Say(Conversation.PlayerName, "Hello.");
+
+        Assert.Equal(new[] { "Traveller: Hello." }, Assert.Single(_chatsSent).history);
+    }
+
+    [Fact]
+    public void Opening_and_closing_without_speaking_leaves_nothing_to_remember()
+    {
+        var convo = StartWithPlayer();
+        convo.End();
+
+        _system.Update(Today);
+
+        Assert.Empty(_decisionsAsked);
     }
 
     [Fact]

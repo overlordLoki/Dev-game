@@ -60,7 +60,10 @@ namespace Ashenveil.Core.GameWorld
 
         /// <summary>
         /// Opens a conversation started by <paramref name="from"/> with <paramref name="others"/>.
-        /// The first NPC's greeting is already "said"; the LLM continues from it once someone answers.
+        /// Whoever starts a conversation speaks first, so it opens with nothing said - only a
+        /// game note saying who approached whom. The LLM's first line is its answer to the
+        /// opener, made with everything the NPC remembers, so it isn't the same every time.
+        /// (NPCs starting conversations themselves comes later - see npc-memory-plan.md.)
         /// </summary>
         public Conversation Start(Entity from, NPC[] others, Location level, int today)
         {
@@ -70,7 +73,8 @@ namespace Ashenveil.Core.GameWorld
             others.CopyTo(everyone, 1);
 
             var convo = new Conversation(everyone, level, BuildRequest(from, others, level, today), _sendChat);
-            convo.Add(others[0].Name, others[0].Greeting);
+            // A note, not a line: no speaker, so it's never sent to the LLM or remembered.
+            convo.Note($"You approach {others[0].Name}.");
 
             foreach (var npc in others) npc.StartTalking();
             _active.Add(convo);

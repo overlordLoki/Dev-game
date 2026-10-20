@@ -15,10 +15,10 @@ namespace Ashenveil.Core.Entities
         protected NpcBrain Brain { get; }
         public string Name { get; }
         public string Portrait { get; set; }
-        // The persona seeds who the NPC is; the greeting is their fixed opening line.
-        // The LLM generates everything said after the greeting (see World.StartConversation).
+        // The persona seeds who the NPC is and how they talk. There's no fixed opening line:
+        // whoever starts a conversation speaks first, and the LLM writes every NPC line
+        // (see ConversationSystem.Start).
         public string Persona { get; set;} = "A generic NPC.";
-        public string Greeting { get; set; } = "Hello, traveller.";
         protected NPC(Vector2 position, int id, string name, NpcBrain brain) : base(position, id)
         {
             Brain = brain;

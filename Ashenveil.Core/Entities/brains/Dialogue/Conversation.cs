@@ -61,12 +61,16 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
             return averagePosition;
         }
 
-        // Puts a line in the transcript without asking for a reply (the NPC's greeting).
+        // Puts a line in the transcript without asking for a reply.
         public void Add(string speaker, string text)
         {
             Messages.Add(new ChatMessage(speaker, text));
             _request.history.Add($"{speaker}: {text}");
         }
+
+        // A note from the game ("You approach Sir Aldric."): shown in the chat, but nobody
+        // said it, so it stays out of the LLM's history and out of the transcript.
+        public void Note(string text) => Messages.Add(new ChatMessage(null, text));
 
         // Says a line and asks the LLM to answer it. Ignored while a reply is still on its way.
         public void Say(string speaker, string text)
@@ -87,7 +91,7 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
             _pending = null;
             if (reply == null || reply.Length == 0)
             {
-                Messages.Add(new ChatMessage(null, NoReply));
+                Note(NoReply);
                 return;
             }
             foreach (var message in reply) Add(message.Speaker, message.Text);

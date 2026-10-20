@@ -303,7 +303,7 @@ def build_decision_prompt(req: DecisionRequest) -> str:
         '(for example "The traveller\'s name is Loki"). Put each fact in `memories`, not only '
         "in the summary. Only record things that are NEW to you: what you learned about the "
         "others or what happened. Never record your own background, your persona, or what you "
-        "said in your greeting - you already know those. "
+        "said yourself - you already know those. "
         "Choose a behaviour: resume (carry on as before), idle (stand still), or do_tasks "
         f"(then give up to {req.max_tasks} tasks). Set clear_current_tasks true only to drop "
         "what you were already doing."

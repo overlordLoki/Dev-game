@@ -17,9 +17,11 @@ namespace Ashenveil.Core.Entities
         {
             Portrait = Assets.KnightPortrait;
             Speed = 100f;
-            Persona = "A noble knight sworn to protect the realm.";
-            Greeting = 
-            $"Halt, traveller. I am {name}, sworn to guard these meadows. The roads have grown dangerous since the ash began to fall. Wolves, bandits, and worse things that walk at night. Keep to the path, and if you hear bells in the fog... run.";
+            // What used to be his fixed greeting, now background he can draw on in his own words.
+            Persona = "A noble knight sworn to guard these meadows. Speaks formally and calls strangers " +
+                      "'traveller'. The roads have grown dangerous since the ash began to fall: wolves, " +
+                      "bandits, and worse things that walk at night. He warns travellers to keep to the " +
+                      "path, and that if they hear bells in the fog, they should run.";
 
             AddAnimation("idle",    Assets.KnightIdle,    0.12);
             AddAnimation("walk",    Assets.KnightWalk,    0.10);

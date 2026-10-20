@@ -231,8 +231,14 @@ prompt for a neutral third-person summary.
 - **Persistence (disk)** — serialize each NPC's journal + tasks, keyed by a **stable
   string id** (`"medows_knight"`), not the runtime int. Survives restart; design the
   journal as save data.
-- **Returning greeting** — generated at decision time (nobody's waiting) and stored,
-  so the next opener is instant *and* personalised. Keep the live greeting instant.
+- **NPC-started conversations** — there's no fixed greeting any more: whoever starts a
+  conversation speaks first, so a player-started chat opens empty and the LLM's first line
+  answers the player. When an NPC walks up to the player it should open with something it
+  *has in mind*, and that comes from whatever sent it over: the decision LLM queues a
+  `talk_to { target, reason }` task; on arrival the task starts the conversation with the
+  reason, and the conversation asks the LLM for the opening line straight away ("You
+  approached the Traveller to: warn them about the wolves. Open the conversation.").
+  Python side: empty history + a reason = open, not reply. Needs `talk_to` (below).
 - **Disposition** — `friendly|neutral|wary|hostile` on the decision; the hook for the
   knight warming to / souring on the player.
 - **Memory consolidation** — dedupe/merge facts (an LLM job) and relevance-select the
