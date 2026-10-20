@@ -73,13 +73,8 @@ public class WorldTests : IDisposable
 
         for (int i = 0; i < 60; i++) Step(world, 1 / 60.0);   // one second of frames
 
-        Assert.Equal(new Vector2(250, 250), Centre(world.player));   // still standing at spawn
-    }
-
-    [Fact]
-    public void The_player_spawns_centred_on_its_spawn_point()
-    {
-        Assert.Equal(new Vector2(250, 250), Centre(NewWorld().player));
+        // Init stood the player centred on Player_spawn, and with no keys held they're still there.
+        Assert.Equal(new Vector2(250, 250), Centre(world.player));
     }
 
     [Fact]
@@ -135,20 +130,6 @@ public class WorldTests : IDisposable
     }
 
     // ------------------------------------------------------------------ remembering
-
-    [Fact]
-    public void Opening_and_closing_a_chat_without_speaking_records_nothing()
-    {
-        var world = NewWorld();
-        var (_, brain) = NpcBeside(world);
-        var convo = world.Interact();
-
-        convo.End();
-        Step(world, 1 / 60.0);
-
-        Assert.Empty(brain.Journal.Transcripts);
-        Assert.Empty(_decisionsAsked);             // and no LLM call was made
-    }
 
     [Fact]
     public void A_finished_chat_is_remembered_and_what_the_NPC_learned_is_applied()

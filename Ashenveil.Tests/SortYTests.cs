@@ -40,18 +40,10 @@ public class SortYTests
         var e = new PaddedEntity(0, 200);
 
         // Feet = 200 + 75. The old rule (sprite bottom) would have said 200 + 100 = 300.
+        // Why it matters: next to a tree whose base is at y = 290, feet at 275 are behind the
+        // tree and drawn first; the old 300 drew this entity in front of a tree it stands behind.
         Assert.Equal(275, e.SortY);
         Assert.Equal(e.Bounds.Bottom, e.SortY);
-    }
-
-    [Fact]
-    public void An_entity_standing_behind_a_base_sorts_before_it()
-    {
-        // A tree-like base at y = 290: the padded entity's feet (275) are above it, so it's
-        // behind and must be drawn first - the case the old rule (300) got wrong.
-        var e = new PaddedEntity(0, 200);
-
-        Assert.True(e.SortY < 290);
     }
 
     [Fact]
