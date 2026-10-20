@@ -5,7 +5,6 @@ using System.Linq;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains;
-using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.GameWorld.Locations;
@@ -30,25 +29,8 @@ namespace Ashenveil.Core.GameWorld
         public WorldBounds worldBounds;
         public Player player;
         public List<NPC> NPCs;
-        private List<Conversation> _conversations = new List<Conversation>();
-        // Decisions in flight: an end-of-conversation LLM call per NPC, with the level it
-        // was had in (so a go_to resolves against the right POIs even if the player wanders
-        // off). We hold the Task so it isn't GC'd, and apply the result on the main thread.
-        // Each one also carries the conversation's transcript, so the decision's summary and
-        // facts can be tied back to it when it lands.
-        private List<(NPC npc, Location level, Transcript transcript, System.Threading.Tasks.Task<NpcDecisionDto> task)> _pendingDecisions = new();
-        // Hands out transcript ids. Only counts up, so a Memory.SourceId always points at the
-        // right conversation.
-        private int _nextTranscriptId = 1;
-        // How many past-conversation memories to feed into a new conversation's prompt.
-        private const int MaxInjectedMemories = 5;
-        // How many earlier conversations (as one-line summaries) to recall into a new one.
-        private const int MaxRecalledConversations = 3;
-
-        // How the world talks to the LLM backend. Handed in rather than called directly, so
-        // tests can pass fakes and never touch the network (same idea as Conversation's send).
-        private readonly Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> _sendChat;
-        private readonly Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> _requestDecision;
+        /// <summary>Every conversation, and what NPCs learn from them.</summary>
+        public ConversationSystem Conversations { get; }
 
         /// <summary>
         /// Raised when a conversation the player is part of begins, so whoever is showing the
@@ -88,8 +70,7 @@ namespace Ashenveil.Core.GameWorld
                      Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> sendChat = null,
                      Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
         {
-            _sendChat = sendChat ?? DialogueApi.RequestAsync;
-            _requestDecision = requestDecision ?? DialogueApi.RequestDecisionAsync;
+            Conversations = new ConversationSystem(sendChat, requestDecision);
             this.player = new Player(new Vector2(100, 100), 0);
             SetLocation(start);
         }
@@ -212,108 +193,15 @@ namespace Ashenveil.Core.GameWorld
         }
 
         /// <summary>
-        /// The one place a conversation begins, whoever starts it. Conversations the player
-        /// is in raise <see cref="PlayerConversationStarted"/>; the rest just live in the list.
+        /// The one place a conversation begins, whoever starts it. The ConversationSystem does
+        /// the work; the World adds the one rule that's about the player: if they're in it,
+        /// raise <see cref="PlayerConversationStarted"/> so the screen can open the chat box.
         /// </summary>
         public Conversation StartConversation(Entity from, params NPC[] others)
         {
-            // Everyone in the room, initiator first (matches your "first one started it" rule).
-            var everyone = new Entity[others.Length + 1];
-            everyone[0] = from;
-            others.CopyTo(everyone, 1);
-
-            var req = new ConversationRequestDto {
-                participants = new List<ParticipantDto>(),
-                location = location.Name,
-                // One reply per thing said, so it reads as a back-and-forth.
-                max_lines = others.Length,
-            };
-            // The initiator is present but listening (your player drives, doesn't get lines).
-            string initiator = (from as NPC)?.Name ?? Conversation.PlayerName;
-            req.participants.Add(new ParticipantDto { name = initiator, speaks = false });
-            // Every NPC is a speaker, with their persona and what they remember of past
-            // conversations - attached to them, so the prompt frames it as their knowledge.
-            foreach (var npc in others)
-                req.participants.Add(new ParticipantDto
-                {
-                    name = npc.Name,
-                    persona = npc.Persona,
-                    memories = npc.RecentMemories(MaxInjectedMemories).ToList(),
-                    past_conversations = npc.PastConversationsWith(
-                        initiator, MaxRecalledConversations, CurrentDate.TotalDays).ToList(),
-                });
-
-            var convo = new Conversation(everyone, location, req, _sendChat);
-            // The opener is already "said"; the LLM continues from it once the player answers.
-            convo.Add(others[0].Name, others[0].Greeting);
-
-            foreach (var npc in others) npc.StartTalking();
-            _conversations.Add(convo);
+            var convo = Conversations.Start(from, others, location, CurrentDate.TotalDays);
             if (from == player) PlayerConversationStarted?.Invoke(convo);
             return convo;
-        }
-
-        // Lets everyone in a finished conversation go back to what they were doing, and asks
-        // the LLM, per NPC, what they now remember and want to do next.
-        private void EndFinishedConversations()
-        {
-            foreach (var convo in _conversations.Where(c => c.IsFinished).ToList())
-            {
-                var npcs = convo.Participants.OfType<NPC>().ToList();
-                foreach (var npc in npcs) npc.StopTalking();
-
-                // One transcript per conversation, shared by everyone in it; then each NPC
-                // asks what it learned. Skipped entirely if there was nothing to learn.
-                var transcript = RecordConversation(convo, npcs);
-                if (transcript != null)
-                    foreach (var npc in npcs) FireDecision(npc, convo, transcript);
-
-                _conversations.Remove(convo);
-            }
-        }
-
-        // Snapshots a finished conversation and files it in the cold-tier memory of every NPC
-        // that took part. Null when nobody but the NPCs spoke (opened and closed the chat):
-        // there's nothing to remember, and asking the LLM anyway gets filler memories
-        // ("the traveller was present") and a wasted call.
-        private Transcript RecordConversation(Conversation convo, List<NPC> npcs)
-        {
-            var npcNames = npcs.Select(n => n.Name).ToHashSet();
-            bool anyoneElseSpoke = convo.Messages.Any(m => m.Speaker != null && !npcNames.Contains(m.Speaker));
-            if (!anyoneElseSpoke) return null;
-
-            var transcript = convo.ToTranscript(_nextTranscriptId++, CurrentDate.TotalDays);
-            foreach (var npc in npcs) npc.RememberConversation(transcript);
-            return transcript;
-        }
-
-        // Kicks off the end-of-conversation decision for one NPC. Fire-and-hold: we keep the
-        // Task so it isn't collected, and PollDecisions applies it when it lands.
-        private void FireDecision(NPC npc, Conversation convo, Transcript transcript)
-        {
-            var req = new DecisionRequestDto
-            {
-                npc_name = npc.Name,
-                persona = npc.Persona,
-                location = transcript.Location,
-                transcript = transcript.Lines.ToArray(),   // already only what was actually said
-                poi_names = convo.Location?.pointsOfInterest.Keys.ToArray() ?? Array.Empty<string>(),
-            };
-            _pendingDecisions.Add((npc, convo.Location, transcript, _requestDecision(req)));
-        }
-
-        // Apply any decisions that have come back. Runs on the main thread (from Update), so
-        // mutating the NPC's brain here is safe. A failed call is dropped - the NPC just
-        // doesn't learn from that conversation.
-        private void PollDecisions()
-        {
-            for (int i = _pendingDecisions.Count - 1; i >= 0; i--)
-            {
-                var (npc, level, transcript, task) = _pendingDecisions[i];
-                if (!task.IsCompleted) continue;
-                if (task.IsCompletedSuccessfully) npc.ApplyDecision(task.Result, level, transcript);
-                _pendingDecisions.RemoveAt(i);
-            }
         }
 
         // Advance game time: 10 real minutes = 1 game day
@@ -343,8 +231,7 @@ namespace Ashenveil.Core.GameWorld
         public void Update(GameTime gameTime)
         {
             AdvanceTime(gameTime);
-            EndFinishedConversations();
-            PollDecisions();
+            Conversations.Update(CurrentDate.TotalDays);
             player.Update(gameTime);
             worldBounds.Clamp(player);
             foreach (var npc in NPCs)
