@@ -55,8 +55,11 @@ namespace Ashenveil.Core.Entities
             else
                 Position = new Vector2(Position.X, Position.Y + pushY);
 
-            Brain.OnBlocked(horizontal);
+            OnBlocked(horizontal);
         }
+
+        /// <summary>Stopped by an entity or the map's edge: the brain decides how to react.</summary>
+        public override void OnBlocked(bool horizontal) => Brain.OnBlocked(horizontal);
         public void GiveTask(brains.Task.ITask task)
         {
             Brain.Enqueue(task);

@@ -17,7 +17,8 @@ namespace Ashenveil.Core.GameWorld
     /// </summary>
     public class World
     {
-        public WorldBounds worldBounds;
+        /// <summary>The edges of the current level; keeps everyone inside.</summary>
+        public WorldBounds Bounds { get; private set; }
         public Player player;
         /// <summary>Every conversation, and what NPCs learn from them.</summary>
         public ConversationSystem Conversations { get; }
@@ -77,7 +78,7 @@ namespace Ashenveil.Core.GameWorld
         private void SetLocation(Location next)
         {
             location = next;
-            worldBounds = new WorldBounds(next.tileMap);
+            Bounds = new WorldBounds(next.tileMap);
             // No NPC spawning here - Layout may not be ready yet (the constructor calls this).
             // Init and UseExit call Roster.Populate once it is.
         }
@@ -144,13 +145,13 @@ namespace Ashenveil.Core.GameWorld
             Clock.Update(gameTime);
             Conversations.Update(Clock.TotalDays);
             player.Update(gameTime);
-            worldBounds.Clamp(player);
+            Bounds.Clamp(player);
             foreach (var npc in NPCs)
             {
                 npc.Update(gameTime);
                 npc.CheckEntityCollision(player);
                 player.CheckEntityCollision(npc);
-                worldBounds.Clamp(npc);
+                Bounds.Clamp(npc);
 
                 foreach (var other in NPCs)
                 {

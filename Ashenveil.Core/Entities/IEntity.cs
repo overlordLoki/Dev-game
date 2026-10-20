@@ -26,5 +26,7 @@ namespace Ashenveil.Core.Entities
         void CheckEntityCollision(IEntity other);
         void ResolveCollision(IReadOnlyList<Rectangle> others);
         void ResolveCollision(Rectangle other);
+        /// <summary>Something stopped this entity - another entity, or the edge of the map.</summary>
+        void OnBlocked(bool horizontal);
     }
 }

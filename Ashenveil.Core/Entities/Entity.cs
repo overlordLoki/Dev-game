@@ -112,6 +112,13 @@ namespace Ashenveil.Core.Entities
             if (best > 0f) ResolveCollision(deepest);
         }
 
+        /// <summary>
+        /// Something stopped this entity along one axis (<paramref name="horizontal"/> = along
+        /// X): another entity, or the edge of the map. Does nothing by default - the player just
+        /// stops. NPC overrides it to let its brain decide (a wanderer turns around).
+        /// </summary>
+        public virtual void OnBlocked(bool horizontal) { }
+
         /// <summary>Push out of one rectangle along the shallower axis, no bounce.</summary>
         public void ResolveCollision(Rectangle other)
         {

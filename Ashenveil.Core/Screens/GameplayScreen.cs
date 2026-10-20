@@ -56,7 +56,7 @@ namespace Ashenveil.Core.Screens
             var player = World.player;
             _camera.Follow(
                 player.Position + new Vector2(player.Width / 2f, player.Height / 2f),
-                _viewWidth, _viewHeight, World.worldBounds.Bounds);
+                _viewWidth, _viewHeight, World.Bounds.Area);
         }
 
         // Edge-triggered, so one press is one action - held down, E would otherwise bounce

@@ -10,9 +10,12 @@ namespace Ashenveil.Core.GameWorld
     /// fenced entities inside a fixed inset of the *screen* - fine before there were
     /// tiles, wrong the moment the world is bigger than the window or a camera moves.
     ///
-    /// The rectangle is the whole tile grid (0,0) to (Cols*CellWidth, Rows*CellHeight),
+    /// The area is the whole tile grid (0,0) to (Cols*CellWidth, Rows*CellHeight),
     /// recomputed from Layout each time it's asked so it tracks the current cell size -
     /// no need to rebuild this on a window resize the way Gamebox did.
+    ///
+    /// It only keeps things in. How something reacts to hitting the edge is up to it
+    /// (IEntity.OnBlocked): the player just stops, an NPC asks its brain.
     /// </summary>
     public class WorldBounds
     {
@@ -20,48 +23,38 @@ namespace Ashenveil.Core.GameWorld
 
         public WorldBounds(TileMap map) => _map = map;
 
-        public Rectangle Bounds => new Rectangle(
+        /// <summary>The whole map, in pixels.</summary>
+        public Rectangle Area => new Rectangle(
             0, 0,
             _map.Cols * Layout.CellWidth,
             _map.Rows * Layout.CellHeight);
 
         /// <summary>
-        /// Pushes an entity back inside the map if it has crossed an edge. NPCs also flip
-        /// their heading so a wanderer turns back rather than pressing into the wall; the
-        /// player has no heading to flip, so it simply stops at the edge.
+        /// Pushes an entity back inside the map if its body has crossed an edge, then tells it
+        /// which way it was stopped. Measures the collision box (the feet and body), not the
+        /// sprite - sprites have transparent padding, which would stop entities short of the
+        /// edge. An entity with no collision boxes falls back to its sprite.
         /// </summary>
         public void Clamp(IEntity entity)
         {
-            Rectangle bounds = Bounds;
+            Rectangle area = Area;
+            Rectangle body = entity.Bounds;
+            if (body.IsEmpty)
+                body = new Rectangle((int)entity.Position.X, (int)entity.Position.Y, entity.Width, entity.Height);
 
-            // left wall
-            if (entity.Position.X < bounds.Left)
-            {
-                entity.Position = new Vector2(bounds.Left, entity.Position.Y);
-                if (entity.Direction != Vector2.Zero)
-                    entity.Direction = new Vector2(-entity.Direction.X, entity.Direction.Y);
-            }
-            // right wall
-            if (entity.Position.X + entity.Width > bounds.Right)
-            {
-                entity.Position = new Vector2(bounds.Right - entity.Width, entity.Position.Y);
-                if (entity.Direction != Vector2.Zero)
-                    entity.Direction = new Vector2(-entity.Direction.X, entity.Direction.Y);
-            }
-            // top wall
-            if (entity.Position.Y < bounds.Top)
-            {
-                entity.Position = new Vector2(entity.Position.X, bounds.Top);
-                if (entity.Direction != Vector2.Zero)
-                    entity.Direction = new Vector2(entity.Direction.X, -entity.Direction.Y);
-            }
-            // bottom wall
-            if (entity.Position.Y + entity.Height > bounds.Bottom)
-            {
-                entity.Position = new Vector2(entity.Position.X, bounds.Bottom - entity.Height);
-                if (entity.Direction != Vector2.Zero)
-                    entity.Direction = new Vector2(entity.Direction.X, -entity.Direction.Y);
-            }
+            // How far to move the entity to get its body back inside, on each axis.
+            int pushX = body.Left < area.Left   ? area.Left - body.Left
+                      : body.Right > area.Right ? area.Right - body.Right
+                      : 0;
+            int pushY = body.Top < area.Top       ? area.Top - body.Top
+                      : body.Bottom > area.Bottom ? area.Bottom - body.Bottom
+                      : 0;
+
+            if (pushX == 0 && pushY == 0) return;   // inside: nothing to do
+
+            entity.Position += new Vector2(pushX, pushY);
+            if (pushX != 0) entity.OnBlocked(horizontal: true);
+            if (pushY != 0) entity.OnBlocked(horizontal: false);
         }
     }
 }
