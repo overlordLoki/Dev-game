@@ -24,7 +24,7 @@ namespace Ashenveil.Core.Screens.Chat
     public class ChatScreen : IScreen
     {
         private const int Margin = 40, Pad = 20, BoxH = 260, PortraitSize = 160, BtnW = 90, BtnH = 40;
-        private const int Gap = 8, MessageGap = 6, InputPad = 12, MaxDraft = 200;
+        private const int Gap = 8, MessageGap = 6;
         public List<Widget> Widgets { get; set;} = new List<Widget>();
         private SpriteFont font;
         private MouseState prevMouse;
@@ -34,10 +34,9 @@ namespace Ashenveil.Core.Screens.Chat
         private Action _onClose;
         private GameWindow _window;
         private NPC _speaker;
-        private Rectangle _log, _input;
+        private Rectangle _log;
+        private TextField _textField;
 
-        // What the player has typed but not sent yet.
-        private string _draft = "";
         // Each message word-wrapped to the log's width, in step with Conversation.Messages.
         // Messages only ever get added, so a wrapped one never needs redoing.
         private List<List<string>> _wrapped = new List<List<string>>();
@@ -68,16 +67,22 @@ namespace Ashenveil.Core.Screens.Chat
             int rowY = box.Bottom - Pad - BtnH;
             var leaveRect = new Rectangle(box.Right - Pad - BtnW, rowY, BtnW, BtnH);
             var sendRect = new Rectangle(leaveRect.X - Gap - BtnW, rowY, BtnW, BtnH);
-            _input = new Rectangle(colX, rowY, sendRect.X - Gap - colX, BtnH);
+            var input = new Rectangle(colX, rowY, sendRect.X - Gap - colX, BtnH);
             _log = new Rectangle(colX, box.Y + Pad, box.Right - Pad - colX, rowY - Gap - (box.Y + Pad));
 
             // The portrait is whoever the player walked up to (the first NPC in the conversation).
             _speaker = conversation.Participants.OfType<NPC>().FirstOrDefault();
 
+            _textField = new TextField(input, "button_brown", _ => Send(), placeholder: "Say something...", maxLength: 200)
+            {
+                Focused = true,   // the chat opens ready to type
+            };
+
+            // Drawn in this order, so the box panel goes first and everything sits on top of it.
             Widgets.Add(new Panel(box, "panel_brown_dark"));
             Widgets.Add(new Image(face, _speaker?.Portrait == null ? null : Textures.Get(_speaker.Portrait)));
             Widgets.Add(new Label(nameRect, _speaker?.Name ?? "", Color.Gold));
-            Widgets.Add(new Panel(_input, "button_brown", border: 6));
+            Widgets.Add(_textField);
             Widgets.Add(new Button(sendRect, "Send", "button_brown", Send));
             Widgets.Add(new Button(leaveRect, "Leave", "button_brown", Close));
 
@@ -87,24 +92,15 @@ namespace Ashenveil.Core.Screens.Chat
 
         private void OnTextInput(object sender, TextInputEventArgs e)
         {
-            if (_waitForRelease) return;
-
-            if (e.Key == Keys.Enter || e.Character == '\r') Send();
-            else if (e.Key == Keys.Back || e.Character == '\b')
-            {
-                if (_draft.Length > 0) _draft = _draft[..^1];
-            }
-            // Only what the font can draw: DrawString throws on a glyph it doesn't have.
-            else if (_draft.Length < MaxDraft && font.Characters.Contains(e.Character))
-                _draft += e.Character;
+            if (_waitForRelease) return;   // the E that opened the chat is still held
+            _textField.Type(e.Character);  // Enter, Backspace and the length limit are the field's job
         }
 
         private void Send()
         {
-            // The draft is kept while a reply is on its way, so it can be sent once it lands.
-            if (_conversation.IsLoading || _draft.Trim().Length == 0) return;
-            _conversation.Say(Conversation.PlayerName, _draft.Trim());
-            _draft = "";
+            if (_conversation.IsLoading || _textField.Text.Trim().Length == 0) return;
+            _conversation.Say(Conversation.PlayerName, _textField.Text.Trim());
+            _textField.Text = "";   // the owner decides to clear, not the widget
         }
 
         // Walking away: mark the conversation finished so the world releases the NPCs.
@@ -124,6 +120,7 @@ namespace Ashenveil.Core.Screens.Chat
 
             var mouse = AshenveilGame.Input.Mouse;
             foreach (var w in Widgets) w.Update(mouse, prevMouse);
+            _textField.Focused = true;   // the only field here: a click on Send or the log mustn't unfocus it
             prevMouse = mouse;
 
             var kb = AshenveilGame.Input.Keyboard;
@@ -138,7 +135,6 @@ namespace Ashenveil.Core.Screens.Chat
         {
             foreach (var w in Widgets) w.Draw(spriteBatch, font);
             DrawLog(spriteBatch);
-            DrawInput(spriteBatch);
         }
 
         // Newest message at the bottom, working upwards until the log is full. Older messages
@@ -189,25 +185,11 @@ namespace Ashenveil.Core.Screens.Chat
             }
         }
 
-        private void DrawInput(SpriteBatch spriteBatch)
-        {
-            // Cursor blinks twice a second.
-            string cursor = _time % 1 < 0.5 ? "_" : "";
-
-            // A draft longer than the field shows its end, where the typing is happening.
-            string shown = _draft;
-            int room = _input.Width - InputPad * 2;
-            while (shown.Length > 0 && font.MeasureString(shown + "_").X > room) shown = shown.Substring(1);
-
-            var pos = new Vector2(_input.X + InputPad, (int)(_input.Y + (_input.Height - font.LineSpacing) / 2f));
-            spriteBatch.DrawString(font, shown + cursor, pos, Color.Black);
-        }
-
         private static string Format(ChatMessage message) =>
             message.Speaker == null ? message.Text : $"{message.Speaker}: {message.Text}";
 
-        // The LLM writes whatever it likes; the font only has so many glyphs, and DrawString
-        // throws on one it doesn't have. Swap the usual suspects for plain ones, "?" for the rest.
+        // The LLM writes whatever it likes; the font only has so many glyphs. Swap the usual
+        // suspects for plain ones that read better than the font's DefaultCharacter '?'.
         private string Printable(string text)
         {
             var sb = new StringBuilder(text.Length);
@@ -221,7 +203,7 @@ namespace Ashenveil.Core.Screens.Chat
                     _ => raw,
                 };
                 if (c == '…') sb.Append("...");
-                else sb.Append(c == '\n' || font.Characters.Contains(c) ? c : '?');
+                else sb.Append(c);
             }
             return sb.ToString();
         }
