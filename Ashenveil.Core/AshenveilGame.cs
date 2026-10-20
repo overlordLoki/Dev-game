@@ -63,6 +63,9 @@ namespace Ashenveil.Core
             graphicsDeviceManager.ApplyChanges();
             Window.AllowUserResizing = true;
             Window.ClientSizeChanged += OnResize;
+            // Subscribed once, here, for the game's lifetime: screens get typing through
+            // IScreen.OnTextInput, so none of them has to subscribe or remember to unsubscribe.
+            Window.TextInput += (s, e) => _screenManager.TextInput(e.Character);
             IsMouseVisible = true;
             // Share GraphicsDeviceManager as a service.
             Services.AddService(typeof(GraphicsDeviceManager), graphicsDeviceManager);
@@ -130,7 +133,7 @@ namespace Ashenveil.Core
             _gameplayScreen = new GameplayScreen(world,
                 () => _screenManager.Push(_pause),
                 // Built fresh each time, from the window as it is now, so the box fits after a resize.
-                convo => _screenManager.Push(new ChatScreen(font, convo, Window,
+                convo => _screenManager.Push(new ChatScreen(font, convo,
                     () => _screenManager.Pop(),
                     GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height)));
             _gameplayScreen.UpdateLayout(w, h);   // set initial cell size before the first frame

@@ -32,7 +32,6 @@ namespace Ashenveil.Core.Screens.Chat
 
         private Conversation _conversation;
         private Action _onClose;
-        private GameWindow _window;
         private NPC _speaker;
         private Rectangle _log;
         private TextField _textField;
@@ -45,11 +44,10 @@ namespace Ashenveil.Core.Screens.Chat
         private bool _waitForRelease = true;
         private double _time;
 
-        public ChatScreen(SpriteFont font, Conversation conversation, GameWindow window, Action onClose, int screenWidth, int screenHeight)
+        public ChatScreen(SpriteFont font, Conversation conversation, Action onClose, int screenWidth, int screenHeight)
         {
             this.font = font;
             _conversation = conversation;
-            _window = window;
             _onClose = onClose;
 
             // Start from what's held right now, so the click or key that opened the chat
@@ -85,15 +83,13 @@ namespace Ashenveil.Core.Screens.Chat
             Widgets.Add(_textField);
             Widgets.Add(new Button(sendRect, "Send", "button_brown", Send));
             Widgets.Add(new Button(leaveRect, "Leave", "button_brown", Close));
-
-            // Typed characters arrive as events, already shifted and key-repeated by the OS.
-            _window.TextInput += OnTextInput;
         }
 
-        private void OnTextInput(object sender, TextInputEventArgs e)
+        // The ScreenManager hands typing to whichever screen is on top.
+        public void OnTextInput(char c)
         {
             if (_waitForRelease) return;   // the E that opened the chat is still held
-            _textField.Type(e.Character);  // Enter, Backspace and the length limit are the field's job
+            _textField.Type(c);            // Enter, Backspace and the length limit are the field's job
         }
 
         private void Send()
@@ -106,7 +102,6 @@ namespace Ashenveil.Core.Screens.Chat
         // Walking away: mark the conversation finished so the world releases the NPCs.
         private void Close()
         {
-            _window.TextInput -= OnTextInput;   // or this screen keeps hearing keystrokes after it's gone
             _conversation.End();
             _onClose();
         }

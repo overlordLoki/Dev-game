@@ -20,6 +20,10 @@ namespace Ashenveil.Core.Screens
                 _screens.Peek().Update(gameTime);
         }
 
+        // Typing goes to the top screen only, the same as Update: a screen underneath
+        // (the world under the chat) never hears it.
+        public void TextInput(char c) => Current?.OnTextInput(c);
+
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
             // One batch per screen: each screen picks its own transform, so the world
