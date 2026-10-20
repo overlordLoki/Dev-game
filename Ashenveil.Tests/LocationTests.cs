@@ -142,4 +142,28 @@ public class LocationTests
 
         Assert.Equal(small * 2, large);
     }
+
+    // --------------------------------------------------------------------- PlaceAt
+
+    [Fact]
+    public void PlaceAt_centres_an_entity_on_the_named_point()
+    {
+        Layout.Update(500);                                   // 100px cells
+        var entity = new TestEntity(0, 0);                    // 100x100
+
+        TestLevels.Location(Level).PlaceAt(entity, "spawn");  // cell (2,1) -> centre (250,150)
+
+        Assert.Equal(new Vector2(250, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
+    }
+
+    [Fact]
+    public void PlaceAt_an_unknown_point_falls_back_to_default()
+    {
+        Layout.Update(500);
+        var entity = new TestEntity(0, 0);
+
+        TestLevels.Location(Level).PlaceAt(entity, "nowhere");  // "default" is cell (1,1) -> centre (150,150)
+
+        Assert.Equal(new Vector2(150, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
+    }
 }

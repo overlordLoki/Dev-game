@@ -38,6 +38,9 @@ public class TestNpc : NPC
     // (NPC.Brain is protected, so this is the only way in from the test side).
     public TestNpc(float x, float y, NpcBrain brain) : base(new Vector2(x, y), 0, "Test", brain) { }
 
+    // A specific id, for tests that look NPCs up by id.
+    public TestNpc(float x, float y, int id) : base(new Vector2(x, y), id, "Test", new WanderBrain()) { }
+
     protected override float SizeInCells => 1f;
     protected override string BoundsKey => nameof(TestEntity);
 }

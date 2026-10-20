@@ -1,15 +1,9 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
-using Ashenveil.Core.Entities.brains;
-using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.GameWorld.Locations;
-using Ashenveil.Core.Tiles;
-using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
 using Ashenveil.Core.Graphics;
 
@@ -25,27 +19,21 @@ namespace Ashenveil.Core.GameWorld
     {
         public WorldBounds worldBounds;
         public Player player;
-        public List<NPC> NPCs;
         /// <summary>Every conversation, and what NPCs learn from them.</summary>
         public ConversationSystem Conversations { get; }
         /// <summary>Game time: days, seasons, years. Raises DayStarted when a day turns over.</summary>
         public GameClock Clock { get; } = new GameClock();
+        /// <summary>Which NPCs exist, and which level each one is in.</summary>
+        public NpcRoster Roster { get; } = new NpcRoster();
+
+        /// <summary>The NPCs in the level being played.</summary>
+        public IReadOnlyList<NPC> NPCs => Roster.In(location.Name);
 
         /// <summary>
         /// Raised when a conversation the player is part of begins, so whoever is showing the
         /// world (GameplayScreen) can open the chat box. The world itself never opens screens.
         /// </summary>
         public event Action<Conversation> PlayerConversationStarted;
-
-        // Every level's NPCs, kept alive across level changes so returning to a level
-        // gives back the same instances (and later, their accumulated memory).
-        private Dictionary<string, List<NPC>> _npcsByLevel = new();
-        // Which levels have already had their first-visit spawn run, so we don't respawn on return.
-        private HashSet<string> _populated = new();
-        // Hands out NPC ids. Only ever counts up, so ids stay unique across levels and
-        // despawns for the whole session. 0 is the player; NPCs start at 1.
-        private int _nextNpcId = 1;
-        private int NextId() => _nextNpcId++;
 
         /// The area currently being played. Only ever one: entering a building swaps
         /// this rather than stacking a second screen, so the player, camera and pause
@@ -65,36 +53,21 @@ namespace Ashenveil.Core.GameWorld
         }
 
         /// <summary>
-        /// Called on first load of a new game, player is spawned here. Layout must already
-        /// have a cell size (the game sets it from the window; tests call Layout.Update).
+        /// Called on first load of a new game: stands the player on the spawn point and brings
+        /// in the level's starting NPCs. Layout must already have a cell size (the game sets it
+        /// from the window; tests call Layout.Update).
         /// </summary>
         public void Init()
         {
-            Spawn(player, "Player_spawn");
-            EnsurePopulated();
-        }
-
-        public void Spawn(Entity entity, String poi_name)
-        {
-            PointOfInterest poi;
-            if(location.Poi(poi_name) == null)
-            {
-                poi = location.Poi("default");
-            }
-            else
-            {
-                poi = location.Poi(poi_name);
-            }
-
-            entity.Position = poi.ToPixel() - new Vector2(entity.Width / 2f, entity.Height / 2f);
-
+            location.PlaceAt(player, "Player_spawn");
+            Roster.Populate(location);
         }
 
         /// <summary>
-        /// Puts an NPC in the current level. Level spawns use this, and so can tests (and a
-        /// future debug-console "spawn" command).
+        /// Puts an NPC in the level being played. Tests use this, and a future debug-console
+        /// "spawn" command can too.
         /// </summary>
-        public void AddNpc(NPC npc) => NPCs.Add(npc);
+        public void AddNpc(NPC npc) => Roster.Add(location.Name, npc);
 
         /// <summary>
         /// Makes <paramref name="next"/> the active area and re-fences the world to its
@@ -105,48 +78,9 @@ namespace Ashenveil.Core.GameWorld
         {
             location = next;
             worldBounds = new WorldBounds(next.tileMap);
-
-            // Point NPCs at this level's bucket, creating an empty one on first visit.
-            // No spawning here — Layout may not be ready yet (we're called from the ctor).
-            if (!_npcsByLevel.TryGetValue(next.Name, out var bucket))
-            {
-                bucket = new List<NPC>();
-                _npcsByLevel[next.Name] = bucket;
-            }
-            NPCs = bucket;
+            // No NPC spawning here - Layout may not be ready yet (the constructor calls this).
+            // Init and UseExit call Roster.Populate once it is.
         }
-        // First-visit spawn for the current level. Safe to call every time you enter a
-        // level — it only does work the first time. Must run after Layout is ready.
-        private void EnsurePopulated()
-        {
-            if (_populated.Contains(location.Name)) return;
-            _populated.Add(location.Name);
-            SpawnLevelNpcs(location.Name);
-        }
-
-        // What NPCs each level starts with. Hardcoded per level for now; later this reads
-        // from the level's JSON the same way POIs and exits already do.
-        private void SpawnLevelNpcs(string levelName)
-        {
-            switch (levelName)
-            {
-                case "Medows":
-                    var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot", new KnightBrain());
-                    Spawn(knight, "Knight_spawn");
-                    AddNpc(knight);
-                    knight.GiveTask(new GoToTask(location.Poi("entry").ToPixel()));
-                    knight.GiveTask(new WaitTask(3f));
-                    knight.GiveTask(new GoToTask(location.Poi("Knight_spawn").ToPixel()));
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// Finds an NPC by id across every level, not just the current one, so a lookup
-        /// works even while the player is somewhere else. Null if no NPC has that id.
-        /// </summary>
-        public NPC FindNpc(int id) =>
-            _npcsByLevel.Values.SelectMany(bucket => bucket).FirstOrDefault(npc => npc.Id == id);
 
         /// <summary>
         /// The player's "interact" action (the E key): talk to an NPC in reach, otherwise use
@@ -172,7 +106,7 @@ namespace Ashenveil.Core.GameWorld
         public void UseExit(ExitData exit)
         {
             SetLocation(new Location(exit.to));
-            EnsurePopulated();          // first visit spawns, return visit reuses
+            Roster.Populate(location);   // first visit spawns, return visit reuses
 
             // Centre the player in the spawn cell rather than at its corner, so they
             // don't start half-inside whatever is standing on the neighbouring tile.

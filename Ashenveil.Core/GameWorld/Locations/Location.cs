@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using Ashenveil.Core.Entities;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Objects;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
+using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.GameWorld.Locations
 {
@@ -41,5 +43,16 @@ namespace Ashenveil.Core.GameWorld.Locations
         /// <summary>The named point with this name, or null if the level has none.</summary>
         public PointOfInterest Poi(string name) =>
             pointsOfInterest.TryGetValue(name, out var p) ? p : null;
+
+        /// <summary>
+        /// Stands an entity centred on the named point - or on "default" if this level doesn't
+        /// have one by that name, so a missing spawn point never leaves something at (0, 0).
+        /// Centred rather than corner-aligned, so it doesn't start half inside the next cell.
+        /// </summary>
+        public void PlaceAt(Entity entity, string poiName)
+        {
+            PointOfInterest poi = Poi(poiName) ?? Poi("default");
+            entity.Position = poi.ToPixel() - new Vector2(entity.Width / 2f, entity.Height / 2f);
+        }
     }
 }
