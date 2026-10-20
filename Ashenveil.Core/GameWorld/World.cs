@@ -23,14 +23,13 @@ namespace Ashenveil.Core.GameWorld
     /// </summary>
     public class World
     {
-        private static readonly string[] Seasons = { "Spring", "Summer", "Fall", "Winter" };
-        private const float SecondsPerDay = 600f; // 10 real minutes = 1 game day
-
         public WorldBounds worldBounds;
         public Player player;
         public List<NPC> NPCs;
         /// <summary>Every conversation, and what NPCs learn from them.</summary>
         public ConversationSystem Conversations { get; }
+        /// <summary>Game time: days, seasons, years. Raises DayStarted when a day turns over.</summary>
+        public GameClock Clock { get; } = new GameClock();
 
         /// <summary>
         /// Raised when a conversation the player is part of begins, so whoever is showing the
@@ -38,16 +37,6 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public event Action<Conversation> PlayerConversationStarted;
 
-        // Time tracking: 10 real minutes = 1 game day
-        private float _elapsedSeconds;
-        public GameDate CurrentDate { get; private set; } = new GameDate();
-
-        public int TotalDays => CurrentDate.TotalDays;
-        public int Year => CurrentDate.Year;
-        public int Day => CurrentDate.Day;
-        public int Season => CurrentDate.Season;
-        public string SeasonName => Seasons[Season];
-        public string DateDisplay => $"{SeasonName} {Day}, Year {Year}";
         // Every level's NPCs, kept alive across level changes so returning to a level
         // gives back the same instances (and later, their accumulated memory).
         private Dictionary<string, List<NPC>> _npcsByLevel = new();
@@ -199,21 +188,9 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public Conversation StartConversation(Entity from, params NPC[] others)
         {
-            var convo = Conversations.Start(from, others, location, CurrentDate.TotalDays);
+            var convo = Conversations.Start(from, others, location, Clock.TotalDays);
             if (from == player) PlayerConversationStarted?.Invoke(convo);
             return convo;
-        }
-
-        // Advance game time: 10 real minutes = 1 game day
-        private void AdvanceTime(GameTime gameTime)
-        {
-            _elapsedSeconds += (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-            while (_elapsedSeconds >= SecondsPerDay)
-            {
-                _elapsedSeconds -= SecondsPerDay;
-                CurrentDate.AdvanceDay();
-            }
         }
 
         /// <summary>
@@ -230,8 +207,8 @@ namespace Ashenveil.Core.GameWorld
         /// <summary>One step of the game: time, conversations, decisions, movement, collision.</summary>
         public void Update(GameTime gameTime)
         {
-            AdvanceTime(gameTime);
-            Conversations.Update(CurrentDate.TotalDays);
+            Clock.Update(gameTime);
+            Conversations.Update(Clock.TotalDays);
             player.Update(gameTime);
             worldBounds.Clamp(player);
             foreach (var npc in NPCs)

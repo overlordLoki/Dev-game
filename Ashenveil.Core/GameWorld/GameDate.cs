@@ -1,6 +1,8 @@
-
 namespace Ashenveil.Core.GameWorld
 {
+    /// <summary>
+    /// Represents the in-game date, including year, season, day, and total days since the start of the game. Provides functionality to advance the date by one day.
+    /// </summary>
     public class GameDate
     {
         public int Year { get; private set; } = 1;

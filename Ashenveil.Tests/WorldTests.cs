@@ -89,7 +89,7 @@ public class WorldTests : IDisposable
 
         Step(world, 600);
 
-        Assert.Equal(2, world.TotalDays);
+        Assert.Equal(2, world.Clock.TotalDays);
     }
 
     // ------------------------------------------------------------------ interacting
