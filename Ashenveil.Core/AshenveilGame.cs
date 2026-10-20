@@ -119,6 +119,7 @@ namespace Ashenveil.Core
             var h = GraphicsDevice.Viewport.Height;
             var w = GraphicsDevice.Viewport.Width;
             var font = Content.Load<SpriteFont>("Fonts/Hud");
+            font.DefaultCharacter = '?';   // draw '?' for a character the font lacks, instead of throwing
             _pause = new Pause(font,
                 () => _screenManager.Pop(),   // Resume
                 Exit,                         // Quit to Desktop
