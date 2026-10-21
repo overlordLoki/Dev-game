@@ -22,7 +22,8 @@ microseconds. It lands in three pieces that can each be tested on their own: a *
   within 4px. It aims the **sprite's centre** (`Position + size/2`), the same point
   `Location.PlaceAt` uses. It has an empty private `AStar()` stub.
 - **Targets** are POIs: `NpcBrain.MakeGoTo` turns a decision's `go_to` into
-  `new GoToTask(poi.ToPixel())`, the POI cell's centre in pixels.
+  `new GoToTask(poi.ToWorld())`, the POI cell's centre in cells (world units, since the
+  world-units refactor).
 - **Obstacles** are only **objects** (trees, bushes, the well, castle pieces). Each sits on
   one cell (`Col`, `Row`) and has collision `Boxes` from `bounds.json`, usually covering
   only part of its cell (a trunk, not the canopy). **Tiles never block**: there's no
@@ -65,13 +66,14 @@ A plain grid of `bool`: `walkable[row, col]`. It's built once from a `Location`:
 Cells are **resolution-independent**: a box covers the same fraction of a cell at any
 window size. So the grid is built once per level and doesn't need rebuilding on resize.
 It can live on `Location` as `location.Nav`, built in its constructor or lazily on first
-use. Lazy is safer, because boxes are measured in pixels and need `Layout` set first.
+use. Since the world-units refactor, boxes are `RectF`s in cells, so building it needs no
+`Layout` at all: in the constructor is fine.
 
 Helpers it should offer, all in cell units:
 ```csharp
 bool IsWalkable(Point cell);               // false off the map
-Point CellAt(Vector2 pixel);               // which cell a point is in
-Vector2 CentreOf(Point cell);              // cell centre in pixels
+Point CellAt(Vector2 world);               // which cell a point is in: just floor x and y
+Vector2 CentreOf(Point cell);              // cell centre: (col + 0.5, row + 0.5)
 ```
 
 **Tests:** an empty level is all walkable; a level with a tree blocks the tree's cell and
@@ -126,16 +128,14 @@ How it works, to learn from:
 
 - **Plan on the first `Execute`, not in the constructor.** A task can wait in the queue
   behind others, so the NPC's position when it's *created* isn't where it'll start from.
-  Keep the path as a list of waypoints in pixels: the centre of each cell, except the last,
+  Keep the path as a list of waypoints in cells: the centre of each cell, except the last,
   which is the exact target.
 - **Each tick:** steer at the current waypoint. Within the arrive radius, move on to
   the next. After the last one, `Completed`, as now.
-- **Use the feet, not the sprite centre.** Collision, `SortY` and the NavGrid all use the
-  **feet** (`Bounds`), so path following should ask "which cell are my feet in" and steer the
-  feet to each waypoint. Steering the sprite centre would aim the body half a cell high, and
-  the feet would clip the trees the path went round. `Location.PlaceAt` centres the sprite
-  on a POI. Decide whether a POI means "stand your feet here" too; feet is the natural
-  answer for a top-down game, and it's a one-line change in `PlaceAt`.
+- **Use the feet ✅ done.** `Entity.Feet` (the bottom centre of the collision box) is what
+  `GoToTask` steers and what `Location.PlaceAt` / `StandAt` put on a POI. Path following
+  should ask "which cell are my feet in" and steer `Feet` to each waypoint. Then the feet,
+  which are what collides, go round the trees the path went round.
 - **The task needs the grid.** Add `NavGrid Nav` to `TaskContext`, filled in by the brain.
   The brain gets it from the NPC, so **NPCs need to know their level**: add `Location` to
   `NPC`, set by `NpcRoster.Add`. It's needed for anything level-aware, and it gets updated

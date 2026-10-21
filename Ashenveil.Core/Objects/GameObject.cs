@@ -21,8 +21,8 @@ namespace Ashenveil.Core.Objects
         public Texture2D Texture { get; protected set; }
         public int Rotate { get; protected set; }
 
-        // Depth-sort key: the base = bottom edge of the object's cell.
-        public int SortY => (Row + 1) * Layout.CellHeight;
+        // Depth-sort key: the base = bottom edge of the object's cell, in cells.
+        public float SortY => Row + 1;
 
         // How big the sprite is drawn, in multiples of a cell. Trees have always sat at
         // 1.5; a subclass whose art wants a different footprint overrides just this.
@@ -36,29 +36,22 @@ namespace Ashenveil.Core.Objects
             Texture = Textures.Get(assetName);
         }
 
-        // The fraction boxes for this concrete class, placed against this object's cell.
-        // The base is the SAME square the sprite is drawn over - a CellSize square,
-        // centred horizontally in the cell and sat on its bottom edge - not the raw cell.
-        // Cells can be non-square (window 1280x720 over a 10x8 grid = 128x90), and the
-        // sprite is sized by CellSize; measuring boxes against the raw cell instead would
-        // stretch them off the art horizontally. This matches the editor's square preview.
-        public IReadOnlyList<Rectangle> Boxes
+        // The fraction boxes for this concrete class, placed against this object's cell: in
+        // world units that's simply the 1x1 square at (Col, Row). (Cells are square now, so
+        // the old centring-in-a-stretched-cell sum always came out as exactly this.)
+        public IReadOnlyList<RectF> Boxes
         {
             get
             {
-                int s  = Layout.CellSize;
-                int ox = Col * Layout.CellWidth  + (Layout.CellWidth  - s) / 2;
-                int oy = Row * Layout.CellHeight + (Layout.CellHeight - s);
-
                 var boxes = BoundsStore.For(GetType().Name);
-                var rects = new Rectangle[boxes.Count];
+                var rects = new RectF[boxes.Count];
                 for (int i = 0; i < boxes.Count; i++)
-                    rects[i] = boxes[i].ToRectangle(ox, oy, s, s);
+                    rects[i] = boxes[i].ToRect(Col, Row, 1f, 1f);
                 return rects;
             }
         }
 
-        public Rectangle Bounds => Geometry.Union(Boxes);
+        public RectF Bounds => Geometry.Union(Boxes);
 
         public void Draw(SpriteBatch spriteBatch)
         {
@@ -78,7 +71,7 @@ namespace Ashenveil.Core.Objects
 
             // Debug: outline every collision box.
             foreach (var box in Boxes)
-                Debug.DrawRect(spriteBatch, box, Color.Black);
+                Debug.DrawRect(spriteBatch, Layout.ToScreen(box), Color.Black);
         }
     }
 }

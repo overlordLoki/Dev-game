@@ -1,5 +1,3 @@
-using Microsoft.Xna.Framework;
-
 namespace Ashenveil.Core.Collision
 {
     /// <summary>
@@ -18,12 +16,8 @@ namespace Ashenveil.Core.Collision
             X = x; Y = y; W = w; H = h;
         }
 
-        /// <summary>Turns the fractions into a pixel rectangle against a placed base.</summary>
-        public Rectangle ToRectangle(int originX, int originY, int baseW, int baseH) =>
-            new Rectangle(
-                originX + (int)(baseW * X),
-                originY + (int)(baseH * Y),
-                (int)(baseW * W),
-                (int)(baseH * H));
+        /// <summary>Turns the fractions into a world rectangle (in cells) against a placed base.</summary>
+        public RectF ToRect(float originX, float originY, float baseW, float baseH) =>
+            new RectF(originX + baseW * X, originY + baseH * Y, baseW * W, baseH * H);
     }
 }

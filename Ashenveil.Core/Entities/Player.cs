@@ -15,7 +15,7 @@ namespace Ashenveil.Core.Entities
         
         public Player(Vector2 position, int id) : base(position, id)
         {
-            Speed = 200f;
+            Speed = 1.4f;   // cells per second (was 200px/s at 720p's 144px cells)
             AddAnimation("idle", Assets.PLAYERIDLE, 0.15);
         }
 

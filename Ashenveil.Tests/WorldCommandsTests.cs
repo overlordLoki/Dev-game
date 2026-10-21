@@ -11,7 +11,7 @@ namespace Ashenveil.Tests;
 
 /// <summary>
 /// The console commands that read and change the game, run against a World built from a test
-/// level - the same way WorldTests does, with no screen. A 5x5 field at 100px cells.
+/// level - the same way WorldTests does, with no screen. A 5x5 field, in cells.
 /// </summary>
 public class WorldCommandsTests : IDisposable
 {
@@ -33,7 +33,6 @@ public class WorldCommandsTests : IDisposable
     public WorldCommandsTests()
     {
         NullContentManager.Install();
-        Layout.Update(500);
         Ashenveil.Core.AshenveilGame.Input = new FakeInput();
 
         _world = new World(TestLevels.Location(Level),
@@ -65,16 +64,64 @@ public class WorldCommandsTests : IDisposable
     {
         var line = RunOne("where");
 
-        Assert.StartsWith(_world.location.Name + ", cell (2, 2)", line.Text);
+        Assert.Equal($"Player: {_world.location.Name}, cell (2, 2), feet at (2.50, 2.90)", line.Text);
     }
 
     [Fact]
-    public void Tp_moves_the_player_to_the_centre_of_the_cell()
+    public void Where_player_is_the_same_as_no_argument()
+    {
+        Assert.Equal(RunOne("where").Text, RunOne("where PLAYER").Text);
+    }
+
+    [Fact]
+    public void Where_an_NPC_shows_its_feet_by_id_or_name()
+    {
+        var npc = new TestNpc(3, 1, 7);   // 1x1, box = whole sprite: feet at (3.5, 2)
+        _world.AddNpc(npc);
+
+        string expected = $"Test (#7): {_world.location.Name}, cell (3, 1), feet at (3.50, 2.00)";
+        Assert.Equal(expected, RunOne("where 7").Text);
+        Assert.Equal(expected, RunOne("where test").Text);
+    }
+
+    [Fact]
+    public void Where_an_unknown_NPC_is_an_error()
+    {
+        Assert.Equal(LineKind.Error, RunOne("where Bob").Kind);
+    }
+
+    [Theory]
+    [InlineData("tpxy 3.25 4.5", 3.25f, 4.5f)]
+    [InlineData("tpxy 1 2", 1f, 2f)]
+    [InlineData("tpxy 0 5", 0f, 5f)]          // the very edge of the map is allowed
+    public void Tpxy_puts_the_feet_on_an_exact_spot(string input, float x, float y)
+    {
+        var line = RunOne(input);
+
+        Assert.Equal(LineKind.Output, line.Kind);
+        Near.Equal(new Vector2(x, y), _world.player.Feet);
+    }
+
+    [Theory]
+    [InlineData("tpxy 5.1 2")]
+    [InlineData("tpxy -0.5 2")]
+    [InlineData("tpxy left up")]
+    [InlineData("tpxy 3,5 2")]                // a comma isn't a decimal point here
+    public void Tpxy_off_the_map_or_not_numbers_is_an_error_and_leaves_the_player_alone(string input)
+    {
+        var before = _world.player.Position;
+
+        Assert.Equal(LineKind.Error, RunOne(input).Kind);
+        Assert.Equal(before, _world.player.Position);
+    }
+
+    [Fact]
+    public void Tp_stands_the_player_on_the_cell_like_a_spawn_point()
     {
         RunOne("tp 4 1");
 
         var p = _world.player;
-        Assert.Equal(new Vector2(450, 150), p.Position + new Vector2(p.Width / 2f, p.Height / 2f));
+        Near.Equal(new Vector2(4.5f, 1.9f), p.Feet);   // centred across, near the bottom
         Assert.Contains("cell (4, 1)", RunOne("where").Text);
     }
 

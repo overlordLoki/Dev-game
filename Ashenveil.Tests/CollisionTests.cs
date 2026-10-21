@@ -1,42 +1,42 @@
-using Ashenveil.Core;
 using Ashenveil.Core.Collision;
 using Microsoft.Xna.Framework;
-using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Tests;
 
 /// <summary>
-/// Every entity here is a 100x100 square with its top-left at Position (see TestEntity),
-/// so the numbers in each test can be checked on paper.
+/// Every entity here is a 1x1-cell square with its top-left at Position (see TestEntity),
+/// so the numbers in each test can be checked on paper. Collision is in world units
+/// (cells), so no Layout.Update is needed - the window size doesn't come into it.
+/// Floats like 0.9 aren't exact in binary, so positions are compared with Near.
 /// </summary>
 public class CollisionTests
 {
-    public CollisionTests() => Layout.Update(500);   // 500 / 5 visible rows = 100px cells
-
     // ------------------------------------------------------------------ the fixture
 
     [Fact]
-    public void TestEntity_body_is_a_cell_sized_square_at_its_position()
+    public void TestEntity_body_is_a_one_cell_square_at_its_position()
     {
-        var e = new TestEntity(30, 40);
+        var e = new TestEntity(0.3f, 0.4f);
 
-        Assert.Equal(new Rectangle(30, 40, 100, 100), e.Bounds);
+        Near.Equal(new RectF(0.3f, 0.4f, 1, 1), e.Bounds);
     }
 
     // --------------------------------------------------------------- Entity.Overlap
 
     [Theory]
-    // other is...        ox   oy   pushX pushY
-    [InlineData(/*right*/  90,  20,  -10,  -80)]
-    [InlineData(/*left */ -90,  20,   10,  -80)]
-    [InlineData(/*below*/  20,  90,  -80,  -10)]
-    [InlineData(/*above*/  20, -90,  -80,   10)]
-    public void Overlap_pushes_away_from_the_nearer_edge_on_each_axis(int ox, int oy, float pushX, float pushY)
+    // other is...         ox     oy    pushX  pushY
+    [InlineData(/*right*/  0.9f,  0.2f, -0.1f, -0.8f)]
+    [InlineData(/*left */ -0.9f,  0.2f,  0.1f, -0.8f)]
+    [InlineData(/*below*/  0.2f,  0.9f, -0.8f, -0.1f)]
+    [InlineData(/*above*/  0.2f, -0.9f, -0.8f,  0.1f)]
+    public void Overlap_pushes_away_from_the_nearer_edge_on_each_axis(float ox, float oy, float pushX, float pushY)
     {
-        var me    = new Rectangle(0, 0, 100, 100);
-        var other = new Rectangle(ox, oy, 100, 100);
+        var me    = new RectF(0, 0, 1, 1);
+        var other = new RectF(ox, oy, 1, 1);
 
-        Assert.Equal((pushX, pushY), TestEntity.OverlapOf(me, other));
+        var (x, y) = TestEntity.OverlapOf(me, other);
+
+        Near.Equal(new Vector2(pushX, pushY), new Vector2(x, y));
     }
 
     [Fact]
@@ -44,41 +44,42 @@ public class CollisionTests
     {
         // Both sides are equally close, so the "<" comparisons fall through to the
         // positive direction. Pinned so the tie-break can't change by accident.
-        var box = new Rectangle(0, 0, 100, 100);
+        var box = new RectF(0, 0, 1, 1);
 
-        Assert.Equal((100f, 100f), TestEntity.OverlapOf(box, box));
+        Assert.Equal((1f, 1f), TestEntity.OverlapOf(box, box));
     }
 
-    // ------------------------------------------------ ResolveCollision(Rectangle)
+    // ------------------------------------------------ ResolveCollision(RectF)
 
     [Theory]
-    // start         obstacle        end up
-    [InlineData(  0,   0,  90,  20,  -10,    0)]   // clipped its left edge   -> pushed left
-    [InlineData( 90,   0,   0,  20,  100,    0)]   // clipped its right edge  -> pushed right
-    [InlineData(  0,   0,  20,  90,    0,  -10)]   // landed on its top edge  -> pushed up
-    [InlineData( 20,  90,   0,   0,   20,  100)]   // hit it from underneath  -> pushed down
+    // start          obstacle       end up
+    [InlineData(0,    0,    0.9f, 0.2f, -0.1f, 0)]      // clipped its left edge   -> pushed left
+    [InlineData(0.9f, 0,    0,    0.2f,  1,    0)]      // clipped its right edge  -> pushed right
+    [InlineData(0,    0,    0.2f, 0.9f,  0,   -0.1f)]   // landed on its top edge  -> pushed up
+    [InlineData(0.2f, 0.9f, 0,    0,     0.2f, 1)]      // hit it from underneath  -> pushed down
     public void ResolveCollision_pushes_out_along_the_shallower_axis(
-        float startX, float startY, int obstacleX, int obstacleY, float endX, float endY)
+        float startX, float startY, float obstacleX, float obstacleY, float endX, float endY)
     {
         var e = new TestEntity(startX, startY);
-        var obstacle = new Rectangle(obstacleX, obstacleY, 100, 100);
+        var obstacle = new RectF(obstacleX, obstacleY, 1, 1);
 
         e.ResolveCollision(obstacle);
 
-        Assert.Equal(new Vector2(endX, endY), e.Position);
+        Near.Equal(new Vector2(endX, endY), e.Position);
         Assert.False(e.Bounds.Intersects(obstacle));
     }
 
     [Fact]
     public void ResolveCollision_on_an_exact_corner_resolves_vertically()
     {
-        // 10px deep on both axes: a tie goes to Y. This is the "sticks on corners"
+        // A quarter cell deep on both axes: a tie goes to Y. This is the "sticks on corners"
         // case - if it ever changes to X, walking along a wall will feel different.
+        // (Quarters are exact in binary, so the tie really is a tie.)
         var e = new TestEntity(0, 0);
 
-        e.ResolveCollision(new Rectangle(90, 90, 100, 100));
+        e.ResolveCollision(new RectF(0.75f, 0.75f, 1, 1));
 
-        Assert.Equal(new Vector2(0, -10), e.Position);
+        Assert.Equal(new Vector2(0, -0.25f), e.Position);
     }
 
     [Fact]
@@ -86,22 +87,34 @@ public class CollisionTests
     {
         var e = new TestEntity(0, 0);
 
-        e.ResolveCollision(new Rectangle(70, 60, 100, 100));   // 30 deep in X, 40 in Y
+        e.ResolveCollision(new RectF(0.7f, 0.6f, 1, 1));   // 0.3 deep in X, 0.4 in Y
 
-        Assert.Equal(new Vector2(-30, 0), e.Position);
+        Near.Equal(new Vector2(-0.3f, 0), e.Position);
     }
 
     [Theory]
-    [InlineData(100,   0)]   // edges touching exactly - not an overlap
-    [InlineData(  0, 100)]
-    [InlineData(300, 300)]   // nowhere near
-    public void ResolveCollision_leaves_position_alone_when_not_overlapping(int ox, int oy)
+    [InlineData(1, 0)]   // edges touching exactly - not an overlap
+    [InlineData(0, 1)]
+    [InlineData(3, 3)]   // nowhere near
+    public void ResolveCollision_leaves_position_alone_when_not_overlapping(float ox, float oy)
     {
         var e = new TestEntity(0, 0);
 
-        e.ResolveCollision(new Rectangle(ox, oy, 100, 100));
+        e.ResolveCollision(new RectF(ox, oy, 1, 1));
 
         Assert.Equal(Vector2.Zero, e.Position);
+    }
+
+    [Fact]
+    public void ResolveCollision_handles_overlaps_smaller_than_a_pixel()
+    {
+        // In cells, a hundredth of a cell is ~1.4px at 720p. Pixel-rectangle collision
+        // rounded this away; float rectangles see it and push it out.
+        var e = new TestEntity(0, 0);
+
+        e.ResolveCollision(new RectF(0.99f, 0, 1, 1));
+
+        Near.Equal(new Vector2(-0.01f, 0), e.Position);
     }
 
     // ---------------------------------------------------- ResolveCollision(list)
@@ -110,14 +123,14 @@ public class CollisionTests
     public void ResolveCollision_list_resolves_against_the_deepest_overlap_only()
     {
         var e = new TestEntity(0, 0);
-        var shallow = new Rectangle(95, 0, 50, 100);    // 5px into the right side
-        var deep    = new Rectangle(0, 80, 100, 50);    // 20px into the bottom
+        var shallow = new RectF(0.95f, 0, 0.5f, 1);    // 0.05 into the right side
+        var deep    = new RectF(0, 0.8f, 1, 0.5f);     // 0.2 into the bottom
 
         e.ResolveCollision(new[] { shallow, deep });
 
-        // Pushed up out of `deep`; X untouched, so it is still 5px inside `shallow`,
+        // Pushed up out of `deep`; X untouched, so it is still 0.05 inside `shallow`,
         // which is left for the next frame.
-        Assert.Equal(new Vector2(0, -20), e.Position);
+        Near.Equal(new Vector2(0, -0.2f), e.Position);
         Assert.False(e.Bounds.Intersects(deep));
         Assert.True(e.Bounds.Intersects(shallow));
     }
@@ -125,8 +138,8 @@ public class CollisionTests
     [Fact]
     public void ResolveCollision_list_gives_the_same_answer_in_either_order()
     {
-        var shallow = new Rectangle(95, 0, 50, 100);
-        var deep    = new Rectangle(0, 80, 100, 50);
+        var shallow = new RectF(0.95f, 0, 0.5f, 1);
+        var deep    = new RectF(0, 0.8f, 1, 0.5f);
         var a = new TestEntity(0, 0);
         var b = new TestEntity(0, 0);
 
@@ -141,8 +154,8 @@ public class CollisionTests
     {
         var e = new TestEntity(0, 0);
 
-        e.ResolveCollision(new[] { new Rectangle(100, 0, 50, 50), new Rectangle(400, 400, 10, 10) });
-        e.ResolveCollision(Array.Empty<Rectangle>());
+        e.ResolveCollision(new[] { new RectF(1, 0, 0.5f, 0.5f), new RectF(4, 4, 0.1f, 0.1f) });
+        e.ResolveCollision(Array.Empty<RectF>());
 
         Assert.Equal(Vector2.Zero, e.Position);
     }
@@ -153,12 +166,12 @@ public class CollisionTests
     public void CheckEntityCollision_moves_the_caller_and_not_the_other_entity()
     {
         var mover = new TestEntity(0, 0);
-        var other = new TestEntity(90, 20);
+        var other = new TestEntity(0.9f, 0.2f);
 
         mover.CheckEntityCollision(other);
 
-        Assert.Equal(new Vector2(-10, 0), mover.Position);
-        Assert.Equal(new Vector2(90, 20), other.Position);
+        Near.Equal(new Vector2(-0.1f, 0), mover.Position);
+        Assert.Equal(new Vector2(0.9f, 0.2f), other.Position);
     }
 
     [Fact]
@@ -166,9 +179,9 @@ public class CollisionTests
     {
         var npc = new TestNpc(0, 0) { Direction = new Vector2(1, 1) };
 
-        npc.CheckEntityCollision(new TestEntity(90, 20));   // shallow in X
+        npc.CheckEntityCollision(new TestEntity(0.9f, 0.2f));   // shallow in X
 
-        Assert.Equal(new Vector2(-10, 0), npc.Position);
+        Near.Equal(new Vector2(-0.1f, 0), npc.Position);
         Assert.Equal(new Vector2(-1, 1), npc.Direction);
     }
 
@@ -177,9 +190,9 @@ public class CollisionTests
     {
         var npc = new TestNpc(0, 0) { Direction = new Vector2(1, 1) };
 
-        npc.CheckEntityCollision(new TestEntity(20, 90));   // shallow in Y
+        npc.CheckEntityCollision(new TestEntity(0.2f, 0.9f));   // shallow in Y
 
-        Assert.Equal(new Vector2(0, -10), npc.Position);
+        Near.Equal(new Vector2(0, -0.1f), npc.Position);
         Assert.Equal(new Vector2(1, -1), npc.Direction);
     }
 
@@ -188,20 +201,20 @@ public class CollisionTests
     {
         var npc = new TestNpc(0, 0) { Direction = new Vector2(1, 1) };
 
-        npc.CheckEntityCollision(new TestEntity(100, 0));   // edges touching only
+        npc.CheckEntityCollision(new TestEntity(1, 0));   // edges touching only
 
         Assert.Equal(Vector2.Zero, npc.Position);
         Assert.Equal(new Vector2(1, 1), npc.Direction);
     }
 
-    // ------------------------------------------------------------- Box / Geometry
+    // ------------------------------------------------------------- Box / Geometry / RectF
 
     [Fact]
-    public void Box_ToRectangle_scales_fractions_against_the_base_and_offsets_by_origin()
+    public void Box_ToRect_scales_fractions_against_the_base_and_offsets_by_origin()
     {
         var box = new Box(0.25f, 0.5f, 0.5f, 0.25f);
 
-        Assert.Equal(new Rectangle(1025, 2100, 50, 50), box.ToRectangle(1000, 2000, 100, 200));
+        Assert.Equal(new RectF(10.25f, 21f, 0.5f, 0.5f), box.ToRect(10, 20, 1, 2));
     }
 
     [Fact]
@@ -209,18 +222,18 @@ public class CollisionTests
     {
         var boxes = new[]
         {
-            new Rectangle(10, 10, 20, 20),
-            new Rectangle(50, 0, 10, 10),
-            new Rectangle(0, 40, 5, 60),
+            new RectF(0.5f, 0.5f, 1, 1),
+            new RectF(2.5f, 0, 0.5f, 0.5f),
+            new RectF(0, 2, 0.25f, 3),
         };
 
-        Assert.Equal(new Rectangle(0, 0, 60, 100), Geometry.Union(boxes));
+        Assert.Equal(new RectF(0, 0, 3, 5), Geometry.Union(boxes));
     }
 
     [Fact]
     public void Union_of_one_box_is_that_box()
     {
-        var only = new Rectangle(3, 4, 5, 6);
+        var only = new RectF(3, 4, 5, 6);
 
         Assert.Equal(only, Geometry.Union(new[] { only }));
     }
@@ -228,7 +241,32 @@ public class CollisionTests
     [Fact]
     public void Union_of_nothing_is_empty()
     {
-        Assert.Equal(Rectangle.Empty, Geometry.Union(Array.Empty<Rectangle>()));
-        Assert.Equal(Rectangle.Empty, Geometry.Union(null));
+        Assert.Equal(RectF.Empty, Geometry.Union(Array.Empty<RectF>()));
+        Assert.Equal(RectF.Empty, Geometry.Union(null!));
+        Assert.True(RectF.Empty.IsEmpty);
+    }
+
+    [Fact]
+    public void RectF_edges_and_centre()
+    {
+        var r = new RectF(1, 2, 3, 4);
+
+        Assert.Equal((1f, 4f, 2f, 6f), (r.Left, r.Right, r.Top, r.Bottom));
+        Assert.Equal(new Vector2(2.5f, 4), r.Center);
+    }
+
+    [Fact]
+    public void RectF_Intersect_is_the_overlap_or_empty()
+    {
+        var a = new RectF(0, 0, 2, 2);
+
+        Assert.Equal(new RectF(1, 1, 1, 1), RectF.Intersect(a, new RectF(1, 1, 2, 2)));
+        Assert.True(RectF.Intersect(a, new RectF(2, 0, 1, 1)).IsEmpty);   // touching only
+    }
+
+    [Fact]
+    public void RectF_Inflate_grows_every_side()
+    {
+        Assert.Equal(new RectF(0.5f, 1.75f, 3, 2.5f), new RectF(1, 2, 2, 2).Inflate(0.5f, 0.25f));
     }
 }

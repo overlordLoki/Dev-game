@@ -11,11 +11,11 @@ namespace Ashenveil.Tests;
 /// <summary>
 /// The World runs with no window, no screen and no network: it's built from a level, given
 /// fake LLM calls, and stepped with hand-made GameTimes - exactly what the game does, minus
-/// the parts that show it. With Layout.Update(500) a cell is 100px.
+/// the parts that show it. Everything is in cells, so no window size is needed.
 /// </summary>
 public class WorldTests : IDisposable
 {
-    // One open 5x5 field with the player's spawn in the middle cell (2,2) -> pixel centre (250,250).
+    // One open 5x5 field with the player's spawn in the middle cell (2,2) -> standing spot (2.5, 2.9).
     private const string Level = """
         {
           "cols": 5, "rows": 5,
@@ -35,7 +35,6 @@ public class WorldTests : IDisposable
     public WorldTests()
     {
         NullContentManager.Install();
-        Layout.Update(500);
         AshenveilGame.Input = new FakeInput();   // no keys held: the player stands still
     }
 
@@ -53,13 +52,11 @@ public class WorldTests : IDisposable
     private static void Step(World world, double seconds) =>
         world.Update(new GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(seconds)));
 
-    private static Vector2 Centre(Entity e) => e.Position + new Vector2(e.Width / 2f, e.Height / 2f);
-
     // An NPC standing right next to the player, with its brain kept so the test can read its journal.
     private static (TestNpc npc, Ashenveil.Core.Entities.NpcBrain brain) NpcBeside(World world)
     {
         var brain = new WanderBrain();
-        var npc = new TestNpc(world.player.Position.X + 50, world.player.Position.Y, brain);
+        var npc = new TestNpc(world.player.Position.X + 0.5f, world.player.Position.Y, brain);
         world.AddNpc(npc);
         return (npc, brain);
     }
@@ -73,8 +70,8 @@ public class WorldTests : IDisposable
 
         for (int i = 0; i < 60; i++) Step(world, 1 / 60.0);   // one second of frames
 
-        // Init stood the player centred on Player_spawn, and with no keys held they're still there.
-        Assert.Equal(new Vector2(250, 250), Centre(world.player));
+        // Init stood the player's feet on Player_spawn, and with no keys held they're still there.
+        Near.Equal(new Vector2(2.5f, 2.9f), world.player.Feet);
     }
 
     [Fact]
@@ -131,7 +128,7 @@ public class WorldTests : IDisposable
 
     // ------------------------------------------------------------------ exits
 
-    // The same field with a door in the top-middle cell (2,0) -> pixels x 200..300, y 0..100.
+    // The same field with a door in the top-middle cell (2,0) -> x 2..3, y 0..1.
     // It leads to the real Medows level, which ships with the tests.
     private const string LevelWithDoor = """
         {
@@ -155,12 +152,12 @@ public class WorldTests : IDisposable
         return world;
     }
 
-    // Stands the player with the top of their body `gap` pixels below the door cell's bottom
-    // edge (y = 100), feet in the row below - where collision leaves you against a solid door.
-    private static void StandBelowDoor(World world, int gap)
+    // Stands the player with the top of their body `gap` cells below the door cell's bottom
+    // edge (y = 1), feet in the row below - where collision leaves you against a solid door.
+    private static void StandBelowDoor(World world, float gap)
     {
         var p = world.player;
-        p.Position += new Vector2(250 - p.Bounds.Center.X, 100 + gap - p.Bounds.Top);
+        p.Position += new Vector2(2.5f - p.Bounds.Center.X, 1 + gap - p.Bounds.Top);
     }
 
     [Fact]
@@ -184,9 +181,9 @@ public class WorldTests : IDisposable
 
         world.Interact();
 
-        // "entry" in Medows is cell (3,7) -> centre (350,750) at 100px cells.
-        Assert.Equal(world.location.Poi("entry").ToPixel(), Centre(world.player));
-        Assert.Equal(new Vector2(350, 750), Centre(world.player));
+        // "entry" in Medows is cell (3,7) -> standing spot (3.5, 7.9).
+        Near.Equal(world.location.Poi("entry").StandingSpot(), world.player.Feet);
+        Near.Equal(new Vector2(3.5f, 7.9f), world.player.Feet);
     }
 
     [Fact]
@@ -200,11 +197,11 @@ public class WorldTests : IDisposable
 
         world.UseExit(world.location.ExitAt(3, 6));
         Assert.Equal("CastleInterior", world.location.Name);
-        Assert.Equal(world.location.Poi("from_medows").ToPixel(), Centre(world.player));
+        Near.Equal(world.location.Poi("from_medows").StandingSpot(), world.player.Feet);
 
         world.UseExit(world.location.ExitAt(3, 4));
         Assert.Equal("Medows", world.location.Name);
-        Assert.Equal(world.location.Poi("entry").ToPixel(), Centre(world.player));
+        Near.Equal(world.location.Poi("entry").StandingSpot(), world.player.Feet);
     }
 
     [Fact]
@@ -229,7 +226,7 @@ public class WorldTests : IDisposable
     public void Interacting_away_from_the_door_stays_put()
     {
         var world = NewWorldWithDoor();
-        StandBelowDoor(world, gap: 30);
+        StandBelowDoor(world, gap: 0.3f);
         string before = world.location.Name;
 
         world.Interact();

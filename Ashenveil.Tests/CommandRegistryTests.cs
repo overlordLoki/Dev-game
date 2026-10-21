@@ -65,6 +65,32 @@ public class CommandRegistryTests
         Assert.Equal(new[] { "hi" }, _echoed);
     }
 
+    [Theory]
+    [InlineData("/echo hi")]
+    [InlineData("  /echo hi")]
+    [InlineData("//echo hi")]     // a double slash too: still clearly meant as the command
+    public void A_leading_slash_is_ignored(string input)
+    {
+        var lines = _commands.Execute(input);
+
+        Assert.Equal(new[] { "hi" }, _echoed);
+        Assert.All(lines, l => Assert.Equal(LineKind.Output, l.Kind));
+    }
+
+    [Fact]
+    public void A_slash_inside_an_argument_is_kept()
+    {
+        _commands.Execute("/echo a/b");
+
+        Assert.Equal(new[] { "a/b" }, _echoed);
+    }
+
+    [Fact]
+    public void A_slash_on_its_own_does_nothing()
+    {
+        Assert.Empty(_commands.Execute("/"));
+    }
+
     [Fact]
     public void Blank_input_does_nothing()
     {

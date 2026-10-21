@@ -1,4 +1,5 @@
 using Ashenveil.Core;
+using Ashenveil.Core.Collision;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Levels;
 using Ashenveil.Core.Screens;
@@ -16,8 +17,8 @@ namespace Ashenveil.Tests;
 /// <summary>
 /// A bare entity with a known body: Content/bounds.json (the tests' own copy) gives
 /// "TestEntity" one box covering the whole frame, and with no animations registered
-/// Width == Height == CellSize. So after Layout.Update(500) the body is exactly a
-/// 100x100 square whose top-left corner is Position.
+/// Width == Height == 1 cell. So the body is exactly a 1x1-cell square whose top-left
+/// corner is Position - at any window size.
 /// </summary>
 public class TestEntity : Entity
 {
@@ -26,10 +27,35 @@ public class TestEntity : Entity
     protected override float SizeInCells => 1f;
 
     // Overlap is protected; this is the door in for the tests.
-    public static (float pushX, float pushY) OverlapOf(Rectangle me, Rectangle other) => Overlap(me, other);
+    public static (float pushX, float pushY) OverlapOf(RectF me, RectF other) => Overlap(me, other);
 }
 
-/// <summary>Same 100x100 body as <see cref="TestEntity"/>, but with an NPC's brain attached.</summary>
+/// <summary>
+/// Equality give or take a rounding error. World positions are floats, and numbers like 0.9
+/// or 0.1 aren't exact in binary, so 0.9 - 1 comes out as -0.099999964, not -0.1.
+/// </summary>
+public static class Near
+{
+    public const float Tolerance = 1e-4f;
+
+    public static void Equal(Vector2 expected, Vector2 actual)
+    {
+        if (Vector2.Distance(expected, actual) > Tolerance)
+            throw new Xunit.Sdk.XunitException($"Expected {expected} (give or take {Tolerance}), but got {actual}.");
+    }
+
+    public static void Equal(RectF expected, RectF actual)
+    {
+        bool close = Math.Abs(expected.X - actual.X) <= Tolerance && Math.Abs(expected.Y - actual.Y) <= Tolerance
+                  && Math.Abs(expected.Width - actual.Width) <= Tolerance && Math.Abs(expected.Height - actual.Height) <= Tolerance;
+        if (!close)
+            throw new Xunit.Sdk.XunitException($"Expected {expected} (give or take {Tolerance}), but got {actual}.");
+    }
+
+    public static void Equal(float expected, float actual) => Assert.Equal(expected, actual, Tolerance);
+}
+
+/// <summary>Same 1x1-cell body as <see cref="TestEntity"/>, but with an NPC's brain attached.</summary>
 public class TestNpc : NPC
 {
     public TestNpc(float x, float y) : this(x, y, new WanderBrain()) { }

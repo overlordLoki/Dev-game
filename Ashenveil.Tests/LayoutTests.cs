@@ -1,5 +1,7 @@
 using Ashenveil.Core;
+using Ashenveil.Core.Collision;
 using Ashenveil.Core.Graphics;
+using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Tests;
 
@@ -41,6 +43,62 @@ public class LayoutTests
         Layout.Update(viewportHeight);
 
         Assert.Equal(100, Layout.CellSize);
+    }
+
+    // ------------------------------------------------------------ world <-> screen
+
+    [Theory]
+    [InlineData(500)]
+    [InlineData(720)]
+    [InlineData(1080)]
+    public void ToWorld_undoes_ToScreen_at_any_cell_size(int viewportHeight)
+    {
+        Layout.Update(viewportHeight);
+        var world = new Vector2(5.5f, 3.25f);
+
+        Assert.Equal(world, Layout.ToWorld(Layout.ToScreen(world)));
+    }
+
+    [Fact]
+    public void ToScreen_scales_a_position_by_the_cell_size()
+    {
+        Layout.Update(720);   // 144px cells
+
+        Assert.Equal(new Vector2(792, 468), Layout.ToScreen(new Vector2(5.5f, 3.25f)));
+    }
+
+    [Fact]
+    public void ToScreen_of_a_rectangle_rounds_each_edge_to_a_whole_pixel()
+    {
+        Layout.Update(720);   // 144px cells
+
+        // x 0.3..1.3 -> 43.2..187.2 px -> 43..187; y 2..2.5 -> 288..360.
+        Assert.Equal(new Rectangle(43, 288, 144, 72), Layout.ToScreen(new RectF(0.3f, 2, 1, 0.5f)));
+    }
+
+    [Fact]
+    public void Rectangles_that_touch_in_the_world_still_touch_on_screen()
+    {
+        // Rounding each edge (not x and width separately) means no 1px gaps or overlaps.
+        Layout.Update(720);
+
+        var left  = Layout.ToScreen(new RectF(0.3f, 0, 0.7f, 1));
+        var right = Layout.ToScreen(new RectF(1.0f, 0, 0.45f, 1));
+
+        Assert.Equal(left.Right, right.Left);
+    }
+
+    [Fact]
+    public void A_resize_changes_how_big_things_are_drawn_not_where_they_are()
+    {
+        var world = new Vector2(2, 3);
+
+        Layout.Update(500);
+        var small = Layout.ToScreen(world);
+        Layout.Update(1000);
+        var large = Layout.ToScreen(world);
+
+        Assert.Equal(small * 2, large);   // the same place, drawn twice as big
     }
 
     [Fact]

@@ -8,7 +8,8 @@ namespace Ashenveil.Tests;
 
 /// <summary>
 /// The player reads AshenveilGame.Input instead of the real keyboard, so a test can
-/// hold keys down and step time by hand. Speed is 200px/s: half a second is 100px.
+/// hold keys down and step time by hand. Speed is 1.4 cells/s: half a second is 0.7 cells.
+/// Positions are in cells, so the window size never comes into it.
 /// </summary>
 public class PlayerTests : IDisposable
 {
@@ -19,7 +20,7 @@ public class PlayerTests : IDisposable
     {
         NullContentManager.Install();
         AshenveilGame.Input = _input;
-        _player = new Player(new Vector2(500, 500), id: 0);
+        _player = new Player(new Vector2(5, 5), id: 0);
     }
 
     // Hand the real keyboard back so no other test inherits held keys.
@@ -29,17 +30,17 @@ public class PlayerTests : IDisposable
         _player.Update(new GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(seconds)));
 
     [Theory]
-    [InlineData(Keys.Right, 600, 500)]
-    [InlineData(Keys.Left,  400, 500)]
-    [InlineData(Keys.Up,    500, 400)]
-    [InlineData(Keys.Down,  500, 600)]
+    [InlineData(Keys.Right, 5.7f, 5)]
+    [InlineData(Keys.Left,  4.3f, 5)]
+    [InlineData(Keys.Up,    5, 4.3f)]
+    [InlineData(Keys.Down,  5, 5.7f)]
     public void Arrow_key_moves_the_player_at_Speed_in_that_direction(Keys key, float x, float y)
     {
         _input.Hold(key);
 
         Step(0.5);
 
-        Assert.Equal(new Vector2(x, y), _player.Position);
+        Near.Equal(new Vector2(x, y), _player.Position);
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public class PlayerTests : IDisposable
     {
         Step(0.5);
 
-        Assert.Equal(new Vector2(500, 500), _player.Position);
+        Assert.Equal(new Vector2(5, 5), _player.Position);
     }
 
     [Theory]
@@ -60,7 +61,7 @@ public class PlayerTests : IDisposable
 
         Step(0.5);
 
-        Assert.Equal(new Vector2(500, 500), _player.Position);
+        Assert.Equal(new Vector2(5, 5), _player.Position);
     }
 
     [Theory]
@@ -72,19 +73,19 @@ public class PlayerTests : IDisposable
 
         Step(0.5);
 
-        Assert.Equal(new Vector2(500, 500), _player.Position);
+        Assert.Equal(new Vector2(5, 5), _player.Position);
     }
 
     [Fact]
     public void Two_keys_move_on_both_axes_at_full_speed_each()
     {
-        // Not normalised: a diagonal covers 100px on X AND on Y, so ~141px overall.
+        // Not normalised: a diagonal covers 0.7 cells on X AND on Y, so ~0.99 overall.
         // If diagonals are ever slowed to match straight lines, this is the test to change.
         _input.Hold(Keys.Right, Keys.Down);
 
         Step(0.5);
 
-        Assert.Equal(new Vector2(600, 600), _player.Position);
+        Near.Equal(new Vector2(5.7f, 5.7f), _player.Position);
     }
 
     [Fact]
@@ -96,7 +97,7 @@ public class PlayerTests : IDisposable
         _input.Hold();
         Step(0.5);
 
-        Assert.Equal(new Vector2(600, 500), _player.Position);
+        Near.Equal(new Vector2(5.7f, 5), _player.Position);
     }
 
     [Fact]
@@ -107,7 +108,7 @@ public class PlayerTests : IDisposable
         Step(0.25);
         Step(0.25);
 
-        Assert.Equal(new Vector2(600, 500), _player.Position);
+        Near.Equal(new Vector2(5.7f, 5), _player.Position);
     }
 
     [Fact]
@@ -117,18 +118,36 @@ public class PlayerTests : IDisposable
 
         Step(0);
 
-        Assert.Equal(new Vector2(500, 500), _player.Position);
+        Assert.Equal(new Vector2(5, 5), _player.Position);
     }
 
     [Fact]
     public void Movement_scales_with_Speed()
     {
-        _player.Speed = 50f;
+        _player.Speed = 0.5f;
         _input.Hold(Keys.Right);
 
         Step(1);
 
-        Assert.Equal(new Vector2(550, 500), _player.Position);
+        Assert.Equal(new Vector2(5.5f, 5), _player.Position);
+    }
+
+    [Fact]
+    public void The_same_walk_covers_the_same_cells_at_any_window_size()
+    {
+        // Pixel speeds made the player faster in a small window (fewer pixels per cell).
+        // In cells/s the window doesn't matter.
+        var small = new Player(new Vector2(5, 5), id: 0);
+        var large = new Player(new Vector2(5, 5), id: 0);
+        _input.Hold(Keys.Right);
+
+        Ashenveil.Core.Graphics.Layout.Update(500);
+        small.Update(new GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1)));
+        Ashenveil.Core.Graphics.Layout.Update(1080);
+        large.Update(new GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1)));
+
+        Assert.Equal(small.Position, large.Position);
+        Near.Equal(new Vector2(6.4f, 5), large.Position);
     }
 
     [Fact]
@@ -138,6 +157,6 @@ public class PlayerTests : IDisposable
 
         Step(0.5);
 
-        Assert.Equal(new Vector2(500, 500), _player.Position);
+        Assert.Equal(new Vector2(5, 5), _player.Position);
     }
 }

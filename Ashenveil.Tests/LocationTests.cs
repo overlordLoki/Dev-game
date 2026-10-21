@@ -1,4 +1,5 @@
 using Ashenveil.Core;
+using Ashenveil.Core.Collision;
 using Ashenveil.Core.GameWorld.Locations;
 using Microsoft.Xna.Framework;
 using Ashenveil.Core.Graphics;
@@ -110,14 +111,12 @@ public class LocationTests
     }
 
     // ---------------------------------------------------------------- ExitTouching
-    // With Layout.Update(500), cells are 100px: the Castle2 exit at (0,1) is x 0..100, y 100..200.
+    // In cells: the Castle2 exit at (0,1) covers x 0..1, y 1..2.
 
     [Fact]
     public void ExitTouching_finds_a_body_standing_in_the_exit_cell()
     {
-        Layout.Update(500);
-
-        var exit = TestLevels.Location(Level).ExitTouching(new Rectangle(30, 130, 40, 40));
+        var exit = TestLevels.Location(Level).ExitTouching(new RectF(0.3f, 1.3f, 0.4f, 0.4f));
 
         Assert.Equal("Castle2", exit?.to);
     }
@@ -126,9 +125,7 @@ public class LocationTests
     public void ExitTouching_counts_a_body_pressed_against_the_exit_from_outside()
     {
         // The feet can't get into a door set in something solid: the body stops flush below it.
-        Layout.Update(500);
-
-        var exit = TestLevels.Location(Level).ExitTouching(new Rectangle(30, 202, 40, 20));   // 2px below
+        var exit = TestLevels.Location(Level).ExitTouching(new RectF(0.3f, 2.02f, 0.4f, 0.2f));   // 0.02 below
 
         Assert.Equal("Castle2", exit?.to);
     }
@@ -137,9 +134,7 @@ public class LocationTests
     public void ExitTouching_counts_a_body_that_only_overlaps_the_exit_cell_a_little()
     {
         // Mostly in the cell below, its top edge just inside the exit cell.
-        Layout.Update(500);
-
-        var exit = TestLevels.Location(Level).ExitTouching(new Rectangle(30, 190, 40, 40));
+        var exit = TestLevels.Location(Level).ExitTouching(new RectF(0.3f, 1.9f, 0.4f, 0.4f));
 
         Assert.Equal("Castle2", exit?.to);
     }
@@ -147,86 +142,112 @@ public class LocationTests
     [Fact]
     public void ExitTouching_is_null_a_little_further_away()
     {
-        Layout.Update(500);
-
-        Assert.Null(TestLevels.Location(Level).ExitTouching(new Rectangle(30, 210, 40, 20)));   // 10px below
+        Assert.Null(TestLevels.Location(Level).ExitTouching(new RectF(0.3f, 2.1f, 0.4f, 0.2f)));   // 0.1 below
     }
 
     [Fact]
     public void ExitTouching_is_null_in_a_level_with_no_exits()
     {
-        Layout.Update(500);
-
-        Assert.Null(TestLevels.Location(BareLevel).ExitTouching(new Rectangle(0, 0, 100, 100)));
+        Assert.Null(TestLevels.Location(BareLevel).ExitTouching(new RectF(0, 0, 1, 1)));
     }
 
-    // --------------------------------------------------------- PointOfInterest.ToPixel
+    // --------------------------------------------------------- PointOfInterest.ToWorld / StandingSpot
+
+    [Fact]
+    public void StandingSpot_is_centred_across_the_cell_and_near_its_bottom()
+    {
+        Near.Equal(new Vector2(2.5f, 3.9f), new PointOfInterest("p", 2, 3).StandingSpot());
+    }
+
+    [Fact]
+    public void Feet_on_a_standing_spot_dont_reach_a_door_in_the_cell_below()
+    {
+        // Standing on cell (0,0), right above the Castle2 door at (0,1). Feet at y = 0.9 plus the
+        // 0.03 door leeway is still short of the door's top edge (y = 1) - which is why the
+        // spot isn't the very bottom of the cell.
+        var feetOnSpot   = new RectF(0.3f, 0.5f, 0.4f, PointOfInterest.FeetDown - 0.5f);   // bottom at 0.9
+        var feetOnTheEdge = new RectF(0.3f, 0.5f, 0.4f, 0.5f);                            // bottom at 1.0
+
+        Assert.Null(TestLevels.Location(Level).ExitTouching(feetOnSpot));
+        Assert.Equal("Castle2", TestLevels.Location(Level).ExitTouching(feetOnTheEdge)?.to);
+    }
 
     [Theory]
-    [InlineData(0, 0,  50f,  50f)]
-    [InlineData(2, 3, 250f, 350f)]
-    [InlineData(7, 0, 750f,  50f)]
-    public void ToPixel_is_the_centre_of_the_cell(int col, int row, float x, float y)
+    [InlineData(0, 0, 0.5f, 0.5f)]
+    [InlineData(2, 3, 2.5f, 3.5f)]
+    [InlineData(7, 0, 7.5f, 0.5f)]
+    public void ToWorld_is_the_centre_of_the_cell(int col, int row, float x, float y)
     {
-        Layout.Update(500);   // 100px cells
-
-        Assert.Equal(new Vector2(x, y), new PointOfInterest("p", col, row).ToPixel());
+        Assert.Equal(new Vector2(x, y), new PointOfInterest("p", col, row).ToWorld());
     }
 
     [Fact]
-    public void ToPixel_keeps_the_half_pixel_on_an_odd_sized_cell()
+    public void ToWorld_does_not_change_when_the_window_resizes()
     {
-        Layout.Update(505);   // 101px cells
-
-        Assert.Equal(new Vector2(151.5f, 50.5f), new PointOfInterest("p", 1, 0).ToPixel());
-    }
-
-    [Fact]
-    public void ToPixel_follows_the_cell_size_when_the_window_resizes()
-    {
+        // The old pixel version doubled when the window did; a world position mustn't move.
         var poi = new PointOfInterest("p", 2, 3);
 
         Layout.Update(500);
-        var small = poi.ToPixel();
+        var small = poi.ToWorld();
         Layout.Update(1000);
-        var large = poi.ToPixel();
+        var large = poi.ToWorld();
 
-        Assert.Equal(small * 2, large);
+        Assert.Equal(small, large);
     }
 
     // --------------------------------------------------------------------- PlaceAt
 
     [Fact]
-    public void PlaceAt_centres_an_entity_on_the_named_point()
+    public void PlaceAt_stands_an_entity_with_its_feet_on_the_named_point()
     {
-        Layout.Update(500);                                   // 100px cells
-        var entity = new TestEntity(0, 0);                    // 100x100
+        var entity = new TestEntity(0, 0);                    // 1x1 cell, box = whole sprite
 
-        TestLevels.Location(Level).PlaceAt(entity, "spawn");  // cell (2,1) -> centre (250,150)
+        TestLevels.Location(Level).PlaceAt(entity, "spawn");  // cell (2,1) -> standing spot (2.5, 1.9)
 
-        Assert.Equal(new Vector2(250, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
+        Near.Equal(new Vector2(2.5f, 1.9f), entity.Feet);
+        Near.Equal(new Vector2(2, 0.9f), entity.Position);    // so the body mostly fills its own cell
+    }
+
+    // Its box (Content/bounds.json) spans y 25%..75% of the sprite: a quarter of padding below
+    // the feet, like a real sprite (the knight's frame is mostly padding above his body).
+    private class PaddedEntity : Ashenveil.Core.Entities.Entity
+    {
+        public PaddedEntity() : base(Vector2.Zero, 0) { }
+        protected override float SizeInCells => 1f;
+        protected override string BoundsKey => "TestPaddedEntity";
+    }
+
+    [Fact]
+    public void PlaceAt_puts_a_padded_sprites_feet_on_the_point_not_its_frame_centre()
+    {
+        var entity = new PaddedEntity();
+
+        TestLevels.Location(Level).PlaceAt(entity, "spawn");   // cell (2,1) -> standing spot (2.5, 1.9)
+
+        Near.Equal(new Vector2(2.5f, 1.9f), entity.Feet);
+        // The feet are 0.75 down the frame, so the frame starts 0.75 above them. Centring the
+        // frame on the spot instead (an older rule) would have put the feet 0.25 lower.
+        Near.Equal(new Vector2(2, 1.15f), entity.Position);
     }
 
     [Fact]
     public void PlaceAt_an_unknown_point_falls_back_to_default()
     {
-        Layout.Update(500);
         var entity = new TestEntity(0, 0);
 
-        TestLevels.Location(Level).PlaceAt(entity, "nowhere");  // "default" is cell (1,1) -> centre (150,150)
+        TestLevels.Location(Level).PlaceAt(entity, "nowhere");  // "default" is cell (1,1) -> standing spot (1.5, 1.9)
 
-        Assert.Equal(new Vector2(150, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
+        Near.Equal(new Vector2(1.5f, 1.9f), entity.Feet);
     }
 
     [Fact]
     public void PlaceAt_with_no_name_falls_back_to_default()
     {
         // An exit with no arriveAt passes null; that must land on "default", not throw.
-        Layout.Update(500);
         var entity = new TestEntity(0, 0);
 
         TestLevels.Location(Level).PlaceAt(entity, null);
 
-        Assert.Equal(new Vector2(150, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
+        Near.Equal(new Vector2(1.5f, 1.9f), entity.Feet);
     }
 }

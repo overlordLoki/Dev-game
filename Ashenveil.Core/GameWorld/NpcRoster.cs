@@ -50,8 +50,7 @@ namespace Ashenveil.Core.GameWorld
 
         /// <summary>
         /// The first time a level is entered, spawn the NPCs it starts with. Safe to call on
-        /// every visit - later calls do nothing. Needs Layout to have a cell size, since
-        /// spawning turns points of interest into pixel positions.
+        /// every visit - later calls do nothing.
         /// </summary>
         public void Populate(Location level)
         {
@@ -76,7 +75,7 @@ namespace Ashenveil.Core.GameWorld
             switch (level.Name)
             {
                 case "Medows":
-                    var knight = new Knight(new Vector2(200, 200), NextId(), "Sir Lancelot", new KnightBrain());
+                    var knight = new Knight(Vector2.Zero, NextId(), "Sir Lancelot", new KnightBrain());
                     level.PlaceAt(knight, "Knight_spawn");
                     Add(level.Name, knight);
 
@@ -85,9 +84,9 @@ namespace Ashenveil.Core.GameWorld
                     PointOfInterest entry = level.Poi("entry"), home = level.Poi("Knight_spawn");
                     if (entry != null && home != null)
                     {
-                        knight.GiveTask(new GoToTask(entry.ToPixel()));
+                        knight.GiveTask(new GoToTask(entry.StandingSpot()));
                         knight.GiveTask(new WaitTask(3f));
-                        knight.GiveTask(new GoToTask(home.ToPixel()));
+                        knight.GiveTask(new GoToTask(home.StandingSpot()));
                     }
                     break;
             }

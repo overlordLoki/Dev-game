@@ -9,7 +9,7 @@ namespace Ashenveil.Core.Graphics
     /// </summary>
     public interface IWorldDrawable
     {
-        int SortY { get; }                    // the base/feet Y — higher = drawn in front
+        float SortY { get; }                  // the base/feet Y, in cells — higher = drawn in front
         void Draw(SpriteBatch spriteBatch);
     }
 }

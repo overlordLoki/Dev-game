@@ -75,8 +75,9 @@ event log can feed into it later.
 | Command | Does | Why it's useful now | |
 |---|---|---|---|
 | `help` | Lists commands | Discoverable | ✅ |
-| `where` | Prints level, cell and pixel position | Essential for the world-units refactor | ✅ |
-| `tp <col> <row>` | Moves the player to a cell | Testing levels, POIs, exits | ✅ |
+| `where [npc]` | Prints the level, cell and x,y of the feet (in cells): the player's, or an NPC's by id/name | Essential for the world-units refactor; checking where NPCs stand | ✅ |
+| `tp <col> <row>` | Stands the player in the middle of a cell | Testing levels, POIs, exits | ✅ |
+| `tpxy <x> <y>` | Puts the player's feet on an exact x,y in cells (`tpxy 3.25 4.5`) | Lining up against box edges and doors | ✅ |
 | `level <name>` | Loads a level | Skip walking | |
 | `npcs` | Lists NPCs in all levels: id, name, level, state | Replaces reading debug prints | ✅ |
 | `journal <npc>` | Dumps an NPC's memories and transcripts | Checking the memory feature | ✅ |

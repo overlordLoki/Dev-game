@@ -5,7 +5,8 @@ using Ashenveil.Core.Levels;
 using Ashenveil.Core.Objects;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
-using Ashenveil.Core.Graphics;
+using System;
+using Ashenveil.Core.Collision;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.GameWorld.Locations
@@ -41,23 +42,27 @@ namespace Ashenveil.Core.GameWorld.Locations
         public ExitData ExitAt(int col, int row) =>
             exits.FirstOrDefault(e => e.col == col && e.row == row);
 
-        // How far outside an exit cell still counts as touching it, in pixels. Collision leaves
-        // the body flush against a solid door, so this is leeway, not reach.
-        private const int ExitLeeway = 4;
+        // How far outside an exit cell still counts as touching it, in cells (about 4px at
+        // 720p). Collision leaves the body flush against a solid door, so this is leeway, not reach.
+        private const float ExitLeeway = 0.03f;
 
         /// <summary>
         /// The doorway this body is touching, or null. A door is usually set into something solid
         /// (Medows' castle door is on the castle's own cell), so collision never lets the feet
         /// stand *in* the exit cell - pressed up against it has to count. Checks every cell the
-        /// body overlaps, give or take <see cref="ExitLeeway"/> pixels.
+        /// body overlaps, give or take <see cref="ExitLeeway"/> cells.
         /// </summary>
-        public ExitData ExitTouching(Rectangle body)
+        public ExitData ExitTouching(RectF body)
         {
-            body.Inflate(ExitLeeway, ExitLeeway);
-            int w = Layout.CellWidth, h = Layout.CellHeight;
+            body = body.Inflate(ExitLeeway, ExitLeeway);
 
-            for (int row = body.Top / h; row <= (body.Bottom - 1) / h; row++)
-                for (int col = body.Left / w; col <= (body.Right - 1) / w; col++)
+            // Right and Bottom are one past the inside, so the last cell is the one just
+            // before them: a body ending exactly on a cell edge doesn't reach the next cell.
+            int firstCol = (int)MathF.Floor(body.Left), lastCol = (int)MathF.Ceiling(body.Right) - 1;
+            int firstRow = (int)MathF.Floor(body.Top),  lastRow = (int)MathF.Ceiling(body.Bottom) - 1;
+
+            for (int row = firstRow; row <= lastRow; row++)
+                for (int col = firstCol; col <= lastCol; col++)
                     if (ExitAt(col, row) is { } exit) return exit;
             return null;
         }
@@ -67,14 +72,16 @@ namespace Ashenveil.Core.GameWorld.Locations
             name != null && pointsOfInterest.TryGetValue(name, out var p) ? p : null;
 
         /// <summary>
-        /// Stands an entity centred on the named point - or on "default" if this level doesn't
-        /// have one by that name, so a missing spawn point never leaves something at (0, 0).
-        /// Centred rather than corner-aligned, so it doesn't start half inside the next cell.
+        /// Stands an entity on the named point, feet on its StandingSpot (centred, near the bottom
+        /// of the cell) - or on "default" if this level doesn't have one by that name, so a
+        /// missing spawn point never leaves something at (0, 0). Feet, not the sprite's centre:
+        /// a tall frame with padding above the body would otherwise land with its feet in the
+        /// cell below.
         /// </summary>
         public void PlaceAt(Entity entity, string poiName)
         {
             PointOfInterest poi = Poi(poiName) ?? Poi("default");
-            entity.Position = poi.ToPixel() - new Vector2(entity.Width / 2f, entity.Height / 2f);
+            entity.StandAt(poi.StandingSpot());
         }
     }
 }

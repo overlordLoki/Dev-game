@@ -47,6 +47,9 @@ namespace Ashenveil.Core.GameWorld
         // travelling between levels) still holds on the return trip.
         private readonly Dictionary<string, Location> _visited = new();
 
+        // How close an NPC has to be to talk to, body centre to body centre, in cells.
+        private const float TalkRange = 1.5f;
+
         /// <param name="start">The level the game begins in.</param>
         /// <param name="sendChat">How a chat reply is asked for. Defaults to the real API.</param>
         /// <param name="requestDecision">How an end-of-conversation decision is asked for. Defaults to the real API.</param>
@@ -55,14 +58,14 @@ namespace Ashenveil.Core.GameWorld
                      Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
         {
             Conversations = new ConversationSystem(sendChat, requestDecision);
-            this.player = new Player(new Vector2(100, 100), 0);
+            this.player = new Player(Vector2.Zero, 0);   // Init stands them on the spawn point
             SetLocation(start);
         }
 
         /// <summary>
         /// Called on first load of a new game: stands the player on the spawn point and brings
-        /// in the level's starting NPCs. Layout must already have a cell size (the game sets it
-        /// from the window; tests call Layout.Update).
+        /// in the level's starting NPCs. Everything is in cells, so this doesn't depend on the
+        /// window size - it can run before the first frame or in a test with no window at all.
         /// </summary>
         public void Init()
         {
@@ -78,16 +81,14 @@ namespace Ashenveil.Core.GameWorld
 
         /// <summary>
         /// Makes <paramref name="next"/> the active area and re-fences the world to its
-        /// grid. WorldBounds is rebuilt because it holds the map it clamps against; it
-        /// still reads cell size from Layout, so resizes remain its own business.
+        /// grid. WorldBounds is rebuilt because it holds the map it clamps against.
         /// </summary>
         private void SetLocation(Location next)
         {
             location = next;
             _visited[next.Name] = next;
             Bounds = new WorldBounds(next.tileMap);
-            // No NPC spawning here - Layout may not be ready yet (the constructor calls this).
-            // Init and UseExit call Roster.Populate once it is.
+            // No NPC spawning here: a new game spawns in Init, a level change in UseExit.
         }
 
         /// <summary>
@@ -106,7 +107,7 @@ namespace Ashenveil.Core.GameWorld
                 return null;
             }
 
-            var npc = player.GetNearestEntityInRange(NPCs, Layout.CellWidth * 1.5f) as NPC;
+            var npc = player.GetNearestEntityInRange(NPCs, TalkRange) as NPC;
             return npc != null ? StartConversation(player, npc) : null;
         }
 

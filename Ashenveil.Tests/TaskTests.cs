@@ -20,8 +20,7 @@ public class GoToTaskTests
     public void Heads_straight_at_a_target_to_the_right()
     {
         var npc = new TestNpc(0, 0);
-        var centre = npc.Position + new Vector2(npc.Width / 2f, npc.Height / 2f);
-        var task = new GoToTask(centre + new Vector2(100, 0));   // 100px right of the npc's centre
+        var task = new GoToTask(npc.Feet + new Vector2(1, 0));   // a cell right of the npc's feet
 
         task.Execute(Ctx(npc));
 
@@ -33,8 +32,7 @@ public class GoToTaskTests
     public void Heading_is_normalised_on_a_diagonal()
     {
         var npc = new TestNpc(0, 0);
-        var centre = npc.Position + new Vector2(npc.Width / 2f, npc.Height / 2f);
-        var task = new GoToTask(centre + new Vector2(3, 4));   // length 5 from centre, outside the radius
+        var task = new GoToTask(npc.Feet + new Vector2(3, 4));   // length 5 from the feet, outside the radius
 
         task.Execute(Ctx(npc));
 
@@ -46,13 +44,36 @@ public class GoToTaskTests
     public void Completes_and_stops_once_within_the_arrive_radius()
     {
         var npc = new TestNpc(0, 0);
-        var centre = npc.Position + new Vector2(npc.Width / 2f, npc.Height / 2f);
-        var task = new GoToTask(centre + new Vector2(2, 0));   // 2px from centre, inside the 4px radius
+        var task = new GoToTask(npc.Feet + new Vector2(0.02f, 0));   // 0.02 cells from the feet, inside the 0.03 radius
 
         task.Execute(Ctx(npc));
 
         Assert.Equal(TaskState.Completed, task.State);
         Assert.Equal(Vector2.Zero, npc.Direction);    // stopped, not still steering
+    }
+
+    [Fact]
+    public void Keeps_going_just_outside_the_arrive_radius()
+    {
+        var npc = new TestNpc(0, 0);
+        var task = new GoToTask(npc.Feet + new Vector2(0.05f, 0));   // ~7px at 720p: not there yet
+
+        task.Execute(Ctx(npc));
+
+        Assert.NotEqual(TaskState.Completed, task.State);
+    }
+
+    [Fact]
+    public void Aims_the_feet_not_the_sprite_centre()
+    {
+        // A target level with the sprite's centre but half a cell below it is where the feet
+        // are already (TestNpc is 1x1 with a full-frame box) - so it has arrived, not "go down".
+        var npc = new TestNpc(0, 0);
+        var task = new GoToTask(new Vector2(0.5f, 1));
+
+        task.Execute(Ctx(npc));
+
+        Assert.Equal(TaskState.Completed, task.State);
     }
 }
 

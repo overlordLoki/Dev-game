@@ -1,14 +1,14 @@
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.GameWorld;
-using Ashenveil.Core.Graphics;
+using Ashenveil.Core.Collision;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Tests;
 
 /// <summary>
 /// WorldBounds keeps every entity's body inside the map and tells it which way it was
-/// stopped - it doesn't decide how anything reacts. A 5x5 map at Layout.Update(500) is
-/// 500x500px; a 1-cell test entity is a 100x100 sprite whose top-left is Position.
+/// stopped - it doesn't decide how anything reacts. Everything is in cells: a 5x5 map is the
+/// area (0,0)-(5,5); a 1-cell test entity is a 1x1 sprite whose top-left is Position.
 /// </summary>
 public class WorldBoundsTests
 {
@@ -49,24 +49,23 @@ public class WorldBoundsTests
     public WorldBoundsTests()
     {
         NullContentManager.Install();
-        Layout.Update(500);   // 100px cells
         _bounds = new WorldBounds(TestLevels.Location(Level).tileMap);
     }
 
     [Fact]
     public void The_area_is_the_whole_tile_grid()
     {
-        Assert.Equal(new Rectangle(0, 0, 500, 500), _bounds.Area);
+        Assert.Equal(new RectF(0, 0, 5, 5), _bounds.Area);
     }
 
     // ------------------------------------------------------------------ keeping things in
 
     [Theory]
-    [InlineData(-30, 200,   0, 200)]   // past the left edge
-    [InlineData(450, 200, 400, 200)]   // past the right edge
-    [InlineData(200, -30, 200,   0)]   // past the top
-    [InlineData(200, 450, 200, 400)]   // past the bottom
-    [InlineData(-30, -30,   0,   0)]   // past a corner: both axes
+    [InlineData(-0.25f, 2,     0, 2)]   // past the left edge
+    [InlineData( 4.5f,  2,     4, 2)]   // past the right edge
+    [InlineData( 2,    -0.25f, 2, 0)]   // past the top
+    [InlineData( 2,     4.5f,  2, 4)]   // past the bottom
+    [InlineData(-0.25f, -0.25f, 0, 0)]  // past a corner: both axes
     public void An_entity_past_an_edge_is_pushed_back_inside(float x, float y, float expectedX, float expectedY)
     {
         var e = new TestEntity(x, y);   // box covers the whole sprite
@@ -79,34 +78,34 @@ public class WorldBoundsTests
     [Fact]
     public void An_entity_inside_the_map_is_left_alone()
     {
-        var e = new TestEntity(200, 200);
+        var e = new TestEntity(2, 2);
 
         _bounds.Clamp(e);
 
-        Assert.Equal(new Vector2(200, 200), e.Position);
+        Assert.Equal(new Vector2(2, 2), e.Position);
     }
 
     [Fact]
     public void The_feet_reach_the_edge_not_the_padding()
     {
-        // Feet (box bottom) at 430 + 75 = 505: 5px over. Only the feet are kept in, so the
-        // transparent padding below them may hang past the edge - the old sprite-based rule
-        // stopped the feet 25px short.
-        var e = new PaddedEntity(200, 430);
+        // Feet (box bottom) at 4.5 + 0.75 = 5.25: a quarter cell over. Only the feet are kept
+        // in, so the transparent padding below them may hang past the edge - the old
+        // sprite-based rule stopped the feet a quarter cell short.
+        var e = new PaddedEntity(2, 4.5f);
 
         _bounds.Clamp(e);
 
-        Assert.Equal(500, e.Bounds.Bottom);
+        Assert.Equal(5f, e.Bounds.Bottom);
     }
 
     [Fact]
     public void Without_collision_boxes_the_sprite_is_kept_in()
     {
-        var e = new BoxlessEntity(450, 200);
+        var e = new BoxlessEntity(4.5f, 2);
 
         _bounds.Clamp(e);
 
-        Assert.Equal(400, e.Position.X);
+        Assert.Equal(4f, e.Position.X);
     }
 
     // ------------------------------------------------------------------ who decides the reaction
@@ -115,7 +114,7 @@ public class WorldBoundsTests
     public void Hitting_a_side_tells_the_NPCs_brain_it_was_blocked_horizontally()
     {
         var brain = new RecordingBrain();
-        var npc = new TestNpc(450, 200, brain);
+        var npc = new TestNpc(4.5f, 2, brain);
 
         _bounds.Clamp(npc);
 
@@ -126,7 +125,7 @@ public class WorldBoundsTests
     public void Hitting_the_top_or_bottom_tells_the_brain_it_was_blocked_vertically()
     {
         var brain = new RecordingBrain();
-        var npc = new TestNpc(200, 450, brain);
+        var npc = new TestNpc(2, 4.5f, brain);
 
         _bounds.Clamp(npc);
 
@@ -138,7 +137,7 @@ public class WorldBoundsTests
     {
         var brain = new RecordingBrain();
 
-        _bounds.Clamp(new TestNpc(200, 200, brain));
+        _bounds.Clamp(new TestNpc(2, 2, brain));
 
         Assert.Empty(brain.Blocked);
     }
@@ -147,7 +146,7 @@ public class WorldBoundsTests
     public void A_wandering_NPC_turns_back_from_the_edge()
     {
         // The reaction lives in WanderBrain now, not in WorldBounds - same result as before.
-        var npc = new TestNpc(450, 200, new WanderBrain()) { Direction = new Vector2(1, 0) };
+        var npc = new TestNpc(4.5f, 2, new WanderBrain()) { Direction = new Vector2(1, 0) };
 
         _bounds.Clamp(npc);
 
@@ -159,7 +158,7 @@ public class WorldBoundsTests
     {
         // Before, WorldBounds flipped every NPC's heading. Now a brain that doesn't react
         // (like the knight's) isn't turned around - e.g. mid-GoToTask.
-        var npc = new TestNpc(450, 200, new RecordingBrain()) { Direction = new Vector2(1, 0) };
+        var npc = new TestNpc(4.5f, 2, new RecordingBrain()) { Direction = new Vector2(1, 0) };
 
         _bounds.Clamp(npc);
 

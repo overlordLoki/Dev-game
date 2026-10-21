@@ -182,7 +182,7 @@ namespace Ashenveil.Core.Entities
         private ITask MakeGoTo(TaskSpecDto spec, Location location)
         {
             var poi = location?.Poi(spec.target);
-            return poi == null ? null : new GoToTask(poi.ToPixel());
+            return poi == null ? null : new GoToTask(poi.StandingSpot());
         }
 
 

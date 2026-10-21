@@ -14,25 +14,34 @@ namespace Ashenveil.Core.Entities
     /// animation from a sprite sheet. Subclasses register their animations in the
     /// constructor and override only what's different about them (Player reads the
     /// keyboard; NPCs wander - see NPC).
+    ///
+    /// Everything is in world units - cells - not pixels: Position, Width/Height, Speed,
+    /// Boxes and Bounds. Only Draw converts to pixels (Layout.ToScreen), so a window resize
+    /// changes how big an entity looks, never where it is or how fast it walks.
     /// </summary>
     public abstract class Entity : IEntity
     {
         public int Id { get; }
+        /// <summary>The sprite's top-left corner, in cells.</summary>
         public Vector2 Position { get; set; }
+        /// <summary>Cells per second.</summary>
         public float Speed { get; set; }
         public Vector2 Direction { get; set; }
 
         // How tall the drawn frame is, in cells. Width follows from the sheet's frame
         // aspect ratio, so a non-square sheet (the knight's 96x84) isn't squashed.
+        // (The editor reads this override from the source, so keep its name and shape.)
         protected virtual float SizeInCells => 0.9f;
 
-        public int Height => (int)(Layout.CellSize * SizeInCells);
-        public int Width
+        /// <summary>The drawn sprite's height, in cells.</summary>
+        public float Height => SizeInCells;
+        /// <summary>The drawn sprite's width, in cells: the height times the frame's aspect ratio.</summary>
+        public float Width
         {
             get
             {
                 if (!Animations.TryGetValue(CurrentAnim, out var anim)) return Height;
-                return (int)(Height * anim.FrameWidth / (float)anim.FrameHeight);
+                return Height * anim.FrameWidth / anim.FrameHeight;
             }
         }
 
@@ -40,12 +49,12 @@ namespace Ashenveil.Core.Entities
         // bottom - sprites have transparent padding under the feet, which made entities sort
         // as if they stood lower than they do (drawn in front of a tree they're behind).
         // No boxes in bounds.json -> fall back to the sprite's bottom.
-        public int SortY
+        public float SortY
         {
             get
             {
-                Rectangle feet = Bounds;
-                return feet.IsEmpty ? (int)(Position.Y + Height) : feet.Bottom;
+                RectF feet = Bounds;
+                return feet.IsEmpty ? Position.Y + Height : feet.Bottom;
             }
         }
 
@@ -70,19 +79,42 @@ namespace Ashenveil.Core.Entities
         // Tight collision box(es) around the body/feet. The sprite frame has transparent
         // padding, so these are tuned by eye in the editor against the debug outline and
         // stored in Content/bounds.json (basis = the sprite's own size).
-        public IReadOnlyList<Rectangle> Boxes
+        public IReadOnlyList<RectF> Boxes
         {
             get
             {
                 var boxes = BoundsStore.For(BoundsKey);
-                var rects = new Rectangle[boxes.Count];
+                var rects = new RectF[boxes.Count];
                 for (int i = 0; i < boxes.Count; i++)
-                    rects[i] = boxes[i].ToRectangle((int)Position.X, (int)Position.Y, Width, Height);
+                    rects[i] = boxes[i].ToRect(Position.X, Position.Y, Width, Height);
                 return rects;
             }
         }
 
-        public Rectangle Bounds => Geometry.Union(Boxes);
+        public RectF Bounds => Geometry.Union(Boxes);
+
+        /// <summary>
+        /// Where this entity stands, in cells: the bottom centre of its collision box, or of the
+        /// sprite if it has no boxes. The one idea of "where it is" for anything about standing
+        /// somewhere - spawning on a point, walking to one, `where` - so they can't drift apart.
+        /// (Depth sorting, doors and the map edge measure the same box.)
+        /// </summary>
+        public Vector2 Feet
+        {
+            get
+            {
+                RectF body = Bounds;
+                if (body.IsEmpty) body = new RectF(Position.X, Position.Y, Width, Height);
+                return new Vector2(body.Center.X, body.Bottom);
+            }
+        }
+
+        /// <summary>
+        /// Moves the entity so its <see cref="Feet"/> are on <paramref name="spot"/>. A sprite
+        /// with lots of padding above the body (the knight's) still lands standing on the spot,
+        /// rather than with its frame centred there and its feet sticking out below.
+        /// </summary>
+        public void StandAt(Vector2 spot) => Position += spot - Feet;
 
         /// <summary>
         /// Push out of another entity, tight box against tight box. NPC overrides this
@@ -95,16 +127,16 @@ namespace Ashenveil.Core.Entities
         /// one frame makes them fight and jitter, so this picks the single deepest overlap
         /// and resolves against that one - the rest sort themselves out over later frames.
         /// </summary>
-        public void ResolveCollision(IReadOnlyList<Rectangle> others)
+        public void ResolveCollision(IReadOnlyList<RectF> others)
         {
-            Rectangle me = Bounds;
-            Rectangle deepest = Rectangle.Empty;
+            RectF me = Bounds;
+            RectF deepest = RectF.Empty;
             float best = 0f;
 
             foreach (var other in others)
             {
                 if (!me.Intersects(other)) continue;
-                Rectangle o = Rectangle.Intersect(me, other);
+                RectF o = RectF.Intersect(me, other);
                 float penetration = Math.Min(o.Width, o.Height);
                 if (penetration > best) { best = penetration; deepest = other; }
             }
@@ -120,9 +152,9 @@ namespace Ashenveil.Core.Entities
         public virtual void OnBlocked(bool horizontal) { }
 
         /// <summary>Push out of one rectangle along the shallower axis, no bounce.</summary>
-        public void ResolveCollision(Rectangle other)
+        public void ResolveCollision(RectF other)
         {
-            Rectangle me = Bounds;
+            RectF me = Bounds;
             if (!me.Intersects(other)) return;
 
             var (pushX, pushY) = Overlap(me, other);
@@ -133,7 +165,7 @@ namespace Ashenveil.Core.Entities
         }
 
         // How far to move `me` on each axis to get it out of `other`, signed.
-        protected static (float pushX, float pushY) Overlap(Rectangle me, Rectangle other)
+        protected static (float pushX, float pushY) Overlap(RectF me, RectF other)
         {
             float overlapLeft   = me.Right  - other.Left;
             float overlapRight  = other.Right - me.Left;
@@ -195,28 +227,29 @@ namespace Ashenveil.Core.Entities
         {
             if (Animations.TryGetValue(CurrentAnim, out var anim))
             {
-                var dest = new Rectangle((int)Position.X, (int)Position.Y, Width, Height);
+                // The one place an entity turns into pixels.
+                var dest = Layout.ToScreen(new RectF(Position.X, Position.Y, Width, Height));
                 var fx = FacingLeft ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                 anim.Draw(spriteBatch, dest, fx);
             }
 
             // Debug: outline the collision body (only shows with Debug.SHOWBOUNDS).
-            Debug.DrawRect(spriteBatch, Bounds, Color.Black);
+            Debug.DrawRect(spriteBatch, Layout.ToScreen(Bounds), Color.Black);
         }
-        //get the nearest entity within a certain range of this entity, used for AI
+        // The nearest entity within maxDistance (in cells) of this one, used for AI and talking.
         public Entity GetNearestEntityInRange(IEnumerable<Entity> entities, float maxDistance)
         {
             Entity nearest = null;
             float closestDistance = float.MaxValue;
             // Measured body to body: Position is the frame's top-left corner, which sits
             // further from the body the bigger the sprite is.
-            Vector2 me = Bounds.Center.ToVector2();
+            Vector2 me = Bounds.Center;
 
             foreach (var entity in entities)
             {
                 if (entity == this) continue;
 
-                float distance = Vector2.Distance(me, entity.Bounds.Center.ToVector2());
+                float distance = Vector2.Distance(me, entity.Bounds.Center);
                 if (distance < maxDistance && distance < closestDistance)
                 {
                     closestDistance = distance;

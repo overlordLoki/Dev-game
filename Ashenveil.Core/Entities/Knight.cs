@@ -16,7 +16,7 @@ namespace Ashenveil.Core.Entities
         public Knight(Vector2 position, int id, string name, NpcBrain brain) : base(position, id, name, brain)
         {
             Portrait = Assets.KnightPortrait;
-            Speed = 100f;
+            Speed = 0.7f;   // cells per second (was 100px/s at 720p's 144px cells)
             // What used to be his fixed greeting, now background he can draw on in his own words.
             Persona = "A noble knight sworn to guard these meadows. Speaks formally and calls strangers " +
                       "'traveller'. The roads have grown dangerous since the ash began to fall: wolves, " +

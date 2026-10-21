@@ -9,7 +9,7 @@ namespace Ashenveil.Tests;
 /// <summary>
 /// The NpcRoster on its own: which NPCs exist and which level each is in. Spawning uses the
 /// real shipped Medows level (copied into the test output), since it's the one level with a
-/// starting NPC - the knight. With Layout.Update(500) a cell is 100px.
+/// starting NPC - the knight. Positions are in cells.
 /// </summary>
 public class NpcRosterTests
 {
@@ -79,8 +79,9 @@ public class NpcRosterTests
         _roster.Populate(medows);
 
         var knight = Assert.IsType<Knight>(Assert.Single(_roster.In("Medows")));
-        var centre = knight.Position + new Vector2(knight.Width / 2f, knight.Height / 2f);
-        Assert.Equal(medows.Poi("Knight_spawn").ToPixel(), centre);
+        // Feet on the point. His frame is 1.2 cells tall with the body in its bottom 40%, so
+        // centring the frame (the old rule) left his feet below the cell.
+        Near.Equal(medows.Poi("Knight_spawn").StandingSpot(), knight.Feet);
     }
 
     [Fact]

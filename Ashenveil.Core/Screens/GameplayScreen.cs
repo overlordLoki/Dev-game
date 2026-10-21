@@ -52,11 +52,12 @@ namespace Ashenveil.Core.Screens
             World.Update(gameTime);
 
             // Last, so the view follows where the player actually ended up this frame
-            // rather than where they were before collisions pushed them back.
+            // rather than where they were before collisions pushed them back. The world is
+            // in cells; the camera scrolls in screen pixels, so both convert here.
             var player = World.player;
             _camera.Follow(
-                player.Position + new Vector2(player.Width / 2f, player.Height / 2f),
-                _viewWidth, _viewHeight, World.Bounds.Area);
+                Layout.ToScreen(player.Position + new Vector2(player.Width / 2f, player.Height / 2f)),
+                _viewWidth, _viewHeight, Layout.ToScreen(World.Bounds.Area));
         }
 
         // Edge-triggered, so one press is one action - held down, E would otherwise bounce

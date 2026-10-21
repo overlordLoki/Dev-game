@@ -49,8 +49,8 @@ namespace Ashenveil.Core.Entities
         /// </summary>
         public override void CheckEntityCollision(IEntity other)
         {
-            Rectangle me = Bounds;
-            Rectangle them = other.Bounds;
+            Collision.RectF me = Bounds;
+            Collision.RectF them = other.Bounds;
             if (!me.Intersects(them)) return;
 
             var (pushX, pushY) = Overlap(me, them);

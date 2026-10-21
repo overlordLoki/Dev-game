@@ -73,10 +73,14 @@ namespace Ashenveil.Core.DevConsole
             };
         }
 
-        /// <summary>Parses and runs one typed line. Blank input gives no lines.</summary>
+        /// <summary>
+        /// Parses and runs one typed line. Blank input gives no lines. A leading "/" is ignored:
+        /// the console only ever runs commands so it doesn't need one, but "/tp 3 4" out of
+        /// habit from other games should still work.
+        /// </summary>
         public IReadOnlyList<ConsoleLine> Execute(string input)
         {
-            var words = Split(input);
+            var words = Split(input?.TrimStart().TrimStart('/'));
             if (words.Count == 0) return Array.Empty<ConsoleLine>();
 
             if (!_byName.TryGetValue(words[0], out var command))
