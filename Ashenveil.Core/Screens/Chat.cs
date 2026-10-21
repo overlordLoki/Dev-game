@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
-using Ashenveil.Core.Utility;
 using Ashenveil.Core.UI.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -12,7 +11,7 @@ using Microsoft.Xna.Framework.Input;
 using Ashenveil.Core.UI;
 using Ashenveil.Core.Graphics;
 
-namespace Ashenveil.Core.Screens.Chat
+namespace Ashenveil.Core.Screens
 {
     /// <summary>
     /// A chat box pushed on top of the World, showing a Conversation the player is part of.
