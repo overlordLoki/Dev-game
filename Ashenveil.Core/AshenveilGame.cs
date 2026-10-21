@@ -11,6 +11,7 @@ using Ashenveil.Core.Utility.Input;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Graphics;
+using Ashenveil.Core.DevConsole;
 namespace Ashenveil.Core
 {
     /// <summary>
@@ -29,6 +30,7 @@ namespace Ashenveil.Core
         private Menu _menu;
         private SettingsScreen _settings;
         private Pause _pause;
+        private ConsoleScreen _console;
         private ScreenManager _screenManager = new();
         private KeyboardState _prevKb;
         private ButtonState _prevPadBack = ButtonState.Released;
@@ -137,6 +139,12 @@ namespace Ashenveil.Core
             this.world.Init();  // spawn the player and set up the level on first load
             Debug.Pixel = _pixel;
 
+            // The dev console: its commands, then the screen. Built once and kept, so its
+            // output and history survive closing it.
+            var commands = new CommandRegistry();
+            WorldCommands.Register(commands, world);
+            _console = new ConsoleScreen(font, commands, () => _screenManager.Pop(), w, h);
+
             // create screens first
             _settings = new SettingsScreen(font, () => _screenManager.Pop(), w, h);
 
@@ -173,6 +181,19 @@ namespace Ashenveil.Core
                     _screenManager.Pop();
                 else if (_screenManager.Current == _gameplayScreen)
                     _screenManager.Push(_pause);
+            }
+
+            // The dev console, only over the world (not the menu, chat or pause) and only in dev mode.
+            bool consolePressed = Array.Exists(ConsoleScreen.ToggleKeys, k => kb.IsKeyDown(k) && !_prevKb.IsKeyDown(k));
+            if (consolePressed && Debug.DEVMODE)
+            {
+                if (_screenManager.Current == _console)
+                    _screenManager.Pop();
+                else if (_screenManager.Current == _gameplayScreen)
+                {
+                    _console.Open(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+                    _screenManager.Push(_console);
+                }
             }
             _prevKb = kb;
             _prevPadBack = padBack;

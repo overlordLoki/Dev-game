@@ -34,6 +34,11 @@ namespace Ashenveil.Core.Entities
             base.Update(gameTime);
         }
 
+        // Read-only views of the brain, for whoever needs to look in (the dev console). Changes
+        // still go through the NPC's own methods below.
+        public NpcBrain.NPCState State => Brain.State;
+        public brains.Memorys.Journal Journal => Brain.Journal;
+
         // The brain is private to the NPC, so the World starts and ends talking through these.
         public void StartTalking() => Brain.StartTalking();
         public void StopTalking() => Brain.StopTalking();

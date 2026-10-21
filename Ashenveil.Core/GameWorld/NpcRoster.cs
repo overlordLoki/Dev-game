@@ -38,6 +38,10 @@ namespace Ashenveil.Core.GameWorld
         /// <summary>Every NPC in every level.</summary>
         public IEnumerable<NPC> All => _byLevel.Values.SelectMany(list => list);
 
+        /// <summary>The name of the level this NPC is in, or null if it isn't in any.</summary>
+        public string LevelOf(NPC npc) =>
+            _byLevel.FirstOrDefault(level => level.Value.Contains(npc)).Key;
+
         /// <summary>
         /// Finds an NPC by id across every level, not just the current one, so a lookup
         /// works even while the player is somewhere else. Null if no NPC has that id.

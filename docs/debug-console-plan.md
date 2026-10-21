@@ -12,9 +12,13 @@ Two design rules: commands live in a **registry** (name + help + handler, not on
 `switch`), and the output is a **log of entries**, not just text on screen — so the Phase 8
 event log can feed into it later.
 
+> **Status: v1 built.** Steps 1–6 are done: press `` ` `` in the world to open it. The
+> first six commands work (`help`, `where`, `tp`, `npcs`, `journal`, `clear`) and the rest
+> of the table below is still to do. See "What was built" at the end.
+
 ---
 
-## Where things are now
+## Where things were before it was built
 
 - **`TextField` widget ✅ done** (`UI/Widgets/TextField.cs`). It's a one-line text box:
   - `Type(char)` handles `'\r'` (submit) and `'\b'` (Backspace), and ignores other control
@@ -68,19 +72,19 @@ event log can feed into it later.
 
 ## First commands
 
-| Command | Does | Why it's useful now |
-|---|---|---|
-| `help` | Lists commands | Discoverable |
-| `where` | Prints level, cell and pixel position | Essential for the world-units refactor |
-| `tp <col> <row>` | Moves the player to a cell | Testing levels, POIs, exits |
-| `level <name>` | Loads a level | Skip walking |
-| `npcs` | Lists NPCs in all levels: id, name, level, state | Replaces reading debug prints |
-| `journal <npc>` | Dumps an NPC's memories and transcripts | Checking the memory feature |
-| `task <npc> go_to <poi>` / `wait <s>` | Gives an NPC a task | Testing the task system by hand |
-| `time` / `time +<n>d` | Shows / skips game time | Phase 8 day-end reflection |
-| `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance |
-| `nav` | Toggles drawing of blocked cells and NPC paths | Pathfinding plan, once it lands |
-| `clear` | Clears the output | |
+| Command | Does | Why it's useful now | |
+|---|---|---|---|
+| `help` | Lists commands | Discoverable | ✅ |
+| `where` | Prints level, cell and pixel position | Essential for the world-units refactor | ✅ |
+| `tp <col> <row>` | Moves the player to a cell | Testing levels, POIs, exits | ✅ |
+| `level <name>` | Loads a level | Skip walking | |
+| `npcs` | Lists NPCs in all levels: id, name, level, state | Replaces reading debug prints | ✅ |
+| `journal <npc>` | Dumps an NPC's memories and transcripts | Checking the memory feature | ✅ |
+| `task <npc> go_to <poi>` / `wait <s>` | Gives an NPC a task | Testing the task system by hand | |
+| `time` / `time +<n>d` | Shows / skips game time | Phase 8 day-end reflection | |
+| `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance | |
+| `nav` | Toggles drawing of blocked cells and NPC paths | Pathfinding plan, once it lands | |
+| `clear` | Clears the output | | ✅ |
 
 Commands that name an NPC should accept its id **or** its name, and say clearly when it's
 not found.
@@ -88,6 +92,8 @@ not found.
 ---
 
 ## Steps
+
+All six steps are ✅ done. What each turned into is listed under "What was built" below.
 
 1. ~~**`TextField` widget**~~ ✅ done, along with typing routed through `IScreen.OnTextInput`.
 2. **`CommandRegistry`** — register/lookup, argument splitting (respect quotes:
@@ -132,6 +138,52 @@ not found.
   (Simplest: only from the world.)
 - **Mirror to the terminal?** Also write console output to `Console.WriteLine`, so it's in
   the terminal after a crash.
+
+## What was built
+
+- **`DevConsole/CommandRegistry.cs`**: `Command`, `ConsoleLine` + `LineKind`, `CommandException`.
+  - `Register(name, usage, help, run, minArgs, maxArgs)`; names ignore case; registering a
+    name twice throws.
+  - `Execute(line)` **never throws**:
+    - an unknown command, the wrong number of arguments (shows the usage), or a
+      `CommandException` each come back as an `Error` line;
+    - any other exception comes back as "'x' failed: ...", including one thrown from a lazy
+      `yield return` handler.
+  - `Split` handles quotes (`journal "Sir Lancelot"`), extra spaces and an unclosed quote.
+  - `help` is built in.
+- **`DevConsole/WorldCommands.cs`**: `where`, `tp`, `npcs`, `journal`. They're given only
+  the `World`, so they're tested against a test level.
+  - `FindNpc` takes an id or a name, ignoring case. When there's no match, or several, it
+    says what to try.
+  - `where` measures the feet, like doors do.
+- **`UI/Widgets/ChatLog.cs`**: the chat box's message drawing, pulled out and shared.
+  - Newest at the bottom, word-wrapped and cached, with an optional coloured name per entry.
+  - An optional cap on how many entries are kept.
+  - A `Pending` entry: the chat box's "...", drawn without being kept.
+  - `Printable` moved here from `Chat.cs`, and now has tests.
+  - `Chat.cs` now uses it, copying new `Conversation.Messages` in as they arrive.
+- **`Screens/ConsoleScreen.cs`**: a translucent panel on the top 45% of the screen, with
+  the output above a `TextField`.
+  - **Kept for the whole game**, so its output and history survive closing it. `Open(w, h)`
+    re-fits it to the window and resets the key state.
+  - **Typing:** `OnTextInput` drops `` ` ``, `~` and `¬`, so the key that opens it is never typed.
+  - **Keys:** Up/Down go through history (no repeats in a row); Escape closes.
+  - **Output** is capped at 200 lines.
+  - `clear` is registered by the screen, since it's about the screen's own output.
+- **`AshenveilGame`**:
+  - builds the registry plus `WorldCommands` plus the screen once;
+  - `` ` `` toggles it, only over the world, and only when `Debug.DEVMODE` is on;
+  - the toggle is `OemTilde` (US layout) or `Oem8` (UK layout).
+- **`Debug.DEVMODE`**: on in Debug builds, off in Release. Becomes a settings toggle later.
+- **Small additions for the commands:**
+  - `NPC.State` and `NPC.Journal`, read-only views of the brain;
+  - `NpcRoster.LevelOf(npc)`.
+- **Tests:** `CommandRegistryTests`, `WorldCommandsTests`, `ConsoleScreenTests`, `ChatLogTests`.
+
+**Answers to the open questions, for now:**
+- **Opening while chatting:** only from the world.
+- **Mirroring to the terminal:** not done.
+- **A configurable toggle key:** not done. Both common layouts work.
 
 ## Depends on / feeds into
 

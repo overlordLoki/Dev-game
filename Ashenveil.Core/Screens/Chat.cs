@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.UI.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using Ashenveil.Core.UI;
 using Ashenveil.Core.Graphics;
 
 namespace Ashenveil.Core.Screens
@@ -23,7 +21,7 @@ namespace Ashenveil.Core.Screens
     public class ChatScreen : IScreen
     {
         private const int Margin = 40, Pad = 20, BoxH = 260, PortraitSize = 160, BtnW = 90, BtnH = 40;
-        private const int Gap = 8, MessageGap = 6;
+        private const int Gap = 8;
         public List<Widget> Widgets { get; set;} = new List<Widget>();
         private SpriteFont font;
         private MouseState prevMouse;
@@ -32,12 +30,12 @@ namespace Ashenveil.Core.Screens
         private Conversation _conversation;
         private Action _onClose;
         private NPC _speaker;
-        private Rectangle _log;
+        private ChatLog _log;
         private TextField _textField;
 
-        // Each message word-wrapped to the log's width, in step with Conversation.Messages.
-        // Messages only ever get added, so a wrapped one never needs redoing.
-        private List<List<string>> _wrapped = new List<List<string>>();
+        // How many of Conversation.Messages are already in the log. Messages only ever get
+        // added, so each new one is copied in once.
+        private int _shown;
         // The E that opened the chat is still held on our first frames; typing stays off
         // until it's let go, so holding it doesn't fill the box with e's.
         private bool _waitForRelease = true;
@@ -65,7 +63,7 @@ namespace Ashenveil.Core.Screens
             var leaveRect = new Rectangle(box.Right - Pad - BtnW, rowY, BtnW, BtnH);
             var sendRect = new Rectangle(leaveRect.X - Gap - BtnW, rowY, BtnW, BtnH);
             var input = new Rectangle(colX, rowY, sendRect.X - Gap - colX, BtnH);
-            _log = new Rectangle(colX, box.Y + Pad, box.Right - Pad - colX, rowY - Gap - (box.Y + Pad));
+            var logRect = new Rectangle(colX, box.Y + Pad, box.Right - Pad - colX, rowY - Gap - (box.Y + Pad));
 
             // The portrait is whoever the player walked up to (the first NPC in the conversation).
             _speaker = conversation.Participants.OfType<NPC>().FirstOrDefault();
@@ -74,14 +72,18 @@ namespace Ashenveil.Core.Screens
             {
                 Focused = true,   // the chat opens ready to type
             };
+            _log = new ChatLog(logRect);
 
             // Drawn in this order, so the box panel goes first and everything sits on top of it.
             Widgets.Add(new Panel(box, "panel_brown_dark"));
             Widgets.Add(new Image(face, _speaker?.Portrait == null ? null : Textures.Get(_speaker.Portrait)));
             Widgets.Add(new Label(nameRect, _speaker?.Name ?? "", Color.Gold));
+            Widgets.Add(_log);
             Widgets.Add(_textField);
             Widgets.Add(new Button(sendRect, "Send", "button_brown", Send));
             Widgets.Add(new Button(leaveRect, "Leave", "button_brown", Close));
+
+            ShowNewMessages();   // the opening note is already there
         }
 
         // The ScreenManager hands typing to whichever screen is on top.
@@ -111,6 +113,12 @@ namespace Ashenveil.Core.Screens
 
             // The world isn't updating while we're on top, so collecting the LLM's reply is our job.
             _conversation.Poll();
+            ShowNewMessages();
+
+            // While the LLM is writing: a reply-shaped line of dots that count up, 1 to 3.
+            _log.Pending = _conversation.IsLoading && _speaker != null
+                ? (_speaker.Name, Color.Gold, new string('.', 1 + (int)(_time * 3) % 3), Color.White)
+                : null;
 
             var mouse = AshenveilGame.Input.Mouse;
             foreach (var w in Widgets) w.Update(mouse, prevMouse);
@@ -128,78 +136,20 @@ namespace Ashenveil.Core.Screens
         public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
         {
             foreach (var w in Widgets) w.Draw(spriteBatch, font);
-            DrawLog(spriteBatch);
         }
 
-        // Newest message at the bottom, working upwards until the log is full. Older messages
-        // simply fall off the top, so there's no scroll position to keep.
-        private void DrawLog(SpriteBatch spriteBatch)
+        // Copies messages the log hasn't got yet into it. The player's name is blue, an NPC's
+        // gold; a note from the game has no name and is all grey.
+        private void ShowNewMessages()
         {
             var messages = _conversation.Messages;
-            while (_wrapped.Count < messages.Count)
-                _wrapped.Add(UIDraw.WrapText(font, Printable(Format(messages[_wrapped.Count])), _log.Width));
-
-            float y = _log.Bottom;
-
-            // While the LLM is writing: a reply-shaped line of dots that count up, 1 to 3.
-            if (_conversation.IsLoading && _speaker != null)
+            for (; _shown < messages.Count; _shown++)
             {
-                y -= font.LineSpacing;
-                string name = _speaker.Name + ":";
-                spriteBatch.DrawString(font, name, new Vector2(_log.X, (int)y), Color.Gold);
-                spriteBatch.DrawString(font, " " + new string('.', 1 + (int)(_time * 3) % 3),
-                    new Vector2((int)(_log.X + font.MeasureString(name).X), (int)y), Color.White);
-                y -= MessageGap;
+                var m = messages[_shown];
+                if (m.Speaker == null) _log.Add(m.Text, Color.LightGray);
+                else _log.Add(m.Text, Color.White, m.Speaker,
+                              m.Speaker == Conversation.PlayerName ? Color.LightSkyBlue : Color.Gold);
             }
-
-            for (int i = messages.Count - 1; i >= 0; i--)
-            {
-                var lines = _wrapped[i];
-                y -= lines.Count * font.LineSpacing;
-                if (y < _log.Top) break;
-
-                // The speaker's name is coloured, the rest of the line isn't, so the first
-                // line is drawn in two pieces. A note from the game has no name: all grey.
-                string name = messages[i].Speaker == null ? "" : Printable(messages[i].Speaker) + ":";
-                Color nameColor = messages[i].Speaker == Conversation.PlayerName ? Color.LightSkyBlue : Color.Gold;
-                Color textColor = messages[i].Speaker == null ? Color.LightGray : Color.White;
-
-                for (int l = 0; l < lines.Count; l++)
-                {
-                    var pos = new Vector2(_log.X, (int)(y + l * font.LineSpacing));
-                    if (l == 0 && name.Length > 0 && lines[0].StartsWith(name))
-                    {
-                        spriteBatch.DrawString(font, name, pos, nameColor);
-                        pos.X = (int)(pos.X + font.MeasureString(name).X);
-                        spriteBatch.DrawString(font, lines[0].Substring(name.Length), pos, textColor);
-                    }
-                    else spriteBatch.DrawString(font, lines[l], pos, textColor);
-                }
-                y -= MessageGap;
-            }
-        }
-
-        private static string Format(ChatMessage message) =>
-            message.Speaker == null ? message.Text : $"{message.Speaker}: {message.Text}";
-
-        // The LLM writes whatever it likes; the font only has so many glyphs. Swap the usual
-        // suspects for plain ones that read better than the font's DefaultCharacter '?'.
-        private string Printable(string text)
-        {
-            var sb = new StringBuilder(text.Length);
-            foreach (char raw in text)
-            {
-                char c = raw switch
-                {
-                    '‘' or '’' => '\'',
-                    '“' or '”' => '"',
-                    '–' or '—' => '-',
-                    _ => raw,
-                };
-                if (c == '…') sb.Append("...");
-                else sb.Append(c);
-            }
-            return sb.ToString();
         }
     }
 }
