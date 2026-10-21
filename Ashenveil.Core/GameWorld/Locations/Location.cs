@@ -56,14 +56,8 @@ namespace Ashenveil.Core.GameWorld.Locations
         {
             body = body.Inflate(ExitLeeway, ExitLeeway);
 
-            // Right and Bottom are one past the inside, so the last cell is the one just
-            // before them: a body ending exactly on a cell edge doesn't reach the next cell.
-            int firstCol = (int)MathF.Floor(body.Left), lastCol = (int)MathF.Ceiling(body.Right) - 1;
-            int firstRow = (int)MathF.Floor(body.Top),  lastRow = (int)MathF.Ceiling(body.Bottom) - 1;
-
-            for (int row = firstRow; row <= lastRow; row++)
-                for (int col = firstCol; col <= lastCol; col++)
-                    if (ExitAt(col, row) is { } exit) return exit;
+            foreach (var cell in Geometry.CellsCovered(body))
+                if (ExitAt(cell.X, cell.Y) is { } exit) return exit;
             return null;
         }
 
