@@ -208,6 +208,24 @@ public class WorldTests : IDisposable
     }
 
     [Fact]
+    public void Going_back_to_a_level_returns_to_the_same_one_not_a_fresh_copy()
+    {
+        var world = new World(new Ashenveil.Core.GameWorld.Locations.Location("Medows"),
+            sendChat: _ => Task.FromResult(Array.Empty<ChatMessage>()),
+            requestDecision: _ => Task.FromResult(_decisionReply));
+        world.Init();
+        var medows = world.location;
+
+        world.UseExit(medows.ExitAt(3, 6));       // into the castle...
+        var castle = world.location;
+        world.UseExit(castle.ExitAt(3, 4));       // ...back out...
+        Assert.Same(medows, world.location);
+
+        world.UseExit(medows.ExitAt(3, 6));       // ...and in again
+        Assert.Same(castle, world.location);
+    }
+
+    [Fact]
     public void Interacting_away_from_the_door_stays_put()
     {
         var world = NewWorldWithDoor();

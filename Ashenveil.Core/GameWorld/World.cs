@@ -41,6 +41,12 @@ namespace Ashenveil.Core.GameWorld
         /// stack all survive the transition untouched.
         public Location location;
 
+        // Every level visited so far, by name. A level is read from disk the first time it's
+        // entered and kept after that, so going back is the same Location, not a fresh copy:
+        // whatever happens to a level (a nav grid built for pathfinding, state to save, NPCs
+        // travelling between levels) still holds on the return trip.
+        private readonly Dictionary<string, Location> _visited = new();
+
         /// <param name="start">The level the game begins in.</param>
         /// <param name="sendChat">How a chat reply is asked for. Defaults to the real API.</param>
         /// <param name="requestDecision">How an end-of-conversation decision is asked for. Defaults to the real API.</param>
@@ -78,6 +84,7 @@ namespace Ashenveil.Core.GameWorld
         private void SetLocation(Location next)
         {
             location = next;
+            _visited[next.Name] = next;
             Bounds = new WorldBounds(next.tileMap);
             // No NPC spawning here - Layout may not be ready yet (the constructor calls this).
             // Init and UseExit call Roster.Populate once it is.
@@ -110,10 +117,14 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public void UseExit(ExitData exit)
         {
-            SetLocation(new Location(exit.to));
+            SetLocation(LocationNamed(exit.to));
             Roster.Populate(location);   // first visit spawns, return visit reuses
             location.PlaceAt(player, exit.arriveAt);
         }
+
+        /// <summary>The level with this name: the one already visited, or loaded from disk on first visit.</summary>
+        private Location LocationNamed(string name) =>
+            _visited.TryGetValue(name, out var known) ? known : new Location(name);
 
         /// <summary>
         /// The one place a conversation begins, whoever starts it. The ConversationSystem does
