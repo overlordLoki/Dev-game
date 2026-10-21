@@ -5,6 +5,7 @@ using Ashenveil.Core.Levels;
 using Ashenveil.Core.Objects;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
+using Ashenveil.Core.Graphics;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.GameWorld.Locations
@@ -39,6 +40,27 @@ namespace Ashenveil.Core.GameWorld.Locations
         /// <summary>The doorway on this cell, or null if it's an ordinary tile.</summary>
         public ExitData ExitAt(int col, int row) =>
             exits.FirstOrDefault(e => e.col == col && e.row == row);
+
+        // How far outside an exit cell still counts as touching it, in pixels. Collision leaves
+        // the body flush against a solid door, so this is leeway, not reach.
+        private const int ExitLeeway = 4;
+
+        /// <summary>
+        /// The doorway this body is touching, or null. A door is usually set into something solid
+        /// (Medows' castle door is on the castle's own cell), so collision never lets the feet
+        /// stand *in* the exit cell - pressed up against it has to count. Checks every cell the
+        /// body overlaps, give or take <see cref="ExitLeeway"/> pixels.
+        /// </summary>
+        public ExitData ExitTouching(Rectangle body)
+        {
+            body.Inflate(ExitLeeway, ExitLeeway);
+            int w = Layout.CellWidth, h = Layout.CellHeight;
+
+            for (int row = body.Top / h; row <= (body.Bottom - 1) / h; row++)
+                for (int col = body.Left / w; col <= (body.Right - 1) / w; col++)
+                    if (ExitAt(col, row) is { } exit) return exit;
+            return null;
+        }
 
         /// <summary>The named point with this name, or null if the level has none.</summary>
         public PointOfInterest Poi(string name) =>

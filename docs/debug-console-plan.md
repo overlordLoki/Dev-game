@@ -16,13 +16,29 @@ event log can feed into it later.
 
 ## Where things are now
 
-- **Typed text** already works, but only inside `Chat.cs`: it subscribes to MonoGame's
-  `Window.TextInput` event, keeps its own text, handles Backspace, and unsubscribes on close.
-  Nothing else can reuse it.
+- **`TextField` widget ✅ done** (`UI/Widgets/TextField.cs`). It's a one-line text box:
+  - `Type(char)` handles `'\r'` (submit) and `'\b'` (Backspace), and ignores other control
+    characters and anything past `maxLength`.
+  - Enter calls `onSubmit` but doesn't clear the text: the owner decides.
+  - Click to focus, plus a placeholder, a blinking cursor, and long text showing its end.
+  - `TextFieldTests` cover it, and the chat box uses it.
+- **Typed text is routed by the `ScreenManager` ✅ done.**
+  - `AshenveilGame` subscribes to `Window.TextInput` once and passes each character to
+    `ScreenManager.TextInput`.
+  - That hands it to the **top screen's** `IScreen.OnTextInput(char)`. The default does
+    nothing, so screens that don't type don't change.
+  - No screen subscribes or unsubscribes itself any more. The console just overrides
+    `OnTextInput` and passes the character to its field.
+- **Unknown characters can't crash drawing**: the font's `DefaultCharacter = '?'` is set
+  when it loads.
 - **Keyboard input** goes through `AshenveilGame.Input` (`IInput`), so key presses like the
-  toggle key can be scripted in tests. `Window.TextInput` does **not** go through `IInput`.
-- **Screens** are a stack (`ScreenManager`): only the top screen updates; all draw. The
-  chat box is a screen pushed on top of `World`.
+  toggle key can be scripted in tests. `Window.TextInput` does **not** go through `IInput`;
+  tests call `Type(char)` / `OnTextInput(char)` directly instead.
+- **Screens** are a stack (`ScreenManager`): only the top screen updates and gets typing;
+  every screen draws. The chat box is a screen pushed on top of `World`.
+- **The chat box's message log** (`ChatScreen.DrawLog`: word-wrap cache, newest at the
+  bottom, coloured names, grey game notes) is still private to `Chat.cs`. The console needs
+  the same thing for its output (see step 3).
 - **Debug output today** = `Console.WriteLine` and the `[DEBUG]` prints we used in
   `main.py` — neither is visible in-game.
 
@@ -33,13 +49,12 @@ event log can feed into it later.
 1. **The console is a screen pushed on the stack**, like the chat box and pause menu. Open:
    the world stops updating underneath (the stack only updates the top). That's what you
    want for a dev console — nothing moves while you type.
-2. **A reusable `TextField` widget, extracted from `Chat.cs`.** The console, the settings
-   screen (backend URL) and the chat box all need typed text. Build it once:
-   - Owns its text, cursor, focus, Backspace/Enter handling, and drawing.
-   - Takes characters through a plain method (`Type(char)`), with the screen wiring
-     `Window.TextInput` to it. That keeps it **testable**: a test calls `Type('a')` instead
-     of needing a real window.
-   - The chat box is switched over to it, so there's one implementation.
+2. **A reusable `TextField` widget ✅ done.** The console, the settings screen (backend
+   URL) and the chat box all need typed text, so it's built once. It takes characters
+   through `Type(char)`, so it's testable without a window. The chat box uses it.
+   - **A screen with one field keeps it focused.** `TextField.Update` unfocuses on any
+     click outside it, so a click on the console's output would stop typing. Do what
+     `Chat.cs` does: set `_field.Focused = true` after the widget updates.
 3. **Command registry.** Each command: `Name`, `Help`, `Run(args) → output lines`.
    `help` lists them from the registry automatically. Adding a command = one registration.
 4. **Output is a list of `ConsoleLine { Text, Kind (Input | Output | Error | Event) }`**,
@@ -64,6 +79,7 @@ event log can feed into it later.
 | `task <npc> go_to <poi>` / `wait <s>` | Gives an NPC a task | Testing the task system by hand |
 | `time` / `time +<n>d` | Shows / skips game time | Phase 8 day-end reflection |
 | `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance |
+| `nav` | Toggles drawing of blocked cells and NPC paths | Pathfinding plan, once it lands |
 | `clear` | Clears the output | |
 
 Commands that name an NPC should accept its id **or** its name, and say clearly when it's
@@ -73,13 +89,21 @@ not found.
 
 ## Steps
 
-1. **`TextField` widget** — extract from `Chat.cs`; `Type(char)`, Backspace, Enter → an
-   `OnSubmit` callback. Switch the chat box to it and confirm chat still works.
+1. ~~**`TextField` widget**~~ ✅ done, along with typing routed through `IScreen.OnTextInput`.
 2. **`CommandRegistry`** — register/lookup, argument splitting (respect quotes:
    `journal "Sir Lancelot"`), unknown-command and bad-argument errors as `Error` lines.
+   Pure logic, so it can be built and tested before there's a screen.
 3. **`ConsoleScreen`** — `TextField` at the bottom, output lines above, a dark translucent
    panel over the world. Toggle with `` ` `` (through `IInput`, edge-triggered). Escape
-   also closes.
+   also closes. Typing arrives through `OnTextInput(char)`; there's nothing to subscribe.
+   - **The toggle key leaks into the field.** It's the same problem `Chat.cs` has with E: the
+     `` ` `` that opened the console also arrives as a typed character. Either reuse the
+     `_waitForRelease` idea, or just ignore `` ` `` in `OnTextInput`, since it's never part of
+     a command. Once two screens need this, consider moving it into the `ScreenManager`
+     (drop typing for the first frame after a push).
+   - **Share the log drawing with the chat box.** Pull `ChatScreen.DrawLog` out into a
+     `ChatLog` widget (lines in, newest at the bottom, word-wrapped and coloured), and use it
+     here for `ConsoleLine`s. Decide its shape now that there are two users, not before.
 4. **Wire it in** — `AshenveilGame` pushes/pops it; only when dev mode is on.
 5. **First commands** — start with `help`, `where`, `tp`, `npcs`, `journal`, `clear`; add
    the rest as you need them.
@@ -89,8 +113,10 @@ not found.
 
 ## Testing
 
-- `TextField`: typing, Backspace, Enter firing `OnSubmit`, ignoring input when unfocused —
-  all through `Type(char)` and fake key states, no window needed.
+- `TextField` ✅ done (`TextFieldTests`, 16 tests): typing, Backspace, the max length, Enter
+  firing `onSubmit` without clearing, ignoring input when unfocused or hidden, and focus by click.
+- `ConsoleScreen.OnTextInput`: the toggle key isn't typed; other characters reach the field.
+  It can be called directly, with no window.
 - `CommandRegistry`: parsing (quotes, extra spaces), unknown command, wrong argument count.
 - Individual commands: most just read/modify game state, so they can be tested against a
   small fake world or the existing test helpers (`TestNpc`, `TestLevels`).
@@ -110,5 +136,6 @@ not found.
 ## Depends on / feeds into
 
 - Needs: nothing new.
-- Provides: `TextField` (used by the settings plan), `where`/`tp` (used to verify the
-  world-units plan), a log the Phase 8 event log can feed.
+- Provides: `where`/`tp` (used to verify the world-units plan), `nav` (pathfinding plan),
+  a `ChatLog` widget shared with the chat box, and a log the Phase 8 event log can feed.
+  (`TextField`, used by the settings plan, already exists.)

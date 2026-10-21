@@ -109,6 +109,57 @@ public class LocationTests
         Assert.Null(TestLevels.Location(BareLevel).ExitAt(0, 0));
     }
 
+    // ---------------------------------------------------------------- ExitTouching
+    // With Layout.Update(500), cells are 100px: the Castle2 exit at (0,1) is x 0..100, y 100..200.
+
+    [Fact]
+    public void ExitTouching_finds_a_body_standing_in_the_exit_cell()
+    {
+        Layout.Update(500);
+
+        var exit = TestLevels.Location(Level).ExitTouching(new Rectangle(30, 130, 40, 40));
+
+        Assert.Equal("Castle2", exit?.to);
+    }
+
+    [Fact]
+    public void ExitTouching_counts_a_body_pressed_against_the_exit_from_outside()
+    {
+        // The feet can't get into a door set in something solid: the body stops flush below it.
+        Layout.Update(500);
+
+        var exit = TestLevels.Location(Level).ExitTouching(new Rectangle(30, 202, 40, 20));   // 2px below
+
+        Assert.Equal("Castle2", exit?.to);
+    }
+
+    [Fact]
+    public void ExitTouching_counts_a_body_that_only_overlaps_the_exit_cell_a_little()
+    {
+        // Mostly in the cell below, its top edge just inside the exit cell.
+        Layout.Update(500);
+
+        var exit = TestLevels.Location(Level).ExitTouching(new Rectangle(30, 190, 40, 40));
+
+        Assert.Equal("Castle2", exit?.to);
+    }
+
+    [Fact]
+    public void ExitTouching_is_null_a_little_further_away()
+    {
+        Layout.Update(500);
+
+        Assert.Null(TestLevels.Location(Level).ExitTouching(new Rectangle(30, 210, 40, 20)));   // 10px below
+    }
+
+    [Fact]
+    public void ExitTouching_is_null_in_a_level_with_no_exits()
+    {
+        Layout.Update(500);
+
+        Assert.Null(TestLevels.Location(BareLevel).ExitTouching(new Rectangle(0, 0, 100, 100)));
+    }
+
     // --------------------------------------------------------- PointOfInterest.ToPixel
 
     [Theory]

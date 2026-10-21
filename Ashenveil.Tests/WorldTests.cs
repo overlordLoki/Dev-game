@@ -129,6 +129,81 @@ public class WorldTests : IDisposable
         Assert.False(raised);
     }
 
+    // ------------------------------------------------------------------ exits
+
+    // The same field with a door in the top-middle cell (2,0) -> pixels x 200..300, y 0..100.
+    // It leads to the real Medows level, which ships with the tests.
+    private const string LevelWithDoor = """
+        {
+          "cols": 5, "rows": 5,
+          "tiles": [["grass","grass","grass","grass","grass"],
+                    ["grass","grass","grass","grass","grass"],
+                    ["grass","grass","grass","grass","grass"],
+                    ["grass","grass","grass","grass","grass"],
+                    ["grass","grass","grass","grass","grass"]],
+          "exits": [ { "col": 2, "row": 0, "to": "Medows", "spawnCol": 3, "spawnRow": 7 } ],
+          "pois": [ { "name": "Player_spawn", "x": 2, "y": 2 } ]
+        }
+        """;
+
+    private World NewWorldWithDoor()
+    {
+        var world = new World(TestLevels.Location(LevelWithDoor),
+            sendChat: _ => Task.FromResult(Array.Empty<ChatMessage>()),
+            requestDecision: _ => Task.FromResult(_decisionReply));
+        world.Init();
+        return world;
+    }
+
+    // Stands the player with the top of their body `gap` pixels below the door cell's bottom
+    // edge (y = 100), feet in the row below - where collision leaves you against a solid door.
+    private static void StandBelowDoor(World world, int gap)
+    {
+        var p = world.player;
+        p.Position += new Vector2(250 - p.Bounds.Center.X, 100 + gap - p.Bounds.Top);
+    }
+
+    [Fact]
+    public void Interacting_pressed_against_a_door_goes_through_it()
+    {
+        // The bug: the feet were the only thing checked, and they can't reach a door set
+        // into something solid, so the castle door in Medows never worked.
+        var world = NewWorldWithDoor();
+        StandBelowDoor(world, gap: 0);
+
+        world.Interact();
+
+        Assert.Equal("Medows", world.location.Name);
+    }
+
+    [Fact]
+    public void Interacting_away_from_the_door_stays_put()
+    {
+        var world = NewWorldWithDoor();
+        StandBelowDoor(world, gap: 30);
+        string before = world.location.Name;
+
+        world.Interact();
+
+        Assert.Equal(before, world.location.Name);
+    }
+
+    [Fact]
+    public void At_a_door_with_an_NPC_beside_it_the_door_wins()
+    {
+        var world = NewWorldWithDoor();
+        StandBelowDoor(world, gap: 0);
+        NpcBeside(world);
+        bool talked = false;
+        world.PlayerConversationStarted += _ => talked = true;
+
+        var convo = world.Interact();
+
+        Assert.Null(convo);
+        Assert.False(talked);
+        Assert.Equal("Medows", world.location.Name);
+    }
+
     // ------------------------------------------------------------------ remembering
 
     [Fact]

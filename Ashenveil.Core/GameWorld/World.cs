@@ -84,19 +84,23 @@ namespace Ashenveil.Core.GameWorld
         }
 
         /// <summary>
-        /// The player's "interact" action (the E key): talk to an NPC in reach, otherwise use
-        /// the exit underfoot. Returns the conversation it started, or null (an exit was used,
-        /// or there was nothing to do). Talking wins over doors when an NPC is within reach.
+        /// The player's "interact" action (the E key): use the exit the player is touching,
+        /// otherwise talk to an NPC in reach. Returns the conversation it started, or null (an
+        /// exit was used, or there was nothing to do). Doors win: being pressed against one is
+        /// the more specific thing to be doing, and NPCs hang around doorways (the knight's walk
+        /// ends right below Medows' castle door) - talking first made the door unusable.
         /// </summary>
         public Conversation Interact()
         {
-            var npc = player.GetNearestEntityInRange(NPCs, Layout.CellWidth * 1.5f) as NPC;
-            if (npc != null) return StartConversation(player, npc);
+            var exit = location.ExitTouching(player.Bounds);
+            if (exit != null)
+            {
+                UseExit(exit);
+                return null;
+            }
 
-            var (col, row) = PlayerCell();
-            var exit = location.ExitAt(col, row);
-            if (exit != null) UseExit(exit);
-            return null;
+            var npc = player.GetNearestEntityInRange(NPCs, Layout.CellWidth * 1.5f) as NPC;
+            return npc != null ? StartConversation(player, npc) : null;
         }
 
         /// <summary>
@@ -126,17 +130,6 @@ namespace Ashenveil.Core.GameWorld
             var convo = Conversations.Start(from, others, location, Clock.TotalDays);
             if (from == player) PlayerConversationStarted?.Invoke(convo);
             return convo;
-        }
-
-        /// <summary>
-        /// Which cell the player is standing in, measured from their feet - the bottom
-        /// centre of the collision box, not the sprite, which has transparent padding
-        /// and would report the cell above.
-        /// </summary>
-        private (int col, int row) PlayerCell()
-        {
-            Rectangle body = player.Bounds;
-            return (body.Center.X / Layout.CellWidth, body.Bottom / Layout.CellHeight);
         }
 
         /// <summary>One step of the game: time, conversations, decisions, movement, collision.</summary>
