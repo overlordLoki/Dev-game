@@ -390,8 +390,7 @@
       "col": 3,
       "row": 6,
       "to": "CastleInterior",
-      "spawnCol": 0,
-      "spawnRow": 0,
+      "arriveAt": "from_medows",
       "rotation": 180
     }
   ],

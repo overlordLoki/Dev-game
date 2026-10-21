@@ -14,8 +14,10 @@
       "col": 3,
       "row": 4,
       "to": "Medows",
-      "spawnCol": 3,
-      "spawnRow": 7
+      "arriveAt": "entry"
     }
+  ],
+  "pois": [
+    { "name": "from_medows", "x": 3, "y": 3 }
   ]
 }

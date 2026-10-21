@@ -17,8 +17,8 @@ public class LocationTests
             ["grass", "grass", "grass", "grass"]
           ],
           "exits": [
-            { "col": 3, "row": 2, "to": "Medows",  "spawnCol": 5, "spawnRow": 6 },
-            { "col": 0, "row": 1, "to": "Castle2", "spawnCol": 1, "spawnRow": 1 }
+            { "col": 3, "row": 2, "to": "Medows",  "arriveAt": "entry" },
+            { "col": 0, "row": 1, "to": "Castle2" }
           ],
           "pois": [
             { "name": "spawn", "x": 2, "y": 1 },
@@ -80,7 +80,7 @@ public class LocationTests
 
         Assert.NotNull(exit);
         Assert.Equal("Medows", exit.to);
-        Assert.Equal((5, 6), (exit.spawnCol, exit.spawnRow));
+        Assert.Equal("entry", exit.arriveAt);
     }
 
     [Fact]
@@ -214,6 +214,18 @@ public class LocationTests
         var entity = new TestEntity(0, 0);
 
         TestLevels.Location(Level).PlaceAt(entity, "nowhere");  // "default" is cell (1,1) -> centre (150,150)
+
+        Assert.Equal(new Vector2(150, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
+    }
+
+    [Fact]
+    public void PlaceAt_with_no_name_falls_back_to_default()
+    {
+        // An exit with no arriveAt passes null; that must land on "default", not throw.
+        Layout.Update(500);
+        var entity = new TestEntity(0, 0);
+
+        TestLevels.Location(Level).PlaceAt(entity, null);
 
         Assert.Equal(new Vector2(150, 150), entity.Position + new Vector2(entity.Width / 2f, entity.Height / 2f));
     }

@@ -104,20 +104,15 @@ namespace Ashenveil.Core.GameWorld
         }
 
         /// <summary>
-        /// Walks through a doorway: loads the target level and stands the player on its
-        /// spawn cell. The destination's own exit sits under that cell, which is what
-        /// lets the player turn round and walk back out.
+        /// Walks through a doorway: loads the target level and stands the player on the point
+        /// the exit names there (its "default" point if it names none, or one that isn't there).
+        /// That point normally sits just inside the destination's own door back.
         /// </summary>
         public void UseExit(ExitData exit)
         {
             SetLocation(new Location(exit.to));
             Roster.Populate(location);   // first visit spawns, return visit reuses
-
-            // Centre the player in the spawn cell rather than at its corner, so they
-            // don't start half-inside whatever is standing on the neighbouring tile.
-            player.Position = new Vector2(
-                exit.spawnCol * Layout.CellWidth + (Layout.CellWidth - player.Width) / 2f,
-                exit.spawnRow * Layout.CellHeight + (Layout.CellHeight - player.Height) / 2f);
+            location.PlaceAt(player, exit.arriveAt);
         }
 
         /// <summary>

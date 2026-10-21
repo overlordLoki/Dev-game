@@ -144,11 +144,12 @@ This is the contract with `MapLoader`:
   "tiles":     [ ["grass", "dirt", "..."] ],
   "rotations": [ [0, 90, 0] ],
   "objects":   [ { "type": "tree", "variety": 3, "col": 6, "row": 3, "rotation": 90 } ],
-  "exits":     [ { "col": 3, "row": 7, "to": "CastleInterior", "spawnCol": 3, "spawnRow": 4, "rotation": 0 } ]
+  "exits":     [ { "col": 3, "row": 7, "to": "CastleInterior", "arriveAt": "from_medows", "rotation": 0 } ],
+  "pois":      [ { "name": "Player_spawn", "x": 1, "y": 1 } ]
 }
 ```
 
-`exits` is optional and omitted when a level has no doors.
+`exits` and `pois` are optional and omitted when a level has none.
 
 Levels are saved as the exact JSON the UI produced, not re-serialised through a
 C# DTO — so a field the UI adds can't be silently dropped by a backend that
@@ -165,8 +166,8 @@ the editor doesn't edit yet survives a round trip.
 ## Doors
 
 A door is a cell, not an object — no sprite, just an entry in `exits` saying
-"stand here, press E, and the game swaps to that level and puts you on that
-cell". So the editor has to invent a marker for it.
+"touch this cell, press E, and the game swaps to that level and puts you on that
+point". So the editor has to invent a marker for it.
 
 The marker is a **bar along one edge** of the cell — a threshold you step over.
 The first attempt outlined the whole cell and hung the destination name in the
@@ -179,40 +180,58 @@ moves *that* door's bar; with none selected it aims the next one. The cell under
 the cursor lights up and shows a faded bar on the side it would land on, since
 otherwise there is no feedback at all until after the click.
 
-`rotation` is presentation only — the game reads `col`/`row`/`to`/`spawnCol`/
-`spawnRow` and ignores it. It's in `ExitData` all the same so it survives a
-load/save round trip rather than being dropped the way object rotation is.
+`rotation` is presentation only — the game reads `col`/`row`/`to`/`arriveAt`
+and ignores it. It's in `ExitData` all the same so it survives a load/save round
+trip rather than being dropped the way object rotation is.
 
-Put the door on the walkable cell **in front of** a building, not on the art —
-the building's collision box fills its own cell, so the player can never stand
-there. A door is one-way; for a way back, the destination needs its own door on
-the cell you spawn onto.
+The door can sit on the building's own cell. The game counts a door as used when
+the player's body **touches** its cell (with a few pixels' leeway), not only when
+their feet stand in it, so pressing up against a solid building works.
+
+**Where you come out** is `arriveAt`: the *name* of a point of interest in the
+destination, picked from the **Arrive** dropdown (filled from that level's
+Points). It used to be `spawnCol`/`spawnRow`, a cell of the destination stored in
+*this* level's file, so moving a door in one level silently broke the other's.
+A name keeps each level's layout in its own file: move the castle's door and its
+`from_medows` point, and Medows needs no change. With no point picked, the player
+lands on the destination's `default` point. A door is one-way; for a way back,
+the destination needs its own door, with its arrival point just inside it (not
+on it, or you'd walk straight back out).
+
+Older files with `spawnCol`/`spawnRow` still open: those keys are dropped on load,
+and the door lands on `default` until you pick a point for it and save.
 
 The sidebar lists every door in the level, in reading order rather than the
 order they were added:
 
 ```
-0,0  top    | Tavern           4,5  x
-2,1  left   | CastleInterior   1,2  x
-3,2  bottom | GoneAway         0,0  x
+0,0  top    | Tavern           front_door   x
+2,1  left   | CastleInterior   from_medows  x
+3,2  bottom | GoneAway         default      x
 ```
 
 Left of the bar is the cell you stand on and which edge its marker is on; right
-of it is where you come out. The
-bar is a separator rather than an arrow on purpose — both halves are just cells,
+of it is where you come out: the level and the point. The
+bar is a separator rather than an arrow on purpose — both halves are just places,
 and an arrow suggests a route to follow rather than two facts to read. Clicking a
 row selects that door and loads it into the fields below, same as clicking its
 cell on the grid.
 
 Doors are copied, cut, moved and deleted along with tiles and objects in Select
-mode. Their `to`/`spawnCol`/`spawnRow` are left alone when a block moves, since
-those are coordinates in a different level that the move didn't touch.
+mode. Their `to`/`arriveAt` are left alone when a block moves, since those name
+places in a different level that the move didn't touch.
 
-The one thing that's checked is the destination: a door pointing at a level that
-isn't on disk turns red and lists itself in the sidebar, because that's the case
-the game throws on. A spawn cell outside the destination's grid is *not* checked
-— it needs the other level's dimensions — but it fails softly, since
-`WorldBounds` clamps the player back inside.
+Two things are checked, and either turns the door red and lists it in the
+sidebar:
+- **The destination level isn't on disk.** That's the case the game throws on.
+- **The destination has no point with the `arriveAt` name** (renamed or deleted).
+  It doesn't crash, since the player lands on `default`, but it's never what was meant.
+  The destination's points are read from disk the first time they're needed and
+  kept until the level list is refreshed. For a door back into the level being
+  edited, the live (maybe unsaved) points are used.
+
+`MapLoaderTests` checks the same two things for every shipped level, plus that
+each door names an arrival point at all.
 
 ## Asset registration — no more hand-editing the .mgcb
 

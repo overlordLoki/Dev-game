@@ -141,7 +141,7 @@ public class WorldTests : IDisposable
                     ["grass","grass","grass","grass","grass"],
                     ["grass","grass","grass","grass","grass"],
                     ["grass","grass","grass","grass","grass"]],
-          "exits": [ { "col": 2, "row": 0, "to": "Medows", "spawnCol": 3, "spawnRow": 7 } ],
+          "exits": [ { "col": 2, "row": 0, "to": "Medows", "arriveAt": "entry" } ],
           "pois": [ { "name": "Player_spawn", "x": 2, "y": 2 } ]
         }
         """;
@@ -174,6 +174,37 @@ public class WorldTests : IDisposable
         world.Interact();
 
         Assert.Equal("Medows", world.location.Name);
+    }
+
+    [Fact]
+    public void Going_through_a_door_lands_on_the_point_it_names()
+    {
+        var world = NewWorldWithDoor();
+        StandBelowDoor(world, gap: 0);
+
+        world.Interact();
+
+        // "entry" in Medows is cell (3,7) -> centre (350,750) at 100px cells.
+        Assert.Equal(world.location.Poi("entry").ToPixel(), Centre(world.player));
+        Assert.Equal(new Vector2(350, 750), Centre(world.player));
+    }
+
+    [Fact]
+    public void Medows_and_the_castle_lead_into_each_other_and_back()
+    {
+        // The shipped levels, both ways: each door lands just inside the other one's door.
+        var world = new World(new Ashenveil.Core.GameWorld.Locations.Location("Medows"),
+            sendChat: _ => Task.FromResult(Array.Empty<ChatMessage>()),
+            requestDecision: _ => Task.FromResult(_decisionReply));
+        world.Init();
+
+        world.UseExit(world.location.ExitAt(3, 6));
+        Assert.Equal("CastleInterior", world.location.Name);
+        Assert.Equal(world.location.Poi("from_medows").ToPixel(), Centre(world.player));
+
+        world.UseExit(world.location.ExitAt(3, 4));
+        Assert.Equal("Medows", world.location.Name);
+        Assert.Equal(world.location.Poi("entry").ToPixel(), Centre(world.player));
     }
 
     [Fact]

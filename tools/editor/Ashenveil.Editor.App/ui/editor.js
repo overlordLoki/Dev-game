@@ -19,14 +19,18 @@ let cols = 8, rows = 5;
 let tiles = [];                 // tiles[r][c] = tile id string
 let tileRot = [];               // tileRot[r][c] = rotation degrees (0/90/180/270)
 let objects = [];               // { type, variety, col, row, rotation }
-let exits = [];                 // { col, row, to, spawnCol, spawnRow, rotation } — doorways to
-                                // other levels; rotation is which edge the bar is drawn on
+let exits = [];                 // { col, row, to, arriveAt, rotation } — doorways to other
+                                // levels; arriveAt names a point of interest over there, and
+                                // rotation is which edge the bar is drawn on
 let selectedExitCell = null;    // { col, row } of the door the sidebar fields are editing
 let pois = [];                  // { name, x, y } — named cells the game looks up by name
 let selectedPoiCell = null;     // { x, y } of the point the name field is editing
 let extras = {};                // keys of the level file the editor doesn't edit,
                                 // kept verbatim so saving doesn't silently delete them
 let levelNames = [];            // every level on disk, for checking a door's destination
+let poiNamesByLevel = {};       // level name -> its point names, read on demand for the
+                                // door's "Arrive" list; cleared whenever the level list is
+                                // refreshed
 
 let mode = "tiles";             // "tiles" | "objects" | "select" | "exits" | "pois"
 let selectedTile = null;
@@ -215,7 +219,7 @@ function markExit(el, e) {
 
   // The destination used to be a badge on the cell. The sidebar list carries it
   // now, so the grid stays a map instead of a wall of overlapping labels.
-  el.title = `Door (${sideName(e.rotation)}) -> ${e.to || "(nowhere)"} at ${e.spawnCol},${e.spawnRow}`
+  el.title = `Door (${sideName(e.rotation)}) -> ${e.to || "(nowhere)"} at "${e.arriveAt || "default"}"`
     + (isKnownLevel(e.to) ? "" : "  — no such level");
 }
 
@@ -403,7 +407,7 @@ function captureBlock(r) {
   }));
 
   block.exits = exits.filter(e => inRect(e, r)).map(e => ({
-    to: e.to, spawnCol: e.spawnCol, spawnRow: e.spawnRow, rotation: e.rotation || 0,
+    to: e.to, arriveAt: e.arriveAt, rotation: e.rotation || 0,
     dx: e.col - r.x, dy: e.row - r.y,
   }));
 
@@ -437,7 +441,7 @@ function stampBlock(block, x, y) {
     if (e.dx >= w || e.dy >= h) return;
     exits.push({
       col: x + e.dx, row: y + e.dy,
-      to: e.to, spawnCol: e.spawnCol, spawnRow: e.spawnRow, rotation: e.rotation || 0,
+      to: e.to, arriveAt: e.arriveAt, rotation: e.rotation || 0,
     });
   });
 
@@ -745,10 +749,59 @@ function removeExit(x, y) {
 function exitFromForm() {
   return {
     to: $("exitTo").value,
-    spawnCol: Math.max(0, +$("exitSpawnCol").value || 0),
-    spawnRow: Math.max(0, +$("exitSpawnRow").value || 0),
+    arriveAt: $("exitArriveAt").value,
     rotation: exitRotation,
   };
+}
+
+/**
+ * The point names in a level, for the "Arrive" list. This level's come straight from
+ * the editor (they may be unsaved); another level's are read from disk once and kept.
+ * Null while that read is still on its way.
+ */
+function poiNamesIn(level) {
+  if (!level) return [];
+  if (level === currentLevel) return pois.map(p => p.name);
+  if (level in poiNamesByLevel) return poiNamesByLevel[level];
+
+  poiNamesByLevel[level] = null;   // in flight: don't ask twice
+  Api.readLevel(level)
+    .then(map => { poiNamesByLevel[level] = (map.pois || []).map(p => p.name); })
+    .catch(() => { poiNamesByLevel[level] = []; })
+    .then(() => { buildArriveOptions(); updateExitUi(); });
+  return null;
+}
+
+/**
+ * Fills the "Arrive" dropdown with the destination's points. The value is kept even
+ * when the destination doesn't have it (shown as missing) rather than silently
+ * re-aiming the door, the same way a missing level is handled.
+ */
+function buildArriveOptions(keep = $("exitArriveAt").value) {
+  const sel = $("exitArriveAt");
+  const names = poiNamesIn($("exitTo").value);
+  sel.innerHTML = "";
+
+  const add = (value, text) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = text;
+    sel.appendChild(opt);
+  };
+
+  // No point picked: the game falls back to the destination's "default" point.
+  add("", names === null ? "(loading...)" : "(default)");
+  (names || []).filter(n => n !== "default").forEach(n => add(n, n));
+  if (keep && names && !names.includes(keep)) add(keep, `${keep} (missing)`);
+
+  sel.value = keep || "";
+}
+
+/** True when the door's arrival point is known to be missing from its destination. */
+function arrivalMissing(e) {
+  if (!e.arriveAt || !isKnownLevel(e.to)) return false;
+  const names = poiNamesIn(e.to);
+  return names !== null && !names.includes(e.arriveAt);
 }
 
 function loadExitIntoForm(e) {
@@ -762,8 +815,7 @@ function loadExitIntoForm(e) {
   }
 
   $("exitTo").value = e.to || "";
-  $("exitSpawnCol").value = e.spawnCol;
-  $("exitSpawnRow").value = e.spawnRow;
+  buildArriveOptions(e.arriveAt || "");
 
   // Picking a door also picks up its side, so R carries on from where that door
   // is rather than from whatever the last one placed happened to be.
@@ -785,9 +837,9 @@ function applyExitForm() {
   markDirty();
 }
 
-["exitTo", "exitSpawnCol", "exitSpawnRow"].forEach(id => {
-  $(id).onchange = applyExitForm;
-});
+// A new destination has different points, so the arrival point starts over at "default".
+$("exitTo").onchange = () => { buildArriveOptions(""); applyExitForm(); };
+$("exitArriveAt").onchange = applyExitForm;
 
 /** Rebuilds the destination dropdown from the levels on disk. */
 function buildExitTargets() {
@@ -804,6 +856,7 @@ function buildExitTargets() {
   });
 
   if (keep && levelNames.includes(keep)) sel.value = keep;
+  buildArriveOptions();
 }
 
 /**
@@ -832,7 +885,7 @@ function buildExitList() {
     const row = document.createElement("div");
     row.className = "exit-row";
     if (sel && sel.col === e.col && sel.row === e.row) row.classList.add("selected");
-    if (!isKnownLevel(e.to)) row.classList.add("broken");
+    if (!isKnownLevel(e.to) || arrivalMissing(e)) row.classList.add("broken");
 
     const at = document.createElement("span");
     at.className = "exit-at";
@@ -847,7 +900,7 @@ function buildExitList() {
 
     const spawn = document.createElement("span");
     spawn.className = "exit-spawn";
-    spawn.textContent = `${e.spawnCol},${e.spawnRow}`;
+    spawn.textContent = e.arriveAt || "default";
 
     // Which edge the bar is on. Cheap to show and the only way to check a door
     // faces the right way without hunting for its cell on the grid.
@@ -864,7 +917,7 @@ function buildExitList() {
 
     row.append(at, side, bar, dest, spawn, del);
     row.title = `Stand on ${e.col},${e.row} (bar on the ${sideName(e.rotation)})`
-      + ` to reach ${e.to || "nowhere"} at ${e.spawnCol},${e.spawnRow}`;
+      + ` to reach ${e.to || "nowhere"} at "${e.arriveAt || "default"}"`;
     row.onclick = () => { selectExit(e); loadExitIntoForm(e); };
 
     list.appendChild(row);
@@ -881,16 +934,23 @@ function updateExitUi() {
       ? "Click a door above or on the grid to edit it."
       : "Left-click a cell to put a door on it.";
 
-  // The one mistake worth shouting about: the game throws on a missing level file.
-  const broken = exits.filter(e => !isKnownLevel(e.to));
+  // The game throws on a missing level file, so that's worth shouting about. A missing
+  // arrival point doesn't crash (the player lands on "default"), but it's almost
+  // certainly a renamed or deleted point, so it's flagged too.
   const list = $("exitWarnings");
   list.innerHTML = "";
-  broken.forEach(e => {
+  const warn = text => {
     const li = document.createElement("li");
-    li.textContent = `Door at ${e.col},${e.row} points at "${e.to || "nothing"}" — no such level.`;
+    li.textContent = text;
     list.appendChild(li);
+  };
+  exits.forEach(e => {
+    if (!isKnownLevel(e.to))
+      warn(`Door at ${e.col},${e.row} points at "${e.to || "nothing"}" — no such level.`);
+    else if (arrivalMissing(e))
+      warn(`Door at ${e.col},${e.row}: ${e.to} has no point "${e.arriveAt}" — the player lands on "default".`);
   });
-  list.hidden = broken.length === 0;
+  list.hidden = list.children.length === 0;
 }
 
 /* --------------------------------------------------- points of interest */
@@ -1031,6 +1091,10 @@ function updatePoiUi() {
     list.appendChild(li);
   });
   list.hidden = dupes.size === 0;
+
+  // A door back into this level picks its arrival point from these, so keep it current.
+  buildArriveOptions();
+  updateExitUi();
 }
 
 gridEl.addEventListener("mousedown", e => {
@@ -1329,7 +1393,10 @@ function loadMap(map) {
   rows = map.rows;
   tiles = map.tiles;
   objects = map.objects || [];
-  exits = map.exits || [];                             // levels with no doors have no key
+  // Levels with no doors have no key. Older doors carry spawnCol/spawnRow (a cell in the
+  // destination); the game now uses arriveAt instead, so they're dropped here and the
+  // door lands on "default" until a point is picked for it.
+  exits = (map.exits || []).map(({ spawnCol, spawnRow, ...e }) => e);
   pois = map.pois || [];                               // ...nor with no points
   tileRot = map.rotations || newGrid(cols, rows, 0);   // older files have no rotations
   extras = Object.fromEntries(
@@ -1393,6 +1460,7 @@ async function refreshLevelList(select) {
   // Doors point at levels by name, so this list is also what a door can target
   // and what tells us a door has been left pointing at a deleted file.
   levelNames = names;
+  poiNamesByLevel = {};             // levels may have been saved, renamed or deleted since
   buildExitTargets();
   updateExitUi();
   if (tiles.length) render();       // repaint door markers with fresh validity

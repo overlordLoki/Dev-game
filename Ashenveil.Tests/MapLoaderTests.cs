@@ -27,7 +27,7 @@ public class MapLoaderTests
             { "type": "tree",   "variety": 9, "col": 0, "row": 0 }
           ],
           "exits": [
-            { "col": 2, "row": 1, "to": "CastleInterior", "spawnCol": 4, "spawnRow": 5, "rotation": 180 }
+            { "col": 2, "row": 1, "to": "CastleInterior", "arriveAt": "from_medows", "rotation": 180 }
           ],
           "pois": [
             { "name": "spawn", "x": 1, "y": 1 },
@@ -143,7 +143,7 @@ public class MapLoaderTests
 
         Assert.Equal((2, 1), (exit.col, exit.row));
         Assert.Equal("CastleInterior", exit.to);
-        Assert.Equal((4, 5), (exit.spawnCol, exit.spawnRow));
+        Assert.Equal("from_medows", exit.arriveAt);
         Assert.Equal(180, exit.rotation);
     }
 
@@ -230,8 +230,11 @@ public class MapLoaderTests
 
                 Assert.True(InGrid(map, exit.col, exit.row), $"{door}: the doorway is off the grid");
                 Assert.True(levels.ContainsKey(exit.to), $"{door}: no such level");
-                Assert.True(InGrid(levels[exit.to], exit.spawnCol, exit.spawnRow),
-                    $"{door}: spawn ({exit.spawnCol},{exit.spawnRow}) is off the destination grid");
+                // A shipped door must say where you land. Leaving it out "works" (you land on
+                // "default", cell 1,1) but is never what was meant.
+                Assert.False(string.IsNullOrEmpty(exit.arriveAt), $"{door}: no arriveAt point");
+                Assert.True(levels[exit.to].PointsOfInterest.ContainsKey(exit.arriveAt),
+                    $"{door}: {exit.to} has no point named \"{exit.arriveAt}\"");
             }
         }
     }

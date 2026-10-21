@@ -62,9 +62,9 @@ namespace Ashenveil.Core.GameWorld.Locations
             return null;
         }
 
-        /// <summary>The named point with this name, or null if the level has none.</summary>
+        /// <summary>The named point with this name, or null if the level has none (or no name is given).</summary>
         public PointOfInterest Poi(string name) =>
-            pointsOfInterest.TryGetValue(name, out var p) ? p : null;
+            name != null && pointsOfInterest.TryGetValue(name, out var p) ? p : null;
 
         /// <summary>
         /// Stands an entity centred on the named point - or on "default" if this level doesn't

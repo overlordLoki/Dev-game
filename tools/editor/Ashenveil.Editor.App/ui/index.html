@@ -101,7 +101,7 @@
       Tiles and objects travel together.</div>
   </div>
 
-  <!-- Doors: a cell that swaps the level when the player stands on it and presses E. -->
+  <!-- Doors: a cell that swaps the level when the player touches it and presses E. -->
   <div id="exitPanel" hidden>
     <h2>Doors</h2>
 
@@ -114,9 +114,8 @@
       <select id="exitTo" class="grow"></select>
     </div>
     <div class="row" style="margin-top:8px">
-      <label>Spawn</label>
-      <input id="exitSpawnCol" type="number" min="0" max="59" value="0" title="Column in the destination">
-      <input id="exitSpawnRow" type="number" min="0" max="59" value="0" title="Row in the destination">
+      <label>Arrive</label>
+      <select id="exitArriveAt" class="grow" title="The point in the destination the player lands on"></select>
     </div>
     <div class="row" style="margin-top:8px">
       <label>Side</label>
@@ -128,10 +127,10 @@
       above so you can re-aim it.<br>
       Side is which edge of the cell the bar sits on — face it towards the way in.
       With a door selected, R moves its bar; otherwise R sets the side for the next one.<br>
-      Put the door on the walkable cell <em>in front of</em> the building — the art
-      itself is solid, so the player can't stand on it.<br>
-      Spawn is the cell they land on over there. For a way back, the destination
-      needs its own door on that cell.</div>
+      The door can go on the building's own cell — pressing up against it counts.<br>
+      Arrive is the point (from the destination's Points) the player lands on over
+      there; with none picked they land on its "default" point. Put that point just
+      inside the destination's own door back, not on it.</div>
     <ul class="warnings" id="exitWarnings" hidden></ul>
   </div>
 

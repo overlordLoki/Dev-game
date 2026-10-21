@@ -39,19 +39,26 @@ namespace Ashenveil.Core.Levels
     }
 
     /// <summary>
-    /// A doorway: stand on (col, row) and the level swaps to <see cref="to"/>, landing
-    /// the player on (spawnCol, spawnRow) there. Deliberately a tile coordinate rather
-    /// than an object, so a door needs no sprite of its own - it is the walkable cell
-    /// in front of whatever building art is already standing there. The destination
-    /// level normally carries the matching exit back.
+    /// A doorway: touch (col, row) and press E, and the level swaps to <see cref="to"/>,
+    /// landing the player on the point named <see cref="arriveAt"/> there. Deliberately a
+    /// tile coordinate rather than an object, so a door needs no sprite of its own - it can
+    /// sit on the building's own cell (see Location.ExitTouching). The destination level
+    /// normally carries the matching exit back.
     /// </summary>
     public class ExitData
     {
         public int col { get; set; }
         public int row { get; set; }
         public string to { get; set; }
-        public int spawnCol { get; set; }
-        public int spawnRow { get; set; }
+
+        /// <summary>
+        /// The point of interest in <see cref="to"/> the player arrives on - a name, not a cell,
+        /// so each level owns its own layout: move the destination's door and its arrival point
+        /// moves with it, with no other level to fix. Missing or unknown -> the destination's
+        /// "default" point (Location.PlaceAt). Replaced spawnCol/spawnRow, which hard-coded a
+        /// cell of the *destination* into this level's file.
+        /// </summary>
+        public string arriveAt { get; set; }
 
         /// <summary>
         /// Which edge of the cell the door faces, clockwise from the top: 0 top,
