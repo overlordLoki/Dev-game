@@ -1,5 +1,10 @@
 # NPC Memory, Tasks & LLM-Driven Behaviour — Plan
 
+> **Status: complete (Phases 1–6).** Kept as a record of how the feature was built. Some
+> names have moved since: `World` was split into `ConversationSystem`, `NpcRoster` and
+> `GameClock`; the fixed `Greeting` was removed; positions are in cells. What comes next is
+> in [npc-memory-next-plan.md](../npc-memory-next-plan.md).
+
 ## Summary
 
 NPCs should feel persistent and reactive: they remember past conversations, and
@@ -117,7 +122,7 @@ remembers the exchange next time.
 > conversation end, facts carried into the next conversation, and a cold transcript store
 > with summaries recalled into later chats). Verified live: the knight remembers your name,
 > and what you talked about last time. Next candidates are in Phase 7 (later list) and
-> Phase 8 (event log).
+> Phase 8 (event log), now in [npc-memory-next-plan.md](../npc-memory-next-plan.md).
 
 ---
 
@@ -181,7 +186,7 @@ what you talked about last time - not just isolated facts.
 
 **Decisions (agreed):**
 - **Recall level (a):** inject short summaries of past conversations *with the same
-  person*. Full-transcript retrieval comes later via embeddings (see Phase 7+), not
+  person*. Full-transcript retrieval comes later via embeddings (see the next plan), not
   keyword triggers.
 - **One shared `Transcript` per conversation**, the same object added to each
   participating NPC's journal. Only participants get it (built-in perception).
@@ -224,60 +229,10 @@ a group chat the other NPC inherits that "I". Fix if group chats matter: ask the
 prompt for a neutral third-person summary.
 ---
 
-## Phase 7 — Later / optional
+## What's next
 
-- **LLM tool-calling recall** — `recall(query)` as a real tool, once on a tool-capable
-  model; multi-round-trip, decision-step first. Rails are laid by the cold store above.
-- **Persistence (disk)** — serialize each NPC's journal + tasks, keyed by a **stable
-  string id** (`"medows_knight"`), not the runtime int. Survives restart; design the
-  journal as save data.
-- **NPC-started conversations** — there's no fixed greeting any more: whoever starts a
-  conversation speaks first, so a player-started chat opens empty and the LLM's first line
-  answers the player. When an NPC walks up to the player it should open with something it
-  *has in mind*, and that comes from whatever sent it over: the decision LLM queues a
-  `talk_to { target, reason }` task; on arrival the task starts the conversation with the
-  reason, and the conversation asks the LLM for the opening line straight away ("You
-  approached the Traveller to: warn them about the wolves. Open the conversation.").
-  Python side: empty history + a reason = open, not reply. Needs `talk_to` (below).
-- **Disposition** — `friendly|neutral|wary|hostile` on the decision; the hook for the
-  knight warming to / souring on the player.
-- **Memory consolidation** — dedupe/merge facts (an LLM job) and relevance-select the
-  top-N to inject, once journals grow large.
-- **More task types / behaviours** — `patrol`, `talk_to`, `follow`; one enum value +
-  one `switch` arm each.
-- **TaskContext as struct** — if NPC crowds appear, avoid per-tick heap allocation.
-
----
-
-## Phase 8 — Event log & daily reflection
-
-**Goal:** NPCs learn from the world, not just conversations.
-
-1. **Structured `EventLog`** — `GameEvent { Day, Location, Actor, Text }` ("Loki killed 2
-   zombies at the well"). Game systems post to it. The **console is one consumer** that
-   prints it; NPCs are another. Build the data first, not console text.
-2. **Perception** — each NPC only receives events near it (same location, maybe a range).
-   Without this every NPC knows everything, which breaks the illusion.
-3. **Hot during the day** — an NPC's recent witnessed events flow into the same framed
-   memory channel as facts (`MemoryKind.Event`). No LLM call per event.
-4. **Cold at day end** — on `GameDate.AdvanceDay()`, each NPC makes one reflection call:
-   summarise the day's events into the cold store (a daily entry, alongside transcripts).
-5. **Stagger the day-end calls** — every NPC wants a call at once; queue them through
-   fire-and-poll with one or two in flight, not a stampede.
-6. **`Memory.Day`** — events give memories a real timestamp; add it here (deferred until
-   now), which also unlocks recency/decay for consolidation.
-
----
-
-## Open decisions
-
-- **Day/night clock?** Deliberately avoided (decision-driven, not time-driven). Only
-  revisit if a time-of-day *Schedule* is genuinely wanted.
-- **LLM task authority:** start **additive-biased** (add tasks + `clear`), no
-  surgical delete/update by id. Widen only once outputs are trusted.
-- **Naming:** keep concrete tasks specific (`GoToTask`, never a bare `Task`, which
-  clashes with `System.Threading.Tasks.Task`). Consider renaming namespace
-  `brains.Task` → `brains.Tasks`, and `Memorys` → `Memories`.
+Phases 7 (the "later" list) and 8 (the event log and daily reflection), plus the open
+decisions, moved to their own plan: [npc-memory-next-plan.md](../npc-memory-next-plan.md).
 
 ---
 

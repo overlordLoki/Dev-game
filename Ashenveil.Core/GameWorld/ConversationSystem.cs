@@ -63,7 +63,7 @@ namespace Ashenveil.Core.GameWorld
         /// Whoever starts a conversation speaks first, so it opens with nothing said - only a
         /// game note saying who approached whom. The LLM's first line is its answer to the
         /// opener, made with everything the NPC remembers, so it isn't the same every time.
-        /// (NPCs starting conversations themselves comes later - see npc-memory-plan.md.)
+        /// (NPCs starting conversations themselves comes later - see docs/npc-memory-next-plan.md, A1.)
         /// </summary>
         public Conversation Start(Entity from, NPC[] others, Location level, int today)
         {

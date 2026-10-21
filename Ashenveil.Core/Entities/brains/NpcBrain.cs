@@ -123,7 +123,7 @@ namespace Ashenveil.Core.Entities
         }
 
         // TODO (separate feature): combat — enemy detection, targeting, a Combat state.
-        // Parked until the memory/task feature (docs/npc-memory-plan.md) is done.
+        // Parked until the NPC memory/behaviour work (docs/npc-memory-next-plan.md) is further along.
 
         /// <summary>
         /// Called after the NPC was pushed out of another entity. <paramref name="horizontal"/>

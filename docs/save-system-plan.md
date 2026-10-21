@@ -142,6 +142,8 @@ if it matters, store transcripts once at the top level and have journals list id
 
 ## Depends on
 
-- **World units** (required): positions and task targets must not depend on window size.
+- **World units** (required) ✅ done: positions, sizes, speeds and task targets are in cells,
+  so they don't depend on window size. See [Completed/world-units-plan.md](Completed/world-units-plan.md).
 - **Settings plan** (helpful): proves the folder, safe write and versioning approach first.
-- **Debug console** (helpful): `journal`, `where`, `npcs` to check what was restored.
+- **Debug console** (helpful) ✅ done: `journal`, `where [npc]`, `npcs` to check what was restored.
+  See [Completed/debug-console-plan.md](Completed/debug-console-plan.md).

@@ -74,7 +74,7 @@ place that converts to pixels — when drawing. This must land **before the save
 "z" meant **layers** — things like tree canopies drawing over the player. That's a
 **draw-order** question, not a third coordinate, so this refactor keeps positions as x/y
 (`Vector2` in cells). Layers are their own small rendering feature: see
-[draw-layers-plan.md](draw-layers-plan.md).
+[draw-layers-plan.md](../draw-layers-plan.md).
 
 For the record, the other meanings of z, neither needed now:
 

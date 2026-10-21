@@ -6,7 +6,7 @@ Things that should cover the player — tree canopies, roofs, archways, bridges 
 than sorting by y. The fix is **three draw layers**: Ground (flat, drawn first), World
 (sorted by the base's y — what the game does now), and Overhead (always on top, fading when
 the player is underneath). It's a rendering feature, not a position coordinate: positions
-stay x/y (see [world-units-plan.md](world-units-plan.md)).
+stay x/y (see [world-units-plan.md](Completed/world-units-plan.md)).
 
 Part of this is a **one-line bug fix** that's worth doing first, on its own: entities sort by
 the bottom of their sprite instead of their feet.
