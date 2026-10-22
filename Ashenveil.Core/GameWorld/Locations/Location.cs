@@ -7,6 +7,7 @@ using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Tiles;
 using System;
 using Ashenveil.Core.Collision;
+using Ashenveil.Core.Navigation;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.GameWorld.Locations
@@ -24,6 +25,9 @@ namespace Ashenveil.Core.GameWorld.Locations
         public List<IObject> objects { get; }
         public List<ExitData> exits { get; }
         public Dictionary<string, PointOfInterest> pointsOfInterest { get; }
+        // Which cells an NPC can walk on, for the Pathfinder. Built once here: boxes are in
+        // cells, so it doesn't change when the window is resized.
+        public NavGrid Nav { get; }
 
         public Location(string name)
         {
@@ -36,6 +40,7 @@ namespace Ashenveil.Core.GameWorld.Locations
             //add a default spawn point for fallback
             PointOfInterest defaultSpawn = new PointOfInterest("default", 1, 1);
             pointsOfInterest["default"] = defaultSpawn;
+            Nav = new NavGrid(this);   // last: it reads tileMap and objects
         }
 
         /// <summary>The doorway on this cell, or null if it's an ordinary tile.</summary>

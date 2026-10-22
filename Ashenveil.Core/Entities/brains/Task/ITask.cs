@@ -37,5 +37,8 @@ namespace Ashenveil.Core.Entities.brains.Task
         public required Entity Owner { get; init; }
         public required Blackboard Blackboard { get; init; }
         public float DeltaTime { get; init; }
+        // The owner's level's walkable cells, for tasks that route round obstacles. Null when
+        // the owner isn't in a level (tests): tasks fall back to walking straight.
+        public Navigation.NavGrid Nav { get; init; }
     }
 }

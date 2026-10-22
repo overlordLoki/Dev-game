@@ -117,6 +117,7 @@ namespace Ashenveil.Core.Entities
                 Owner = Npc,
                 Blackboard = _blackboard,
                 DeltaTime = dt,
+                Nav = Npc.Location?.Nav,
             });
 
             if (task.State == TaskState.Completed) TaskQueue.Dequeue();

@@ -2,8 +2,10 @@ using Ashenveil.Core.DevConsole;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
+using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Graphics;
+using Ashenveil.Core.Utility;
 using Ashenveil.Core.Utility.Input;
 using Microsoft.Xna.Framework;
 
@@ -42,7 +44,11 @@ public class WorldCommandsTests : IDisposable
         WorldCommands.Register(_commands, _world);
     }
 
-    public void Dispose() => Ashenveil.Core.AshenveilGame.Input = new LiveInput();
+    public void Dispose()
+    {
+        Ashenveil.Core.AshenveilGame.Input = new LiveInput();
+        Debug.SHOWNAV = false;   // static, so don't leave it on for the next test
+    }
 
     private string[] Run(string input) => _commands.Execute(input).Select(l => l.Text).ToArray();
 
@@ -210,5 +216,39 @@ public class WorldCommandsTests : IDisposable
 
         Assert.Equal(LineKind.Error, line.Kind);
         Assert.Contains("1, 2", line.Text);
+    }
+
+    // ------------------------------------------------------------------ nav
+
+    [Fact]
+    public void Nav_turns_the_overlay_on_then_off()
+    {
+        RunOne("nav");
+        Assert.True(Debug.SHOWNAV);
+
+        RunOne("nav");
+        Assert.False(Debug.SHOWNAV);
+    }
+
+    [Fact]
+    public void An_NPC_walking_somewhere_shows_its_path_ending_on_the_target()
+    {
+        var (npc, brain) = AddNpc();
+        npc.StandAt(new Vector2(0.5f, 0.5f));
+        var target = new Vector2(4.5f, 4.9f);
+        npc.GiveTask(new GoToTask(target));
+
+        brain.Update(new GameTime());   // the first tick plans the route
+
+        Assert.NotEmpty(npc.CurrentPath);
+        Assert.Equal(target, npc.CurrentPath[^1]);
+    }
+
+    [Fact]
+    public void An_NPC_with_nothing_to_do_has_no_path()
+    {
+        var (npc, _) = AddNpc();
+
+        Assert.Empty(npc.CurrentPath);
     }
 }

@@ -32,8 +32,12 @@ namespace Ashenveil.Core.GameWorld
         /// <summary>The NPCs in this level (none yet if it's never been visited).</summary>
         public IReadOnlyList<NPC> In(string levelName) => ListFor(levelName);
 
-        /// <summary>Puts an NPC in a level.</summary>
-        public void Add(string levelName, NPC npc) => ListFor(levelName).Add(npc);
+        /// <summary>Puts an NPC in a level, and tells the NPC which level it's in.</summary>
+        public void Add(Location level, NPC npc)
+        {
+            ListFor(level.Name).Add(npc);
+            npc.Location = level;
+        }
 
         /// <summary>Every NPC in every level.</summary>
         public IEnumerable<NPC> All => _byLevel.Values.SelectMany(list => list);
@@ -77,7 +81,7 @@ namespace Ashenveil.Core.GameWorld
                 case "Medows":
                     var knight = new Knight(Vector2.Zero, NextId(), "Sir Lancelot", new KnightBrain());
                     level.PlaceAt(knight, "Knight_spawn");
-                    Add(level.Name, knight);
+                    Add(level, knight);
 
                     // A short walk to the entry and back. Only if the level has both points:
                     // a missing one would otherwise crash here with a null reference.

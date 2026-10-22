@@ -28,6 +28,16 @@ namespace Ashenveil.Core.DevConsole
                 _ => Npcs(world));
             commands.Register("journal", "<npc>", "Shows what an NPC remembers. <npc> is an id or a name.",
                 args => Journal(world, args[0]), minArgs: 1, maxArgs: 1);
+            commands.Register("nav", "", "Shows or hides the blocked cells (red) and each NPC's path (yellow).",
+                _ => ToggleNav());
+        }
+
+        private static IEnumerable<string> ToggleNav()
+        {
+            Utility.Debug.SHOWNAV = !Utility.Debug.SHOWNAV;
+            yield return Utility.Debug.SHOWNAV
+                ? "Nav overlay on: red cells are blocked, yellow lines are NPC paths."
+                : "Nav overlay off.";
         }
 
         // Measured by the feet - the bottom centre of the collision box - like doors and

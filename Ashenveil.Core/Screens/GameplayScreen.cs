@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Ashenveil.Core.Collision;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Graphics;
 using Ashenveil.Core.UI.Widgets;
+using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -87,6 +89,32 @@ namespace Ashenveil.Core.Screens
             // 4. draw in that order
             foreach (var d in drawables)
                 d.Draw(spriteBatch);
+
+            // 5. debug overlay on top of everything
+            if (Debug.SHOWNAV) DrawNav(spriteBatch, pixel);
+        }
+
+        // Blocked cells as red squares, and each NPC's route as a yellow line from its feet
+        // through its remaining waypoints. Shows *why* an NPC walks where it does.
+        private void DrawNav(SpriteBatch spriteBatch, Texture2D pixel)
+        {
+            var nav = World.location.Nav;
+            for (int row = 0; row < nav.Rows; row++)
+                for (int col = 0; col < nav.Cols; col++)
+                    if (!nav.IsWalkable(new Point(col, row)))
+                        spriteBatch.Draw(pixel, Layout.ToScreen(new RectF(col, row, 1, 1)), Color.Red * 0.35f);
+
+            foreach (var npc in World.NPCs)
+            {
+                Vector2 from = npc.Feet;
+                foreach (var waypoint in npc.CurrentPath)
+                {
+                    Debug.DrawLine(spriteBatch, Layout.ToScreen(from), Layout.ToScreen(waypoint), Color.Yellow);
+                    // A small square on each waypoint, a tenth of a cell across.
+                    spriteBatch.Draw(pixel, Layout.ToScreen(new RectF(waypoint.X - 0.05f, waypoint.Y - 0.05f, 0.1f, 0.1f)), Color.Yellow);
+                    from = waypoint;
+                }
+            }
         }
     }
 }

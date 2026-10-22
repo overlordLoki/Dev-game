@@ -1,5 +1,6 @@
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.GameWorld;
+using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Graphics;
 using Microsoft.Xna.Framework;
@@ -34,10 +35,21 @@ public class NpcRosterTests
     {
         var npc = new TestNpc(0, 0);
 
-        _roster.Add("Medows", npc);
+        _roster.Add(new Location("Medows"), npc);
 
         Assert.Contains(npc, _roster.In("Medows"));
         Assert.Empty(_roster.In("Castle2"));
+    }
+
+    [Fact]
+    public void Adding_an_NPC_tells_it_which_level_its_in()
+    {
+        var npc = new TestNpc(0, 0);
+        var medows = new Location("Medows");
+
+        _roster.Add(medows, npc);
+
+        Assert.Same(medows, npc.Location);
     }
 
     // ------------------------------------------------------------------ finding
@@ -47,8 +59,8 @@ public class NpcRosterTests
     {
         var a = new TestNpc(0, 0, 7);
         var b = new TestNpc(0, 0, 8);
-        _roster.Add("Medows", a);
-        _roster.Add("Castle2", b);
+        _roster.Add(new Location("Medows"), a);
+        _roster.Add(new Location("Castle2"), b);
 
         Assert.Same(b, _roster.Find(8));
         Assert.Equal(2, _roster.All.Count());
@@ -103,5 +115,52 @@ public class NpcRosterTests
         _roster.Populate(castle);
 
         Assert.Empty(_roster.In("Castle2"));
+    }
+
+    // -------------------------------------------------------------- navigation
+
+    // Keeps the context it was run with, so a test can see what the brain handed it.
+    private sealed class ProbeTask : ITask
+    {
+        public TaskState State { get; set; }
+        public TaskContext Seen { get; private set; }
+        public void Execute(TaskContext context) => Seen = context;
+    }
+
+    [Fact]
+    public void A_level_has_a_nav_grid_the_size_of_its_tile_map()
+    {
+        var medows = new Location("Medows");
+
+        Assert.Equal(medows.tileMap.Cols, medows.Nav.Cols);
+        Assert.Equal(medows.tileMap.Rows, medows.Nav.Rows);
+    }
+
+    [Fact]
+    public void Tasks_get_the_nav_grid_of_the_NPCs_level()
+    {
+        var brain = new WanderBrain();
+        var npc = new TestNpc(0, 0, brain);
+        var medows = new Location("Medows");
+        _roster.Add(medows, npc);
+        var probe = new ProbeTask();
+        npc.GiveTask(probe);
+
+        brain.Update(new GameTime());
+
+        Assert.Same(medows.Nav, probe.Seen.Nav);
+    }
+
+    [Fact]
+    public void Tasks_get_no_nav_grid_when_the_NPC_isnt_in_a_level()
+    {
+        var brain = new WanderBrain();
+        var npc = new TestNpc(0, 0, brain);
+        var probe = new ProbeTask();
+        npc.GiveTask(probe);
+
+        brain.Update(new GameTime());
+
+        Assert.Null(probe.Seen.Nav);
     }
 }

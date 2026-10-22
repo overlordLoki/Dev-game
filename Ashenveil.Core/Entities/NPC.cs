@@ -19,6 +19,9 @@ namespace Ashenveil.Core.Entities
         // whoever starts a conversation speaks first, and the LLM writes every NPC line
         // (see ConversationSystem.Start).
         public string Persona { get; set;} = "A generic NPC.";
+        // The level this NPC is in, set by NpcRoster.Add. Null until it's been added to one
+        // (tests often skip that). Tasks get the level's NavGrid through it.
+        public GameWorld.Locations.Location Location { get; internal set; }
         protected NPC(Vector2 position, int id, string name, NpcBrain brain) : base(position, id)
         {
             Brain = brain;
@@ -38,6 +41,12 @@ namespace Ashenveil.Core.Entities
         // still go through the NPC's own methods below.
         public NpcBrain.NPCState State => Brain.State;
         public brains.Memorys.Journal Journal => Brain.Journal;
+        // Where the current go-to task is still heading, in cells; empty when the NPC isn't
+        // walking to anything. For the `nav` debug drawing.
+        public IReadOnlyList<Vector2> CurrentPath =>
+            State == NpcBrain.NPCState.Tasked && Brain.TaskQueue.TryPeek(out var task) && task is brains.Task.GoToTask go
+                ? go.RemainingWaypoints
+                : Array.Empty<Vector2>();
 
         // The brain is private to the NPC, so the World starts and ends talking through these.
         public void StartTalking() => Brain.StartTalking();

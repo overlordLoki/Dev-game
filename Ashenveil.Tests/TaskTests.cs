@@ -1,5 +1,6 @@
 using Ashenveil.Core;
 using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Navigation;
 using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Tests;
@@ -74,6 +75,97 @@ public class GoToTaskTests
         task.Execute(Ctx(npc));
 
         Assert.Equal(TaskState.Completed, task.State);
+    }
+
+    // ------------------------------------------------------------ with a nav grid
+
+    // A grid drawn as text: '#' is blocked, anything else is walkable.
+    private static NavGrid Grid(params string[] rows)
+    {
+        var grid = new NavGrid(rows[0].Length, rows.Length);
+        for (int row = 0; row < rows.Length; row++)
+            for (int col = 0; col < rows[row].Length; col++)
+                if (rows[row][col] == '#')
+                    grid.Block(new Point(col, row));
+        return grid;
+    }
+
+    // Ticks the task until it completes, stepping the NPC 0.05 cells along Direction each
+    // tick. There's no collision here, so only the route keeps the feet out of blocked
+    // cells. Returns every cell the feet were in along the way.
+    private static List<Point> Walk(TestNpc npc, GoToTask task, NavGrid nav)
+    {
+        var cells = new List<Point> { NavGrid.CellAt(npc.Feet) };
+        for (int tick = 0; tick < 1000 && task.State != TaskState.Completed; tick++)
+        {
+            task.Execute(new TaskContext { Owner = npc, Blackboard = new Blackboard(), Nav = nav });
+            npc.Position += npc.Direction * 0.05f;
+            cells.Add(NavGrid.CellAt(npc.Feet));
+        }
+        return cells;
+    }
+
+    [Fact]
+    public void Walks_round_a_tree_and_ends_on_the_exact_target()
+    {
+        var nav = Grid(
+            ".....",
+            "..#..",
+            ".....");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(new Vector2(0.5f, 1.9f));        // feet low in cell (0, 1), like a POI's standing spot
+        var target = new Vector2(4.5f, 1.9f);        // cell (4, 1): straight through the tree
+
+        var cells = Walk(npc, new GoToTask(target), nav);
+
+        Assert.DoesNotContain(new Point(2, 1), cells);
+        Assert.True(Vector2.Distance(target, npc.Feet) <= 0.03f);   // within the arrive radius
+    }
+
+    [Fact]
+    public void Without_a_grid_it_still_walks_straight_through()
+    {
+        var nav = Grid(
+            ".....",
+            "..#..",
+            ".....");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(new Vector2(0.5f, 1.9f));
+        var task = new GoToTask(new Vector2(4.5f, 1.9f));
+
+        var cells = Walk(npc, task, nav: null);
+
+        Assert.Contains(new Point(2, 1), cells);     // the old straight line, tree or not
+        Assert.Equal(TaskState.Completed, task.State);
+    }
+
+    [Fact]
+    public void Plans_from_where_the_NPC_is_when_it_starts_not_when_the_task_was_made()
+    {
+        var nav = Grid("......");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
+        var task = new GoToTask(NavGrid.CentreOf(new Point(2, 0)));
+
+        npc.StandAt(NavGrid.CentreOf(new Point(5, 0)));   // moved while the task waited its turn
+        task.Execute(new TaskContext { Owner = npc, Blackboard = new Blackboard(), Nav = nav });
+
+        Assert.Equal(new Vector2(-1, 0), npc.Direction);  // heads left, back towards the target
+    }
+
+    [Fact]
+    public void A_target_on_a_blocked_cell_stops_next_to_it()
+    {
+        var nav = Grid("....#");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
+        var task = new GoToTask(NavGrid.CentreOf(new Point(4, 0)));   // a POI on a tree
+
+        var cells = Walk(npc, task, nav);
+
+        Assert.Equal(TaskState.Completed, task.State);
+        Assert.DoesNotContain(new Point(4, 0), cells);
+        Assert.True(Vector2.Distance(NavGrid.CentreOf(new Point(3, 0)), npc.Feet) <= 0.03f);
     }
 }
 

@@ -77,7 +77,7 @@ namespace Ashenveil.Core.GameWorld
         /// Puts an NPC in the level being played. Tests use this, and a future debug-console
         /// "spawn" command can too.
         /// </summary>
-        public void AddNpc(NPC npc) => Roster.Add(location.Name, npc);
+        public void AddNpc(NPC npc) => Roster.Add(location, npc);
 
         /// <summary>
         /// Makes <paramref name="next"/> the active area and re-fences the world to its
