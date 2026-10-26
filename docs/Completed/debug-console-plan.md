@@ -76,15 +76,16 @@ event log can feed into it later.
 |---|---|---|---|
 | `help` | Lists commands | Discoverable | ✅ |
 | `where [npc]` | Prints the level, cell and x,y of the feet (in cells): the player's, or an NPC's by id/name | Essential for the world-units refactor; checking where NPCs stand | ✅ |
-| `tp <col> <row>` | Stands the player in the middle of a cell | Testing levels, POIs, exits | ✅ |
+| `tp <col> <row>` | Stands the player on a cell (feet on its standing spot, like a spawn) | Testing levels, POIs, exits | ✅ |
 | `tpxy <x> <y>` | Puts the player's feet on an exact x,y in cells (`tpxy 3.25 4.5`) | Lining up against box edges and doors | ✅ |
 | `level <name>` | Loads a level | Skip walking | |
 | `npcs` | Lists NPCs in all levels: id, name, level, state | Replaces reading debug prints | ✅ |
 | `journal <npc>` | Dumps an NPC's memories and transcripts | Checking the memory feature | ✅ |
 | `task <npc> go_to <poi>` / `wait <s>` | Gives an NPC a task | Testing the task system by hand | |
 | `time` / `time +<n>d` | Shows / skips game time | Phase 8 day-end reflection | |
-| `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance | |
-| `nav` | Toggles drawing of blocked cells and NPC paths | Pathfinding plan, once it lands | |
+| `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance | (planned in [settings-plan.md](../settings-plan.md)) |
+| `nav` | Toggles drawing of blocked cells and NPC paths | Seeing why an NPC walks where it does | ✅ (built with pathfinding) |
+| `goto <npc> <poi>` | Sends an NPC to a point | Testing routes by hand | |
 | `clear` | Clears the output | | ✅ |
 
 Commands that name an NPC should accept its id **or** its name, and say clearly when it's

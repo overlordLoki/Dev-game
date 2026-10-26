@@ -12,13 +12,30 @@ rehearsal for the save system: same folder, same safe-write and versioning appro
 
 ## Where things are now
 
-- `SettingsScreen` has one widget: a Back button.
-- `Settings` (static) only holds `Scale`, computed from the window height. Nothing is
-  user-set or saved.
-- The backend address is **hard-coded** in `DialogueApi`:
-  `new HttpClient { BaseAddress = new Uri("http://127.0.0.1:8000") }`.
-- Widgets available: `Button`, `Checkbox`, `Slider`, `Label`, `Panel`, `Image`,
-  `ProgressBar`. Missing: a **text field** (coming from the debug-console plan).
+*(Refreshed after the debug console, world units and pathfinding landed.)*
+
+- **`Screens/SettingsScreen.cs`** has one widget: a Back button. The menu pushes it; Back
+  pops it.
+- **`Utility/Settings.cs`** is a static class holding only `Scale`, which is computed from the
+  window height (`UpdateScale`). Nothing in it is chosen by the user or saved. (When this
+  feature is built, it moves out of `Utility/`, as agreed during the folder refactor.)
+- **The backend address is hard-coded** in `Entities/brains/Dialogue/DialogueAPI.cs`:
+  `private static readonly HttpClient _http = new() { BaseAddress = new Uri("http://127.0.0.1:8000") };`
+  Both LLM calls (`RequestAsync` for chat, `RequestDecisionAsync` for decisions) go through it.
+- **The Python backend already has `GET /health`** (`TestAPI/main.py`), ready for a "Test
+  connection" button.
+- **The widgets exist:** `Button`, `Checkbox`, `Slider`, `Label`, `Panel`, `Image`,
+  `ProgressBar`, `ChatLog`, and **`TextField`**. `TextField` is built and tested
+  (`TextFieldTests`):
+  - Typing reaches it through `IScreen.OnTextInput(char)`, which the `ScreenManager` sends to
+    the top screen, so the settings screen needs no `Window.TextInput` wiring of its own.
+  - `TextField.Update` unfocuses on a click outside it. That's what you want on a screen with
+    several fields, unlike the console and chat, which force their single field to stay focused.
+- **Dev mode is `Debug.DEVMODE`** (`Utility/Debug.cs`). It's on in Debug builds and off in
+  Release, and the `` ` `` console only opens when it's on. It's a hard-coded flag waiting to
+  become a setting.
+- **The console** has `help`, `where`, `tp`, `tpxy`, `npcs`, `journal`, `nav`, `clear`. The
+  plan's `server` / `health` commands aren't built yet; they belong with this feature.
 
 ---
 
@@ -27,18 +44,27 @@ rehearsal for the save system: same folder, same safe-write and versioning appro
 1. **Split "computed" from "chosen".** `Scale` is computed from the window and isn't a
    setting. Chosen values go in a new **`GameSettings`** data class (plain data, like the
    level DTOs) that's loaded at startup and saved on change.
-2. **Saved to `%LOCALAPPDATA%\Ashenveil\settings.json`**
-   (`Environment.SpecialFolder.LocalApplicationData`) — not the install folder, which is
+2. **Where the code goes:** a new folder, but **not named `Settings`**. A namespace called
+   `Settings` would clash with the static `Settings` class, the same problem `UI.UI` and
+   `World` had. Suggested: `Config/` with `GameSettings` and `SettingsStore`. The static
+   `Settings.Scale` can move there too, or be renamed (e.g. `UiScale`) to stop the confusion.
+3. **Saved to `%LOCALAPPDATA%\Ashenveil\settings.json`**
+   (`Environment.SpecialFolder.LocalApplicationData`), not the install folder, which is
    read-only content (and not writable at all on Android).
-3. **Safe write**: write `settings.json.tmp`, then replace — a crash mid-write can't corrupt
-   it. **`version` field** from day one. A missing or broken file → defaults, never a crash.
-4. **Settings are applied, not just stored.** Each setting has a clear "apply" step (change
-   the backend URL, set the window mode, set volume) that runs on load and on change.
-5. **Changing the backend address at runtime.** `HttpClient.BaseAddress` can't change after
+4. **Safe write**: write `settings.json.tmp`, then replace, so a crash mid-write can't corrupt
+   it. **`version` field** from day one. A missing or broken file means defaults, never a crash.
+5. **Settings are applied, not just stored.** Each setting has a clear "apply" step (change
+   the backend URL, set dev mode, set the window mode) that runs on load and on change.
+6. **Changing the backend address at runtime.** `HttpClient.BaseAddress` can't change after
    the first request. Options:
    - rebuild the `HttpClient` when the URL changes (simplest), or
    - drop `BaseAddress` and build the full URL per request.
-   Either way `DialogueApi` reads the URL from settings instead of a constant.
+
+   Either way, `DialogueApi` reads the URL from settings instead of a constant.
+7. **Make `DialogueApi` testable while in there.** Today its `HttpClient` is a private static
+   with a fixed address. Letting a test hand it an `HttpMessageHandler` (or a base URL plus a
+   handler) means "the next request goes to the new address" can be tested with no network.
+   It's the same seam idea as the fake `sendChat` / `requestDecision` functions.
 
 ---
 
@@ -47,10 +73,10 @@ rehearsal for the save system: same folder, same safe-write and versioning appro
 | Setting | Widget | Notes |
 |---|---|---|
 | **Backend URL** | `TextField` + "Test connection" button | The button calls `/health` and shows the result: unreachable / reachable but model missing / OK (with the model name). |
-| Dev mode | `Checkbox` | Turns the debug console on/off. |
-| Fullscreen / window size | `Checkbox` / buttons | Applying it triggers the existing resize path (`OnResize`). |
+| Dev mode | `Checkbox` | Replaces the hard-coded `Debug.DEVMODE`. Turns the `` ` `` console on or off. |
+| Fullscreen / window size | `Checkbox` / buttons | Applying it triggers the existing resize path (`OnResize`). Positions are in cells now, so a resize is safe mid-game. |
 | Master volume | `Slider` | Once there's audio. |
-| Console toggle key | — | Later, if backtick is awkward on your keyboard. |
+| Console toggle key | — | Later. Both US (`OemTilde`) and UK (`Oem8`) layouts already work. |
 
 The backend URL is the reason to do this now; the rest can come one at a time.
 
@@ -58,37 +84,47 @@ The backend URL is the reason to do this now; the rest can come one at a time.
 
 ## Steps
 
-1. **`GameSettings` + `SettingsStore`** — load (defaults if missing/broken), save (temp file
-   then replace), `version` field.
+1. **`GameSettings` + `SettingsStore`**: load (defaults if missing or broken), save (temp file
+   then replace), `version` field. Pure file logic, so testable with a temp folder.
 2. **Load at startup** in `AshenveilGame.Initialize`, before anything uses the values.
-3. **`DialogueApi` reads the URL** from settings; rebuild the client when it changes.
-4. **Settings screen layout** — rows of label + widget; Back saves.
-5. **Backend URL field** (needs `TextField` from the console plan) + **Test connection**
-   showing the `/health` result.
-6. **Dev mode** checkbox → console availability.
-7. Window mode and volume as they become relevant.
+3. **`DialogueApi` reads the URL** from settings; rebuild the client when it changes (and add
+   the test seam from decision 7).
+4. **Settings screen layout**: rows of label plus widget; Back saves.
+5. **Backend URL field** (`TextField`) + **Test connection**, showing the `/health` result.
+   The screen needs `OnTextInput` to pass characters to the focused field.
+6. **Dev mode** checkbox, replacing `Debug.DEVMODE`.
+7. **Console commands** `server` (show or set the URL) and `health` (call `/health`), sharing
+   the code the settings screen uses.
+8. Window mode and volume as they become relevant.
 
 ---
 
 ## Testing
 
-- `SettingsStore`: round-trip (save then load gives the same values), missing file →
-  defaults, corrupt file → defaults, unknown/extra fields ignored, older `version` handled.
-- URL validation: empty, missing `http://`, trailing slash — normalise or reject clearly.
+- `SettingsStore`: round trip (save then load gives the same values); missing file gives
+  defaults; corrupt file gives defaults; unknown or extra fields are ignored; an older
+  `version` is handled.
+- URL validation: empty, missing `http://`, a trailing slash. Normalise or reject clearly.
 - `DialogueApi` URL switch: after changing settings, the next request goes to the new
-  address (test against a fake handler, no network).
+  address (a fake handler, no network).
+- `server` / `health` console commands against a fake, like `WorldCommandsTests`.
+- The screen itself: by hand.
 
 ---
 
 ## Open questions
 
-- **Apply immediately or on "Back"?** Immediate is nicer for sliders; the URL probably only
-  on confirm.
+- **Apply immediately or on "Back"?** Immediate is nicer for sliders and checkboxes; the URL
+  probably only on confirm.
 - **Validate the URL on save, or just let "Test connection" tell you?**
 - **Should the model name be a setting too?** It's chosen server-side (`OLLAMA_MODEL` in
   `main.py`); exposing it means a new endpoint. Probably not yet.
+- **Should a Release build be able to turn dev mode on from settings?** Handy for testing a
+  shipped build; risky if players find it. Maybe only with a command-line flag.
 
 ## Depends on / feeds into
 
-- Needs: `TextField` from the debug-console plan.
-- Provides: the save-file folder, safe write and versioning approach the save system reuses.
+- **Needs:** nothing new. `TextField` and text routing are done (see
+  [Completed/debug-console-plan.md](Completed/debug-console-plan.md)).
+- **Provides:** the save-file folder, safe write and versioning approach that the
+  [save system](save-system-plan.md) reuses.

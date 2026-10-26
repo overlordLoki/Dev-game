@@ -31,6 +31,13 @@ points; the engine *validates and disposes*; there's no LLM in the per-frame loo
   tier is `Transcript { Id, Day, Location, Participants, Lines, Summary }`.
 - **Tasks:** `GoToTask` (walks the **feet** to a POI's `StandingSpot()`) and `WaitTask`.
   `NpcBrain.ApplyDecision` turns `go_to` / `wait` specs into tasks.
+- **Pathfinding is done** ([Completed/pathfinding-plan.md](Completed/pathfinding-plan.md)):
+  - `GoToTask` plans an A\* route round objects on each level's `Location.Nav` grid and smooths it.
+  - It replans when stuck, and **fails** (`TaskState.Failed`) when there's no way through.
+  - NPCs know their level (`NPC.Location`, set by `NpcRoster.Add`).
+  - `nav` in the console shows the routes.
+- **Failures aren't remembered yet:** there's a TODO in `NpcBrain.TickTasks` waiting for the
+  event log (Part B).
 - **No fixed greeting:** whoever starts a conversation speaks first. A player-started chat
   opens with only a grey game note.
 - **Time:** `GameWorld/GameClock.cs` raises `DayStarted` when a day turns over (10 real
@@ -55,8 +62,13 @@ comes from whatever sent it over:
 
 ### A2. More task types
 `patrol`, `talk_to`, `follow`. Each is one enum value in the decision schema (`main.py`) plus
-one `switch` arm in `NpcBrain.ApplyDecision`, plus its `ITask` class. Walking ones should
-wait for the [pathfinding plan](pathfinding-plan.md), or they'll walk into trees.
+one `switch` arm in `NpcBrain.ApplyDecision`, plus its `ITask` class. Pathfinding is done, so
+the walking ones can reuse it:
+- **`patrol`:** a loop of `GoToTask`s between POIs.
+- **`talk_to`:** walk to the target with `Pathfinder` (it ends next to a blocked goal, so it
+  works for a person standing somewhere awkward), then start the conversation (A1).
+- **`follow`:** replan towards a moving target every second or so, like the stuck check does.
+- Each should fail cleanly (`TaskState.Failed`) when there's no route, like `GoToTask`.
 
 ### A3. Disposition
 `friendly | neutral | wary | hostile` on the decision: the hook for the knight warming to,
@@ -107,6 +119,8 @@ summary. Only matters once NPCs chat in groups.
    list is the pattern.)
 6. **`Memory.Day`:** events give memories a real timestamp. Add it here; it also unlocks
    recency and decay for consolidation (A4).
+7. **Failed tasks become events:** `NpcBrain.TickTasks` has a TODO for exactly this
+   ("couldn't reach the well"). An NPC then knows it failed, and can say so next time you talk.
 
 **Console commands that help here:**
 - `time` / `time +<n>d` to skip to day end;

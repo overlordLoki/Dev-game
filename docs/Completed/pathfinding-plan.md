@@ -1,5 +1,16 @@
 # NPC Pathfinding — Plan
 
+> **Status: complete.** Steps 1–4 plus smoothing and the `nav` overlay are done and in use.
+> Left over, small and optional:
+> - tests for `NavGrid` itself (empty level, a tree blocks one cell, `CellAt`/`CentreOf`);
+> - the U-shaped pocket test for `Pathfinder`;
+> - arrive slowdown;
+> - a `goto <npc> <poi>` console command.
+>
+> The bigger "Later" ideas (tile walkability, routes between levels, crowds) are below. New
+> walking tasks (`patrol`, `talk_to`, `follow`) are in
+> [npc-memory-next-plan.md](../npc-memory-next-plan.md), A2.
+
 ## Summary
 
 Today `GoToTask` walks an NPC in a straight line at its target. The first tree, well or
@@ -18,8 +29,8 @@ microseconds. It lands in three pieces that can each be tested on their own: a *
 
 ## Where things are now
 
-> **Status:** steps 1–4 are done (see the notes on each), so this section describes the
-> code *before* them. What's still true: tiles never block, only objects do.
+> This section describes the code *before* the plan was built. What's still true: tiles
+> never block, only objects do.
 
 - **`GoToTask`** sets `npc.Direction` straight at the target every tick and completes
   within 4px. It aims the **sprite's centre** (`Position + size/2`), the same point
