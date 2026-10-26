@@ -4,10 +4,20 @@
 
 Close the game, reopen it, and the world is as you left it — most importantly, NPCs still
 remember you. Saving converts the live game into **plain save classes** (like the level
-DTOs `MapData` / `PoiData`, but the other direction), writes them as JSON, and rebuilds the
-real objects on load. Its main prerequisite, world units (positions that don't depend on
-window size), is done. It reuses the file approach the [settings plan](Completed/settings-plan.md)
-built and tested.
+DTOs `MapData` / `PoiData`, but the other direction), writes them to a **SQLite database,
+one file per save** (`saves/slot1.db`), and rebuilds the real objects on load.
+
+**Why SQLite from the start, not JSON:** the cold tier of NPC memory (transcripts, and later
+the event log) is what grows without limit and what recall will want to *search* (by person,
+by day, eventually by meaning). That ends up in a database either way, so starting there
+avoids writing a JSON save format only to migrate off it. v1 still saves a **snapshot** (the
+game keeps everything in memory while playing). The tables are laid out so the cold tier can
+later be written incrementally and queried in place, without changing the format.
+
+Its main prerequisite, world units (positions that don't depend on window size), is done.
+The [settings plan](Completed/settings-plan.md) built the "where files go" and "loading never
+throws" approach this reuses. Settings themselves stay JSON: they're machine config, small and
+meant to be hand-editable.
 
 ---
 
@@ -43,11 +53,18 @@ built and tested.
 ## Core idea: save data, not objects
 
 - **Save:** game objects → save classes (`SaveData`, `PlayerSave`, `NpcSave`,
-  `TranscriptSave`…) → JSON.
-- **Load:** JSON → save classes → rebuild the real `Knight`, `Journal`, etc.
+  `TranscriptSave`…) → SQLite rows.
+- **Load:** SQLite rows → save classes → rebuild the real `Knight`, `Journal`, etc.
 
 Never serialise live objects: a `Knight` holds textures, a brain, a back-reference and
 animation state. Save classes hold only what's needed to rebuild it.
+
+**Two layers, so each can be tested on its own:**
+- **`SaveMapper`:** game ↔ save classes. Pure, no database, so it's fast to test.
+- **`SaveStore`:** save classes ↔ SQLite. The only code that knows about tables and SQL.
+  Tested against a real database file in a temp folder.
+
+The save classes are the boundary between the two.
 
 ---
 
@@ -56,10 +73,10 @@ animation state. Save classes hold only what's needed to rebuild it.
 | Saved | Not saved | Why not |
 |---|---|---|
 | Clock (`CurrentDate` + time into the day) | Level tiles, objects, POIs | Already in the level JSON; save only what changes |
-| Player: level, position | Conversations in progress | Saving is blocked while a chat is open |
+| Players: stable id, name, level, feet position | Conversations in progress | Saving is blocked while a chat is open |
 | Each visited level's NPCs: type, stable key, name, position, journal | Decisions waiting on the LLM | Lost; the NPC just misses learning from one chat |
 | Id counters (`NpcRoster._nextId`, `ConversationSystem._nextTranscriptId`), populated levels (`NpcRoster._populated`) | Window size, cell size, textures, nav grids, the `_visited` level cache | Rebuilt at startup / from the level files |
-| — | Task queues (first version) | Back to default behaviour on load; see below |
+| Each NPC's task queue (`go_to` targets, `wait` time left), in order | A task's planned path and stuck timers | Replanned on the first tick after loading |
 
 ---
 
@@ -73,99 +90,238 @@ animation state. Save classes hold only what's needed to rebuild it.
 2. **Positions in cells** ✅: guaranteed by the world-units refactor, which is done.
 3. **NPC factory.** A lookup from saved type name to constructor:
    `"Knight" → (pos, id, name) => new Knight(..., new KnightBrain())`. One line per NPC type.
-4. **`version` field** from the first save. New fields just come back empty in old saves;
-   the version is for the rare breaking change.
-5. **Safe write**: `slot.json.tmp`, then replace. This is the same as `Config/SettingsStore.Save()`,
-   so copy its pattern (or pull the write-temp-then-rename into a small shared helper, now that
-   there are two users).
-6. **Location**: `%LOCALAPPDATA%\Ashenveil\saves\`, i.e. a `saves` folder inside
+4. **SQLite, one database file per save** ✅ decided: `saves/slot1.db`. Through
+   `Microsoft.Data.Sqlite`, Microsoft's lightweight ADO.NET provider. It bundles the native
+   SQLite library for Windows, Linux, macOS and Android, so nothing to install. No ORM:
+   plain SQL with parameters is easy to read, and it teaches how the tables actually work.
+5. **Schema version: `PRAGMA user_version`**, SQLite's built-in integer for exactly this.
+   - A new file is created at the current version.
+   - Opening an older one runs the **migrations** in order (version 1 → 2 → ...), each a few
+     `ALTER TABLE` / `CREATE TABLE` statements kept in code.
+   - A file *newer* than the game knows is refused with a clear message, never half-read.
+6. **Safe write: one transaction.** A v1 save is a snapshot: in a single transaction, clear
+   the tables and insert the current state. SQLite's journal makes a transaction all or
+   nothing, so a crash mid-save leaves the previous save intact. The settings store's
+   `.tmp`-then-rename trick isn't needed here.
+7. **Location**: `%LOCALAPPDATA%\Ashenveil\saves\`, i.e. a `saves` folder inside
    `SettingsStore.DefaultFolder`. Take the folder as a parameter, as `SettingsStore` does, so
    tests use a temp folder.
-7. **Loading never throws**, like `SettingsStore.Load()`: a missing save means "no Continue"; a
-   broken one means a clear message, and the game still starts.
-8. **Mapping is testable.** Game ↔ save-class conversion is plain methods that don't need
+8. **Loading never throws**, like `SettingsStore.Load()`: a missing save means "no Continue";
+   a broken or too-new one means a clear message, and the game still starts.
+9. **Transcripts are stored once**, with each NPC's journal listing the transcript ids it holds.
+   That matches the game, where one `Transcript` object is shared by everyone in the
+   conversation, and it's how the cold tier will be queried later.
+10. **Mapping is testable.** Game ↔ save-class conversion is plain methods that don't need
    the GPU or a `World` (same approach as `Conversation.ToTranscript`). The key test:
    **save → load → everything matches.**
-9. **Load path.** A way to build `World` from a `SaveData`, next to the existing `Init()`
+11. **Load path.** A way to build `World` from a `SaveData`, next to the existing `Init()`
    (new game). The main menu gets **Continue** next to **New Game**. This is the biggest
    structural change.
 
-### Open — to decide before building
+### Decided (2026-10-27)
 
-1. **JSON or SQLite?** Recommendation: **JSON** now — already used, readable, simple. SQLite
-   later if transcripts get large or memory search needs it (embeddings recall). Save
-   classes don't care which, so switching is contained.
-2. **Slots:** one or several? (Recommendation: one; slots later.)
-3. **When to save:** pause-menu "Save" + save on quit first; autosave on level change / day
-   end later.
-4. **Task queues:** skip in the first version (recommended): on load, NPCs fall back to
-   their default behaviour. Saving them later is now straightforward:
-   - `GoToTask` targets are in cells, so saving the target (or the POI name it came from)
-     is enough;
-   - the path is replanned on the first tick anyway;
-   - a `WaitTask` saves its seconds left.
+1. **SQLite** from the start (see the summary and decision 4).
+2. **One save slot** for now (`slot1.db`). More slots later are just more files; nothing in
+   the schema changes.
+3. **Save only from the Save button** (in the pause menu). No save on quit and no autosave:
+   saving is always a deliberate choice. Worth adding with it: quitting asks "Quit without
+   saving?" when there's been play since the last save, so a forgotten save isn't lost
+   silently.
+4. **Task queues are saved.** They're part of the game: an NPC sent to the well should still be
+   on its way after a load. See decision 12 below.
+5. **Players get a stable id and a name.** Multiplayer may come later, so the save holds a
+   **list of players**, not one, and nothing about a person relies on their name being unique
+   or unchanging. See decision 13 below.
 
-   Each task type needs a small save class (`{ "type": "go_to", "x": 3.5, "y": 7.9 }`).
-5. **Player identity:** the player is "Traveller", and transcripts/memories store names.
-   Keep that for now, or introduce a stable player id + chosen name now? (Renaming the
-   player later would otherwise break every memory of them.)
+### Following from those
+
+12. **Saving tasks.** Each task in each NPC's queue becomes a row, in order: `go_to` saves its
+    target (in cells); `wait` saves the seconds left. Only what's needed to carry on:
+    - a `GoToTask`'s planned path, waypoint index and stuck timers aren't saved; it replans on
+      its first tick, which it already does whenever it starts;
+    - completed and failed tasks are never saved (they've already left the queue);
+    - a task in the middle of running is saved like a waiting one, and picks up from there;
+    - on load, an NPC with a non-empty queue is put back in the `Tasked` state, as `Enqueue` does.
+
+    This needs a little game code first: `WaitTask` must expose its time left (today
+    `_elapsed` is private), and `GoToTask` its target. The type names match the decision
+    schema's (`"go_to"`, `"wait"`), so one new task type means one new branch in the
+    decision code *and* one in the save mapping. New types (`patrol`, `follow`...) add their
+    columns or rows when they're built.
+13. **People are known by id, not by name.**
+    - **Players:** a `Player` gets a stable `PlayerId`, a new GUID created with a new game and
+      kept forever after, plus a `Name` ("Traveller" until there's a way to choose one).
+    - **NPCs:** the stable key from decision 1 (`"medows_knight"`) is their id.
+    - **This changes game code before saving.** Today a transcript's `Participants` are
+      **names**, `Conversation.PlayerName` is the constant `"Traveller"`, and
+      `NPC.PastConversationsWith(person)` matches by name. So renaming the player, or two
+      players with the same name, would mix up memories.
+    - **Transcripts keep both:** participant **ids** (who it was) and **names** (what they were
+      called then, for the LLM prompt and the console).
+    - **Recall matches by id.**
+    - **Memory text stays text** ("The traveller's name is Loki"): it's what the NPC
+      *believes*, written in words, and is fine to keep as words.
+    - **Multiplayer itself (networking, several local players) is not part of this plan.**
+      This just makes sure the save format and memories won't need redoing when it comes.
 
 ---
 
-## Save file shape (first version)
+## Database shape (schema version 1)
 
-```json
-{
-  "version": 1,
-  "savedAt": "2026-10-20T14:03:00Z",
-  "clock": { "totalDays": 4, "secondsIntoDay": 213.5 },
-  "player": { "level": "Medows", "x": 5.5, "y": 3.25 },
-  "counters": { "nextNpcId": 3, "nextTranscriptId": 12 },
-  "levels": {
-    "Medows": {
-      "npcs": [
-        {
-          "key": "medows_knight", "type": "Knight", "name": "Sir Lancelot",
-          "x": 7.0, "y": 2.5,
-          "memories": [ { "text": "The traveller's name is Loki", "kind": "Conversation", "sourceId": 4 } ],
-          "transcripts": [ { "id": 4, "day": 3, "location": "Medows", "participants": ["Traveller", "Sir Lancelot"],
-                             "lines": ["Traveller: my name is Loki", "..."], "summary": "..." } ]
-        }
-      ]
-    }
-  }
-}
+Plain tables, one row per thing. Names are `snake_case`, the SQL convention. `npc_key` is
+the stable key from decision 1.
+
+```sql
+-- One row: everything there's only one of.
+CREATE TABLE game (
+    id                 INTEGER PRIMARY KEY CHECK (id = 1),
+    saved_at           TEXT    NOT NULL,   -- ISO 8601, UTC
+    total_days         INTEGER NOT NULL,   -- GameClock.CurrentDate
+    seconds_into_day   REAL    NOT NULL,   -- GameClock._elapsedSeconds
+    next_npc_id        INTEGER NOT NULL,   -- NpcRoster._nextId
+    next_transcript_id INTEGER NOT NULL    -- ConversationSystem._nextTranscriptId
+);
+
+-- Every player (one for now; a list so multiplayer doesn't need a new format).
+CREATE TABLE players (
+    player_id TEXT PRIMARY KEY,   -- a GUID made with the new game, never changes
+    name      TEXT NOT NULL,      -- "Traveller" until names can be chosen
+    level     TEXT NOT NULL,
+    x         REAL NOT NULL,      -- feet, in cells
+    y         REAL NOT NULL
+);
+
+-- Levels whose starting NPCs have already spawned (NpcRoster._populated).
+CREATE TABLE populated_levels (level TEXT PRIMARY KEY);
+
+CREATE TABLE npcs (
+    npc_key TEXT PRIMARY KEY,   -- "medows_knight"
+    type    TEXT NOT NULL,      -- "Knight", for the NPC factory
+    name    TEXT NOT NULL,
+    level   TEXT NOT NULL,
+    x       REAL NOT NULL,      -- feet, in cells
+    y       REAL NOT NULL
+);
+
+-- Hot tier: facts, in the order they were learned.
+CREATE TABLE memories (
+    npc_key       TEXT    NOT NULL REFERENCES npcs(npc_key),
+    seq           INTEGER NOT NULL,
+    text          TEXT    NOT NULL,
+    kind          TEXT    NOT NULL,   -- MemoryKind name: "Conversation", "Event"
+    transcript_id INTEGER,            -- Memory.SourceId; NULL if it didn't come from a chat
+    PRIMARY KEY (npc_key, seq)
+);
+
+-- Cold tier: each conversation stored once...
+CREATE TABLE transcripts (
+    id       INTEGER PRIMARY KEY,
+    day      INTEGER NOT NULL,
+    location TEXT,
+    summary  TEXT
+);
+CREATE TABLE transcript_participants (
+    transcript_id INTEGER NOT NULL REFERENCES transcripts(id),
+    seq           INTEGER NOT NULL,
+    person_id     TEXT    NOT NULL,   -- a player_id or an npc_key: who it was
+    name          TEXT    NOT NULL,   -- what they were called at the time
+    PRIMARY KEY (transcript_id, seq)
+);
+CREATE TABLE transcript_lines (
+    transcript_id INTEGER NOT NULL REFERENCES transcripts(id),
+    seq           INTEGER NOT NULL,
+    text          TEXT    NOT NULL,   -- "Traveller: my name is Loki"
+    PRIMARY KEY (transcript_id, seq)
+);
+-- ...and each NPC's journal lists the ones it holds.
+CREATE TABLE journal_transcripts (
+    npc_key       TEXT    NOT NULL REFERENCES npcs(npc_key),
+    transcript_id INTEGER NOT NULL REFERENCES transcripts(id),
+    PRIMARY KEY (npc_key, transcript_id)
+);
+
+-- Each NPC's task queue, front first. Each type fills the columns it uses:
+--   go_to: x, y (the target, in cells)      wait: seconds (time left)
+CREATE TABLE tasks (
+    npc_key TEXT    NOT NULL REFERENCES npcs(npc_key),
+    seq     INTEGER NOT NULL,       -- 0 = the front of the queue
+    type    TEXT    NOT NULL,       -- "go_to", "wait": the decision schema's names
+    x       REAL,
+    y       REAL,
+    seconds REAL,
+    PRIMARY KEY (npc_key, seq)
+);
 ```
 
-Shared transcripts (a group conversation) appear once per NPC in this shape. Fine for v1;
-if it matters, store transcripts once at the top level and have journals list ids.
+On load, transcripts are built once and the **same** `Transcript` object is handed to every
+journal that lists it, just as it was shared before saving.
+
+**Later, without changing these tables:**
+- **Cold tier written incrementally:** insert a transcript when a conversation ends, instead
+  of only at save time.
+- **The event log** becomes a new `events` table (Part B of the NPC plan).
+- **Recall by query:** "conversations with Loki in the last 10 days" becomes a `WHERE`, not a
+  loop over everything.
 
 ---
 
 ## Steps
 
-1. **Stable NPC keys** in spawning.
+1. **Identity** (game code, before any saving):
+   - stable NPC keys in spawning (`NpcRoster.SpawnStartingNpcs`);
+   - `Player.PlayerId` (a GUID made with a new game) and `Player.Name`, replacing the
+     `Conversation.PlayerName` constant;
+   - `Transcript` gets participant ids alongside the names;
+   - `PastConversationsWith` matches by id.
+
+   The existing tests show what changes: anything comparing with `"Traveller"` or a
+   participant name.
 2. **Save classes** + **`SaveMapper`**: game → save classes and back (memories, transcripts,
    NPCs, player, clock). Round-trip tests.
-3. **NPC factory** (type name → constructor + brain).
-4. **`SaveStore`**: write (temp then replace) / read / "is there a save?", `version`.
+3. **NPC factory** (type name → constructor + brain) and **task mapping** (`"go_to"` ↔
+   `GoToTask`, `"wait"` ↔ `WaitTask`; `WaitTask` exposes its time left).
+4. **`SaveStore`** (SQLite):
+   - **create** the schema on a new file and set `user_version`;
+   - **save** a snapshot in one transaction;
+   - **load** into save classes;
+   - **"is there a save?"**;
+   - **migrations:** an empty list for now, with the "too new" check.
+
+   Add the `Microsoft.Data.Sqlite` package to `Ashenveil.Core`, and check that the DesktopGL
+   build still runs (the native library has to be copied alongside the game).
 5. **World load path**: build a `World` from `SaveData`. That's the levels, `NpcRoster`'s
    buckets and `_populated`, both id counters, the `GameClock` date and time into the day, and
    the player's level and feet position. `NpcRoster` and `GameClock` will each need a way to
    be set from saved values (today their counters and clock are private, with no setters).
-6. **Menu**: Continue (only if a save exists) + New Game; pause-menu Save; save on quit.
-   Block saving during a conversation.
-7. **Live check**: tell the knight your name, save, quit, relaunch, Continue, ask him.
+6. **Menu**: Continue (only if a save exists) + New Game; a **Save** button in the pause
+   menu, the only way to save. Block saving during a conversation. "Quit without saving?" when
+   there's unsaved play.
+7. **Live check**:
+   - tell the knight your name, save, quit, relaunch, Continue, and ask him;
+   - send him to the well (or catch him mid-walk), save, reload: he carries on walking there.
 
 ---
 
 ## Testing
 
-- Round-trip: build a world state → save → load → compare (memories, transcripts with
-  summary and `SourceId`, NPC positions, clock, counters).
-- Missing save → no Continue; corrupt save → clear error, game still starts.
-- Older `version` → loads with defaults for new fields.
-- Ids after load: new transcripts/NPCs don't reuse saved ids (counters restored).
+- **`SaveMapper` round trip** (no database): world → save classes → world, then compare
+  memories, transcripts (with summary and `SourceId`), NPC positions, clock and counters.
+- **`SaveStore` round trip** against a real `.db` in a temp folder: save classes → file →
+  save classes, field for field.
+- **A shared transcript stays shared:** two NPCs who were in the same conversation get the
+  *same* `Transcript` object back after loading, not two copies.
+- **Saving twice:** the second save fully replaces the first; no leftover rows.
+- **Missing save** → no Continue. **A file that isn't a database, or is missing tables** → a
+  clear error, and the game still starts. **`user_version` newer than the game** → refused.
+- **Ids after load:** new transcripts and NPCs don't reuse saved ids (counters restored).
+- **Tasks:** a queue of `go_to` + `wait` + `go_to` comes back in order, with the wait's time
+  left; an NPC with tasks loads as `Tasked`, one without as its default state. A `go_to` whose
+  target is now unreachable fails cleanly after loading (that's the existing `Failed` path).
+- **Identity:** the player's id survives save and load. Recall still finds past conversations
+  after the player's *name* changes (it matches the id). Two people with the same name aren't
+  mixed up.
+- **By hand:** open `slot1.db` in "DB Browser for SQLite" (free) to see what was written.
+  It's the database equivalent of reading a JSON file.
 
 ---
 
@@ -173,12 +329,12 @@ if it matters, store transcripts once at the top level and have journals list id
 
 - **World units** (required) ✅ done: positions, sizes, speeds and task targets are in cells,
   so they don't depend on window size. See [Completed/world-units-plan.md](Completed/world-units-plan.md).
-- **Settings** ✅ done: proved the folder, safe write and versioning approach on simple data.
-  Reuse from `Config/`:
+- **Settings** ✅ done: proved the folder, versioning and "never throws" approach on simple
+  data. Reuse from `Config/`:
   - `SettingsStore.DefaultFolder` for where saves go;
-  - `Save()`'s write-`.tmp`-then-rename;
-  - `Load()`'s "never throws; anything wrong means defaults";
-  - the `version` field.
+  - `Load()`'s "never throws; anything wrong means a clear fallback";
+  - the idea of a version number. Here it's `PRAGMA user_version` rather than a JSON field,
+    and SQLite's transactions replace the `.tmp`-then-rename write.
 
   See [Completed/settings-plan.md](Completed/settings-plan.md).
 - **Debug console** (helpful) ✅ done: `journal`, `where [npc]`, `npcs` to check what was restored.
