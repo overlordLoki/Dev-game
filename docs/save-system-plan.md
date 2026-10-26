@@ -6,7 +6,8 @@ Close the game, reopen it, and the world is as you left it — most importantly,
 remember you. Saving converts the live game into **plain save classes** (like the level
 DTOs `MapData` / `PoiData`, but the other direction), writes them as JSON, and rebuilds the
 real objects on load. Its main prerequisite, world units (positions that don't depend on
-window size), is done; it reuses the file approach from the [settings plan](settings-plan.md).
+window size), is done. It reuses the file approach the [settings plan](Completed/settings-plan.md)
+built and tested.
 
 ---
 
@@ -74,12 +75,18 @@ animation state. Save classes hold only what's needed to rebuild it.
    `"Knight" → (pos, id, name) => new Knight(..., new KnightBrain())`. One line per NPC type.
 4. **`version` field** from the first save. New fields just come back empty in old saves;
    the version is for the rare breaking change.
-5. **Safe write**: `slot.json.tmp`, then replace.
-6. **Location**: `%LOCALAPPDATA%\Ashenveil\saves\` (same folder approach as settings).
-7. **Mapping is testable.** Game ↔ save-class conversion is plain methods that don't need
+5. **Safe write**: `slot.json.tmp`, then replace. This is the same as `Config/SettingsStore.Save()`,
+   so copy its pattern (or pull the write-temp-then-rename into a small shared helper, now that
+   there are two users).
+6. **Location**: `%LOCALAPPDATA%\Ashenveil\saves\`, i.e. a `saves` folder inside
+   `SettingsStore.DefaultFolder`. Take the folder as a parameter, as `SettingsStore` does, so
+   tests use a temp folder.
+7. **Loading never throws**, like `SettingsStore.Load()`: a missing save means "no Continue"; a
+   broken one means a clear message, and the game still starts.
+8. **Mapping is testable.** Game ↔ save-class conversion is plain methods that don't need
    the GPU or a `World` (same approach as `Conversation.ToTranscript`). The key test:
    **save → load → everything matches.**
-8. **Load path.** A way to build `World` from a `SaveData`, next to the existing `Init()`
+9. **Load path.** A way to build `World` from a `SaveData`, next to the existing `Init()`
    (new game). The main menu gets **Continue** next to **New Game**. This is the biggest
    structural change.
 
@@ -166,7 +173,13 @@ if it matters, store transcripts once at the top level and have journals list id
 
 - **World units** (required) ✅ done: positions, sizes, speeds and task targets are in cells,
   so they don't depend on window size. See [Completed/world-units-plan.md](Completed/world-units-plan.md).
-- **Settings plan** (helpful, do it first): proves the folder, safe write and versioning
-  approach on simple data. See [settings-plan.md](settings-plan.md).
+- **Settings** ✅ done: proved the folder, safe write and versioning approach on simple data.
+  Reuse from `Config/`:
+  - `SettingsStore.DefaultFolder` for where saves go;
+  - `Save()`'s write-`.tmp`-then-rename;
+  - `Load()`'s "never throws; anything wrong means defaults";
+  - the `version` field.
+
+  See [Completed/settings-plan.md](Completed/settings-plan.md).
 - **Debug console** (helpful) ✅ done: `journal`, `where [npc]`, `npcs` to check what was restored.
   See [Completed/debug-console-plan.md](Completed/debug-console-plan.md).

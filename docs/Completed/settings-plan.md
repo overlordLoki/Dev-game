@@ -1,5 +1,8 @@
 # Settings Menu — Plan
 
+> **Status: complete (steps 1–7).** Step 8, window mode and volume, waits until it's needed.
+> The save system reuses this plan's file approach: see [save-system-plan.md](../save-system-plan.md).
+
 ## Summary
 
 Turn the settings screen from a lone Back button into real settings, starting with the one
@@ -162,6 +165,6 @@ The backend URL is the reason to do this now; the rest can come one at a time.
 ## Depends on / feeds into
 
 - **Needs:** nothing new. `TextField` and text routing are done (see
-  [Completed/debug-console-plan.md](Completed/debug-console-plan.md)).
+  [debug-console-plan.md](debug-console-plan.md)).
 - **Provides:** the save-file folder, safe write and versioning approach that the
-  [save system](save-system-plan.md) reuses.
+  [save system](../save-system-plan.md) reuses.
