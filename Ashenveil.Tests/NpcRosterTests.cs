@@ -127,6 +127,28 @@ public class NpcRosterTests
         public void Execute(TaskContext context) => Seen = context;
     }
 
+    // Gives up the first time it's run.
+    private sealed class FailingTask : ITask
+    {
+        public TaskState State { get; set; }
+        public void Execute(TaskContext context) => State = TaskState.Failed;
+    }
+
+    [Fact]
+    public void A_failed_task_is_dropped_and_the_next_one_runs()
+    {
+        var brain = new WanderBrain();
+        var npc = new TestNpc(0, 0, brain);
+        var next = new ProbeTask();
+        npc.GiveTask(new FailingTask());
+        npc.GiveTask(next);
+
+        brain.Update(new GameTime());   // the failing task runs, fails and is dropped
+        brain.Update(new GameTime());   // so this tick runs the next one
+
+        Assert.NotNull(next.Seen);
+    }
+
     [Fact]
     public void A_level_has_a_nav_grid_the_size_of_its_tile_map()
     {

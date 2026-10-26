@@ -167,6 +167,85 @@ public class GoToTaskTests
         Assert.DoesNotContain(new Point(4, 0), cells);
         Assert.True(Vector2.Distance(NavGrid.CentreOf(new Point(3, 0)), npc.Feet) <= 0.03f);
     }
+
+    // ------------------------------------------------------- getting stuck and failing
+
+    private static TaskContext NavCtx(TestNpc npc, NavGrid nav, float dt) =>
+        new() { Owner = npc, Blackboard = new Blackboard(), Nav = nav, DeltaTime = dt };
+
+    [Fact]
+    public void A_target_with_no_way_through_fails_at_once()
+    {
+        var nav = Grid(".#.");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
+        var task = new GoToTask(NavGrid.CentreOf(new Point(2, 0)));
+
+        task.Execute(NavCtx(npc, nav, 0.25f));
+
+        Assert.Equal(TaskState.Failed, task.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+
+    [Fact]
+    public void An_NPC_that_never_gets_closer_gives_up_after_its_replans()
+    {
+        // Something not in the grid (the player, another NPC) is in the way: the NPC is
+        // never moved, as if collision pushed it back every tick.
+        var nav = Grid(".....");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
+        var task = new GoToTask(NavGrid.CentreOf(new Point(4, 0)));
+
+        // 1s stuck per try, and 3 replans: still trying after 3s...
+        for (int tick = 0; tick < 12; tick++) task.Execute(NavCtx(npc, nav, 0.25f));
+        Assert.NotEqual(TaskState.Failed, task.State);
+
+        // ...given up well before 8s.
+        for (int tick = 0; tick < 20 && task.State != TaskState.Failed; tick++) task.Execute(NavCtx(npc, nav, 0.25f));
+        Assert.Equal(TaskState.Failed, task.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+
+    [Fact]
+    public void Slow_but_steady_progress_isnt_stuck()
+    {
+        var nav = Grid("......");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
+        var task = new GoToTask(NavGrid.CentreOf(new Point(5, 0)));
+
+        // 0.02 cells every quarter second: about a minute for the walk, never stalled.
+        for (int tick = 0; tick < 1000 && task.State != TaskState.Completed; tick++)
+        {
+            task.Execute(NavCtx(npc, nav, 0.25f));
+            npc.Position += npc.Direction * 0.02f;
+        }
+
+        Assert.Equal(TaskState.Completed, task.State);
+    }
+
+    [Fact]
+    public void When_stuck_it_plans_a_new_route()
+    {
+        var nav = Grid(
+            "......",
+            "......");
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
+        var target = NavGrid.CentreOf(new Point(5, 0));
+        var task = new GoToTask(target);
+        task.Execute(NavCtx(npc, nav, 0.25f));        // an open row: straight at the target
+        Assert.Equal(new[] { target }, task.RemainingWaypoints);
+
+        nav.Block(new Point(3, 0));                    // now something's in the way
+        for (int tick = 0; tick < 4; tick++)           // no closer for 1s
+            task.Execute(NavCtx(npc, nav, 0.25f));
+
+        // The new route goes round through row 1, so it has a corner before the target.
+        Assert.True(task.RemainingWaypoints.Count > 1);
+        Assert.Equal(target, task.RemainingWaypoints[^1]);
+    }
 }
 
 public class WaitTaskTests

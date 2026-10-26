@@ -99,7 +99,7 @@ namespace Ashenveil.Core.Entities
         /// <summary>A brain's own idle/wander behaviour. Base does nothing; WanderBrain walks.</summary>
         protected virtual void UpdateDefault(GameTime gameTime) { }
 
-        // Runs the task at the front of the queue until it reports Completed, then moves on.
+        // Runs the task at the front of the queue until it reports Completed or Failed, then moves on.
         // A task may take many ticks; Peek (not Dequeue) keeps it at the front until it's done.
         private void TickTasks(float dt)
         {
@@ -120,7 +120,9 @@ namespace Ashenveil.Core.Entities
                 Nav = Npc.Location?.Nav,
             });
 
-            if (task.State == TaskState.Completed) TaskQueue.Dequeue();
+            // A failed task is dropped the same way, so the NPC moves on to the next one.
+            // TODO: remember failures ("couldn't reach the well") once there's an event log.
+            if (task.State is TaskState.Completed or TaskState.Failed) TaskQueue.Dequeue();
         }
 
         // TODO (separate feature): combat — enemy detection, targeting, a Combat state.

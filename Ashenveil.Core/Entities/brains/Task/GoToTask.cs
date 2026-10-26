@@ -7,7 +7,8 @@ namespace Ashenveil.Core.Entities.brains.Task
     /// <summary>
     /// Walks the NPC's feet to a point. With a <see cref="NavGrid"/> it routes round
     /// obstacles with the <see cref="Pathfinder"/>, one waypoint at a time; without one
-    /// (tests, or a level with no grid) it heads straight at the target.
+    /// (tests, or a level with no grid) it heads straight at the target. Fails if there's
+    /// no way through, or if it keeps getting stuck.
     /// </summary>
     public class GoToTask : ITask
     {
@@ -21,6 +22,16 @@ namespace Ashenveil.Core.Entities.brains.Task
         // Where the feet go, in order, in cells. Null until the first Execute plans the route.
         private List<Vector2> _waypoints;
         private int _next;                           // index of the waypoint being walked to
+
+        // Getting stuck: no closer to the waypoint for StuckSeconds means replan; more than
+        // MaxReplans replans means give up. Closer by less than ProgressEpsilon cells
+        // doesn't count, so jittering against something isn't mistaken for progress.
+        private const float StuckSeconds = 1f;
+        private const int MaxReplans = 3;
+        private const float ProgressEpsilon = 0.01f;
+        private float _bestDistance = float.MaxValue;   // closest the feet have got to the waypoint
+        private float _stuckFor;                        // seconds since they last got closer
+        private int _replans;
 
         public GoToTask(Vector2 target) => _target = target;
 
@@ -37,7 +48,7 @@ namespace Ashenveil.Core.Entities.brains.Task
 
             // Plan on the first tick, not in the constructor: the task may wait in the queue
             // behind others, so where the NPC is now is only known once it starts.
-            _waypoints ??= Plan(context.Nav, npc.Feet);
+            if (_waypoints == null && !StartRoute(context.Nav, npc)) return;
 
             // Walk the feet to each waypoint - the same point Location.PlaceAt stands an entity
             // on a POI by, so walking to a point ends exactly where spawning on it would.
@@ -55,23 +66,69 @@ namespace Ashenveil.Core.Entities.brains.Task
 
                 // Reached a waypoint on the way: steer at the next one this same tick.
                 _next++;
+                ResetProgress();
+                toWaypoint = _waypoints[_next] - npc.Feet;
+            }
+
+            // Stuck check. The grid only knows about objects, so the player or another NPC
+            // standing on the path can still block it. If the feet haven't got any closer to
+            // the waypoint for a while, plan again from here; after a few goes, give up.
+            float distance = toWaypoint.Length();
+            if (distance < _bestDistance - ProgressEpsilon)
+            {
+                _bestDistance = distance;
+                _stuckFor = 0f;
+            }
+            else if ((_stuckFor += context.DeltaTime) >= StuckSeconds)
+            {
+                if (++_replans > MaxReplans)
+                {
+                    Fail(npc);
+                    return;
+                }
+                if (!StartRoute(context.Nav, npc)) return;
                 toWaypoint = _waypoints[_next] - npc.Feet;
             }
 
             npc.Direction = Vector2.Normalize(toWaypoint);  // Entity.Move steps
         }
 
-        // The cell centres along the route, then the exact target. Without a grid, or with
-        // no way through, it's just the target: the old straight-line walk.
-        // TODO (pathfinding step 4): no way through should fail the task, not walk at a wall.
+        // Plans a route from where the feet are now and starts walking it from the first
+        // waypoint. False (and the task Failed) if there's no way through.
+        private bool StartRoute(NavGrid nav, NPC npc)
+        {
+            _waypoints = Plan(nav, npc.Feet);
+            _next = 0;
+            ResetProgress();
+            if (_waypoints != null) return true;
+
+            Fail(npc);
+            return false;
+        }
+
+        // A new waypoint to head for: start measuring progress towards it afresh.
+        private void ResetProgress()
+        {
+            _bestDistance = float.MaxValue;
+            _stuckFor = 0f;
+        }
+
+        private void Fail(NPC npc)
+        {
+            npc.Direction = Vector2.Zero;
+            State = TaskState.Failed;
+        }
+
+        // The cell centres along the route, then the exact target, smoothed into straight
+        // runs; null if there's no way through. Without a grid it's just the target: the old
+        // straight-line walk.
         private List<Vector2> Plan(NavGrid nav, Vector2 feet)
         {
-            var straight = new List<Vector2> { _target };
-            if (nav == null) return straight;
+            if (nav == null) return new List<Vector2> { _target };
 
             Point goal = NavGrid.CellAt(_target);
             List<Point> path = Pathfinder.FindPath(nav, NavGrid.CellAt(feet), goal);
-            if (path == null) return straight;
+            if (path == null) return null;
 
             // Skip path[0]: the feet are already in that cell, and heading for its centre
             // first could mean stepping backwards.
@@ -92,7 +149,12 @@ namespace Ashenveil.Core.Entities.brains.Task
                 waypoints.Add(NavGrid.CentreOf(path[0]));   // already next to a blocked goal
             }
 
-            return waypoints;
+            // Smooth the zig-zags out, starting from the feet themselves (not their cell's
+            // centre), then drop the feet again: they're where the NPC is, not somewhere to go.
+            waypoints.Insert(0, feet);
+            List<Vector2> smoothed = Pathfinder.Smooth(nav, waypoints);
+            smoothed.RemoveAt(0);
+            return smoothed;
         }
     }
 }

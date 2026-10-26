@@ -133,4 +133,87 @@ public class PathfinderTests
         Assert.NotNull(path);
         Assert.Equal(new Point(3, 3), path[^1]);
     }
+
+    // ---------------------------------------------------------- CanWalkStraight
+
+    [Fact]
+    public void Can_walk_straight_across_an_open_grid()
+    {
+        var grid = Grid("....", "....", "....");
+
+        Assert.True(Pathfinder.CanWalkStraight(grid, new Vector2(0.5f, 0.5f), new Vector2(3.5f, 2.5f)));
+    }
+
+    [Fact]
+    public void Cant_walk_straight_through_a_blocked_cell()
+    {
+        var grid = Grid("..#..");
+
+        Assert.False(Pathfinder.CanWalkStraight(grid, new Vector2(0.5f, 0.5f), new Vector2(4.5f, 0.5f)));
+    }
+
+    [Fact]
+    public void Cant_squeeze_diagonally_between_two_blocked_corners()
+    {
+        var grid = Grid(
+            ".#",
+            "#.");
+
+        Assert.False(Pathfinder.CanWalkStraight(grid, new Vector2(0.5f, 0.5f), new Vector2(1.5f, 1.5f)));
+    }
+
+    [Fact]
+    public void Cant_skim_the_edge_of_a_blocked_cell()
+    {
+        // The centre line runs along row 0, only 0.1 above the blocked cell below it.
+        var grid = Grid(
+            "...",
+            ".#.");
+
+        Assert.False(Pathfinder.CanWalkStraight(grid, new Vector2(0.5f, 0.9f), new Vector2(2.5f, 0.9f)));
+    }
+
+    // ------------------------------------------------------------------- Smooth
+
+    private static List<Vector2> Centres(List<Point> path) => path.ConvertAll(NavGrid.CentreOf);
+
+    [Fact]
+    public void A_path_across_an_open_grid_smooths_to_just_its_ends()
+    {
+        var grid = Grid("......", "......", "......");
+        var path = Pathfinder.FindPath(grid, new Point(0, 0), new Point(5, 2));   // diagonal, then straight
+
+        var smoothed = Pathfinder.Smooth(grid, Centres(path));
+
+        Assert.Equal(new[] { new Vector2(0.5f, 0.5f), new Vector2(5.5f, 2.5f) }, smoothed);
+    }
+
+    [Fact]
+    public void Smoothing_keeps_the_corner_round_a_wall()
+    {
+        var grid = Grid(
+            "....",
+            "###.",
+            "....");
+        var path = Pathfinder.FindPath(grid, new Point(0, 0), new Point(0, 2));
+
+        var smoothed = Pathfinder.Smooth(grid, Centres(path));
+
+        // Round the end of the wall, so more than just the two ends...
+        Assert.True(smoothed.Count > 2);
+        // ...and every straight run in it really can be walked.
+        for (int i = 1; i < smoothed.Count; i++)
+            Assert.True(Pathfinder.CanWalkStraight(grid, smoothed[i - 1], smoothed[i]));
+    }
+
+    [Fact]
+    public void Smoothing_a_short_path_keeps_it_as_it_is()
+    {
+        var grid = Grid("..");
+        var one = new List<Vector2> { new(0.5f, 0.5f) };
+        var two = new List<Vector2> { new(0.5f, 0.5f), new(1.5f, 0.5f) };
+
+        Assert.Equal(one, Pathfinder.Smooth(grid, one));
+        Assert.Equal(two, Pathfinder.Smooth(grid, two));
+    }
 }

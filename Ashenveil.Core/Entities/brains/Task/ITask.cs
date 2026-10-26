@@ -8,6 +8,7 @@ namespace Ashenveil.Core.Entities.brains.Task
         Inactive,
         Active,
         Completed,
+        Failed,      // gave up (no way through, or stuck too long); dropped like Completed
     }
     public interface ITask
     {

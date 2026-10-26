@@ -18,6 +18,9 @@ microseconds. It lands in three pieces that can each be tested on their own: a *
 
 ## Where things are now
 
+> **Status:** steps 1–4 are done (see the notes on each), so this section describes the
+> code *before* them. What's still true: tiles never block, only objects do.
+
 - **`GoToTask`** sets `npc.Direction` straight at the target every tick and completes
   within 4px. It aims the **sprite's centre** (`Position + size/2`), the same point
   `Location.PlaceAt` uses. It has an empty private `AStar()` stub.
@@ -53,7 +56,13 @@ sensible), and a pure class can be tested without an NPC.
 
 ---
 
-## Step 1 — NavGrid: which cells can you walk on
+## Step 1 — NavGrid: which cells can you walk on ✅ done
+
+> **Done:** `Navigation/NavGrid.cs`, on every level as `Location.Nav` (built in the
+> constructor). It stores `_blocked` rather than `walkable`, so a new grid starts all
+> walkable. `Block` throws on an off-map cell. The "which cells does this box cover" maths
+> is shared with `Location.ExitTouching` as `Geometry.CellsCovered`. Tests for the grid
+> itself (empty level, tree blocks one cell, `CellAt`/`CentreOf`) aren't written yet.
 
 A plain grid of `bool`: `walkable[row, col]`. It's built once from a `Location`:
 - **Start with every cell walkable.**
@@ -81,7 +90,13 @@ only that cell; cells off the map aren't walkable; `CellAt`/`CentreOf` round-tri
 
 ---
 
-## Step 2 — Pathfinder: the A\* search
+## Step 2 — Pathfinder: the A\* search ✅ done
+
+> **Done:** `Navigation/Pathfinder.cs`, tested in `PathfinderTests`. One change from the
+> plan below: a blocked goal doesn't swap in the nearest neighbour as the crow flies (that
+> one can be walled off). Instead the search stops at **any** cell next to the goal, so it
+> ends on the cheapest *reachable* side. The heuristic is cut by one diagonal step (14) in
+> that case, so it still never overestimates. The U-shaped pocket test isn't written yet.
 
 A static, pure function, with no NPC, no drawing and no `Layout`:
 ```csharp
@@ -124,7 +139,16 @@ How it works, to learn from:
 
 ---
 
-## Step 3 — GoToTask follows the path
+## Step 3 — GoToTask follows the path ✅ done
+
+> **Done**, checked in game with the `nav` overlay. `NpcRoster.Add` now takes the
+> `Location` and sets `NPC.Location`; the brain fills `TaskContext.Nav` from it.
+> `GoToTask` plans on its first `Execute`, skips the cell the feet are already in, and
+> finishes on the exact target (or on the centre of the cell next to a blocked goal).
+> Waypoints on the way use a looser 0.1-cell radius so the NPC doesn't stop dead on each
+> one; the final stop keeps 0.03. With no grid, or no way through, it still walks straight
+> (no way through should fail instead: step 4). The tests check the feet never enter the
+> tree's cell, with no collision running.
 
 - **Plan on the first `Execute`, not in the constructor.** A task can wait in the queue
   behind others, so the NPC's position when it's *created* isn't where it'll start from.
@@ -150,7 +174,14 @@ behaviour.
 
 ---
 
-## Step 4 — Getting stuck and failing
+## Step 4 — Getting stuck and failing ✅ done
+
+> **Done:** `TaskState.Failed`, and `TickTasks` drops a failed task like a completed one.
+> `GoToTask` fails at once when `FindPath` returns `null`. If the feet get no closer to the
+> current waypoint (by at least 0.01 cells) for 1s, it replans from where it is now; after
+> 3 replans it fails. Without a grid it still walks straight, but the stuck check applies
+> there too. `OnBlocked` isn't used as a trigger: the timer alone is enough so far.
+> Failures aren't remembered yet (a TODO in `TickTasks`, for the Phase 8 event log).
 
 The grid only knows about objects. **The player and other NPCs aren't in it**: they move,
 and putting them in would mean replanning constantly. So the path can still be blocked
@@ -174,17 +205,19 @@ failure.
 
 ## Step 5 — Nicer movement (optional)
 
-- **Path smoothing (string-pulling):** grid paths zig-zag (straight, diagonal, straight).
+- **Path smoothing (string-pulling) ✅ done:** `Pathfinder.Smooth` and
+  `Pathfinder.CanWalkStraight`, used by `GoToTask.Plan` starting from the feet. The
+  line-of-sight check samples the line every 0.05 cells and also 0.25 cells either side,
+  so a straight run never skims a tree's cell. The original idea: grid paths zig-zag (straight, diagonal, straight).
   Skip any waypoint where the NPC can see the one after it in a straight line (a
   line-of-sight check across the grid's cells). The NPC then walks in long straight runs.
   It's a small function and easy to test: a path across an empty grid smooths down to
   just start and end.
 - **Arrive slowdown:** ease off speed in the last half-cell, so the NPC doesn't stop dead.
-- **Debug drawing:** draw blocked cells and each NPC's current path (lines between
-  waypoints) behind a `Debug` flag, like `SHOWBOUNDS`. It's the fastest way to see *why*
-  an NPC walks where it does, and it's worth doing alongside step 3, not after.
-- **A console command** (once the debug console exists): `goto <npc> <poi>` to test any
-  route by hand, and `nav` to toggle the debug drawing.
+- **Debug drawing ✅ done** (with step 3): `Debug.SHOWNAV` draws blocked cells in red and
+  each NPC's `CurrentPath` in yellow, from `GameplayScreen.DrawNav`.
+- **Console commands:** `nav` toggles the debug drawing ✅ done. Still to do: `goto <npc> <poi>`
+  to test any route by hand.
 
 ---
 
@@ -203,11 +236,11 @@ failure.
 
 ## Order and what each step proves
 
-1. **NavGrid + tests:** the game knows where you can walk.
-2. **Pathfinder + tests:** routes are correct, with no NPC involved.
-3. **GoToTask follows paths, plus debug drawing:** the knight walks round the well.
-4. **Stuck and fail:** nothing walks into a wall forever.
-5. **Smoothing:** it looks natural.
+1. **NavGrid + tests:** the game knows where you can walk. ✅
+2. **Pathfinder + tests:** routes are correct, with no NPC involved. ✅
+3. **GoToTask follows paths, plus debug drawing:** the knight walks round the well. ✅
+4. **Stuck and fail:** nothing walks into a wall forever. ✅
+5. **Smoothing:** it looks natural. ✅ (arrive slowdown and `goto` still to do)
 
 Steps 1–2 are pure logic and good C# practice (`PriorityQueue`, dictionaries, `Point`).
 Step 3 is where it meets the game.

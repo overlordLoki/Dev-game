@@ -108,6 +108,64 @@ namespace Ashenveil.Core.Navigation
             return Straight * (dx + dy) - (2 * Straight - Diagonal) * Math.Min(dx, dy);
         }
 
+        // How far either side of a straight walk must be clear, in cells: room for the feet,
+        // so a smoothed line doesn't skim the edge of a tree's cell.
+        private const float Clearance = 0.25f;
+        // How often CanWalkStraight checks along the line, in cells.
+        private const float SampleStep = 0.05f;
+
+        /// <summary>
+        /// Can the feet walk from one point to the other in a straight line? Checks points
+        /// along the line, and either side of it by <see cref="Clearance"/>, are all on
+        /// walkable cells. Points are in cells, like everything else.
+        /// </summary>
+        public static bool CanWalkStraight(NavGrid grid, Vector2 from, Vector2 to)
+        {
+            Vector2 line = to - from;
+            float length = line.Length();
+            if (length == 0f) return grid.IsWalkable(NavGrid.CellAt(from));
+
+            // A quarter-turn of the line's direction points sideways; scale it to the clearance.
+            Vector2 side = new Vector2(-line.Y, line.X) / length * Clearance;
+            int samples = (int)MathF.Ceiling(length / SampleStep);
+            for (int i = 0; i <= samples; i++)
+            {
+                Vector2 p = from + line * (i / (float)samples);
+                if (!grid.IsWalkable(NavGrid.CellAt(p)) ||
+                    !grid.IsWalkable(NavGrid.CellAt(p + side)) ||
+                    !grid.IsWalkable(NavGrid.CellAt(p - side)))
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// String-pulling: drops every point the walker can skip by heading straight for a
+        /// later one. Grid paths zig-zag (straight, diagonal, straight); this turns them into
+        /// long straight runs. Always keeps the first and last points.
+        /// </summary>
+        public static List<Vector2> Smooth(NavGrid grid, IReadOnlyList<Vector2> points)
+        {
+            var smoothed = new List<Vector2>();
+            if (points.Count == 0) return smoothed;
+
+            // From the last point kept (the anchor), look further and further ahead. When the
+            // next point can't be seen, the one before it is a corner: keep it, and look on
+            // from there.
+            int anchor = 0;
+            smoothed.Add(points[0]);
+            for (int i = 2; i < points.Count; i++)
+            {
+                if (!CanWalkStraight(grid, points[anchor], points[i]))
+                {
+                    anchor = i - 1;
+                    smoothed.Add(points[anchor]);
+                }
+            }
+            if (points.Count > 1) smoothed.Add(points[^1]);
+            return smoothed;
+        }
+
         // One of the 8 cells around b.
         private static bool IsNextTo(Point a, Point b) =>
             a != b && Math.Abs(a.X - b.X) <= 1 && Math.Abs(a.Y - b.Y) <= 1;
