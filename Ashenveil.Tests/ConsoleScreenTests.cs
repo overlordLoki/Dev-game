@@ -183,4 +183,25 @@ public class ConsoleScreenTests : IDisposable
 
         Assert.Equal("ping", _console.Typed);
     }
+
+    [Fact]
+    public void A_line_written_later_from_another_thread_shows_at_the_next_update()
+    {
+        Task.Run(() => _console.WriteLater(new ConsoleLine("Connected.", LineKind.Output))).Wait();
+        Assert.Empty(AfterWelcome);   // not yet: only the game's thread touches the output
+
+        _console.Update(new Microsoft.Xna.Framework.GameTime());
+
+        Assert.Equal(new ConsoleLine("Connected.", LineKind.Output), Assert.Single(AfterWelcome));
+    }
+
+    [Fact]
+    public void A_line_written_later_while_closed_shows_when_it_opens()
+    {
+        _console.WriteLater(new ConsoleLine("Connected.", LineKind.Output));
+
+        _console.Open(1280, 720);
+
+        Assert.Equal("Connected.", Assert.Single(AfterWelcome).Text);
+    }
 }

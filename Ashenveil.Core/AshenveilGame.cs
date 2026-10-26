@@ -12,6 +12,8 @@ using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Graphics;
 using Ashenveil.Core.DevConsole;
+using Ashenveil.Core.Config;
+using Ashenveil.Core.Entities.brains.Dialogue;
 namespace Ashenveil.Core
 {
     /// <summary>
@@ -34,6 +36,10 @@ namespace Ashenveil.Core
         private ScreenManager _screenManager = new();
         private KeyboardState _prevKb;
         private ButtonState _prevPadBack = ButtonState.Released;
+        // The chosen settings: loaded first thing in Initialize, changed by the settings
+        // screen and the console's `server` command, saved by CommitSettings.
+        private SettingsStore _settingsStore;
+        private GameSettings _config;
         // Resources for drawing.
         private GraphicsDeviceManager graphicsDeviceManager;
         public static TextureAtlas UiAtlas { get; private set; }
@@ -77,7 +83,7 @@ namespace Ashenveil.Core
         private void OnResize(object sender, EventArgs e)
         {
             if (_pixel == null) return;
-            Settings.UpdateScale(GraphicsDevice.Viewport.Height);
+            UiScale.Update(GraphicsDevice.Viewport.Height);
             // WorldBounds recomputes itself from Layout, so a resize only needs the layout
             // refreshed - no bounds object to rebuild anymore.
             _gameplayScreen.UpdateLayout(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
@@ -88,6 +94,12 @@ namespace Ashenveil.Core
         /// </summary>
         protected override void Initialize()
         {
+            // Settings before base.Initialize, which runs LoadContent: everything built there
+            // should see the saved values, not the defaults.
+            _settingsStore = new SettingsStore(SettingsStore.DefaultFolder);
+            _config = _settingsStore.Load();
+            ApplySettings();
+
             base.Initialize();
 
             // Load supported languages and set the default language.
@@ -117,7 +129,7 @@ namespace Ashenveil.Core
             _pixel = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData([Color.White]);
             Textures.Init(Content);   // must run before anything calls Textures.Get
-            Settings.UpdateScale(GraphicsDevice.Viewport.Height);
+            UiScale.Update(GraphicsDevice.Viewport.Height);
             var h = GraphicsDevice.Viewport.Height;
             var w = GraphicsDevice.Viewport.Width;
             var font = Content.Load<SpriteFont>("Fonts/Hud");
@@ -143,10 +155,13 @@ namespace Ashenveil.Core
             // output and history survive closing it.
             var commands = new CommandRegistry();
             WorldCommands.Register(commands, world);
+            BackendCommands.Register(commands, () => _config.backendUrl, SetBackendUrl,
+                DialogueApi.CheckHealthAsync, line => _console.WriteLater(line));
             _console = new ConsoleScreen(font, commands, () => _screenManager.Pop(), w, h);
 
             // create screens first
-            _settings = new SettingsScreen(font, () => _screenManager.Pop(), w, h);
+            _settings = new SettingsScreen(font, _config, CommitSettings, DialogueApi.CheckHealthAsync,
+                Debug.DevModeAllowed, () => _screenManager.Pop());
 
             //UI
             UiAtlas = TextureAtlas.FromXml(Content, Assets.UiAtlas);
@@ -154,12 +169,43 @@ namespace Ashenveil.Core
             _menu = new Menu(
                 font,
                 () => _screenManager.Push(_gameplayScreen),  // New Game
-                () => _screenManager.Push(_settings),        // Settings
+                () =>                                        // Settings
+                {
+                    _settings.Open(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+                    _screenManager.Push(_settings);
+                },
                 w, h);
 
             // start on the menu
             _screenManager.Push(_menu);
             base.LoadContent();
+        }
+
+        /// <summary>
+        /// Puts the settings into effect. Runs at startup and after every change, so each setting
+        /// has exactly one place that makes it happen.
+        /// </summary>
+        private void ApplySettings()
+        {
+            DialogueApi.BaseUrl = _config.backendUrl;
+            Debug.DEVMODE = _config.devMode && Debug.DevModeAllowed;
+        }
+
+        /// <summary>
+        /// Applies then saves the settings. Applied even if the save fails, so the change still
+        /// works this session; the IOException is thrown on for the caller to report.
+        /// </summary>
+        private void CommitSettings()
+        {
+            ApplySettings();
+            _settingsStore.Save(_config);
+        }
+
+        // The console's `server <url>`: the URL is already normalised by BackendCommands.
+        private void SetBackendUrl(string url)
+        {
+            _config.backendUrl = url;
+            CommitSettings();
         }
 
         /// <summary>

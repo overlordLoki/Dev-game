@@ -83,7 +83,7 @@ event log can feed into it later.
 | `journal <npc>` | Dumps an NPC's memories and transcripts | Checking the memory feature | ✅ |
 | `task <npc> go_to <poi>` / `wait <s>` | Gives an NPC a task | Testing the task system by hand | |
 | `time` / `time +<n>d` | Shows / skips game time | Phase 8 day-end reflection | |
-| `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance | (planned in [settings-plan.md](../settings-plan.md)) |
+| `server` / `health` | Shows the backend URL / calls `/health` | Backend problems at a glance | Built with the settings menu ([settings-plan.md](../settings-plan.md)) |
 | `nav` | Toggles drawing of blocked cells and NPC paths | Seeing why an NPC walks where it does | ✅ (built with pathfinding) |
 | `goto <npc> <poi>` | Sends an NPC to a point | Testing routes by hand | |
 | `clear` | Clears the output | | ✅ |

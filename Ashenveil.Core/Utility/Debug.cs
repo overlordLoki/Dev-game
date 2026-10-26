@@ -10,12 +10,18 @@ namespace Ashenveil.Core.Utility
         public static bool SHOWBOUNDS = false;
         // The nav grid's blocked cells and each NPC's path (the `nav` console command).
         public static bool SHOWNAV = false;
-        // Dev-only tools, like the ` console. On in Debug builds, off in Release; later a
-        // settings toggle (see settings-plan.md).
-#if DEBUG
-        public static bool DEVMODE = true;
-#else
+        // Dev-only tools, like the ` console. Set from the settings (GameSettings.devMode) by
+        // AshenveilGame.ApplySettings, and only ever on where DevModeAllowed.
         public static bool DEVMODE = false;
+
+        // Whether dev mode can be turned on at all, and so whether the settings screen offers
+        // it: always in a Debug build; in a Release build only when started with --dev, so a
+        // shipped build can be tested without players stumbling on the console.
+#if DEBUG
+        public static readonly bool DevModeAllowed = true;
+#else
+        public static readonly bool DevModeAllowed =
+            System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a == "--dev");
 #endif
         // Draws a hollow outline so you can still see the sprite inside.
         public static void DrawRect(SpriteBatch sb, Rectangle r, Color c, int thickness = 2)

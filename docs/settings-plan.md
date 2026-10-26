@@ -10,7 +10,40 @@ rehearsal for the save system: same folder, same safe-write and versioning appro
 
 ---
 
-## Where things are now
+## Status (2026-10-27)
+
+Steps 1 to 7 are built; step 8 (window mode, volume) waits until it's needed.
+
+- **`Config/`** (namespace `Ashenveil.Core.Config`):
+  - `GameSettings`: `version`, `backendUrl`, `devMode`. Plain data; the initial values are the defaults.
+  - `SettingsStore`: `Load()` never throws (missing, broken, `null` or wrong-typed file → defaults;
+    unknown keys ignored; comments, trailing commas and any key case accepted; a bad stored URL →
+    the default), and `Save()` writes `settings.json.tmp` then renames it over `settings.json`.
+    `SettingsStore.DefaultFolder` is `%LOCALAPPDATA%\Ashenveil`.
+  - `BackendUrl.TryNormalize`: adds a missing `http://`, drops a trailing slash, keeps a path,
+    refuses non-http(s), `?`/`#` parts and empty input, with a reason.
+  - `UiScale` (was `Utility/Settings.Scale`): computed from the window, never saved.
+- **`AshenveilGame`** loads the settings in `Initialize` *before* `base.Initialize()` (which runs
+  `LoadContent`), and has one `ApplySettings()` (backend URL, dev mode) plus `CommitSettings()`
+  (apply, then save).
+- **`DialogueApi`** builds the full URL per request from `DialogueApi.BaseUrl` (option 2 of
+  decision 6), so a change takes effect on the next request. `UseHandler(HttpMessageHandler)` is
+  the test seam. `CheckHealthAsync(url)` calls `/health` and returns a `HealthResult`:
+  `Ok` / `ModelMissing` / `OllamaDown` (a 503) / `Unreachable` (incl. an 8 s timeout) / `Error`.
+- **Settings screen**: Backend server field + Test connection (checks the *typed* address,
+  answer shown underneath when it arrives), Dev mode checkbox, Back. Escape is Back. Laid out in
+  `Open(w, h)`, called each time the menu shows it, so it fits after a resize.
+- **`Debug.DEVMODE`** is set from the settings; `Debug.DevModeAllowed` is true in Debug builds
+  and in Release only with `--dev` on the command line. The checkbox only appears where it's allowed.
+- **Console**: `server [url]` shows or sets (and saves) the address; `health [url]` prints
+  "Checking..." at once and the answer when it comes, via the new thread-safe
+  `ConsoleScreen.WriteLater` (queued, written at the next `Update` or `Open`).
+- **Tests**: `SettingsStoreTests`, `BackendUrlTests`, `DialogueApiTests` (fake handler),
+  `BackendCommandsTests`, `SettingsScreenTests`, and two `WriteLater` tests in `ConsoleScreenTests`.
+
+---
+
+## Where things were (before this was built)
 
 *(Refreshed after the debug console, world units and pathfinding landed.)*
 
@@ -112,15 +145,19 @@ The backend URL is the reason to do this now; the rest can come one at a time.
 
 ---
 
-## Open questions
+## Open questions (answered when built)
 
-- **Apply immediately or on "Back"?** Immediate is nicer for sliders and checkboxes; the URL
-  probably only on confirm.
-- **Validate the URL on save, or just let "Test connection" tell you?**
-- **Should the model name be a setting too?** It's chosen server-side (`OLLAMA_MODEL` in
-  `main.py`); exposing it means a new endpoint. Probably not yet.
-- **Should a Release build be able to turn dev mode on from settings?** Handy for testing a
-  shipped build; risky if players find it. Maybe only with a command-line flag.
+- **Apply immediately or on "Back"?** Both, by kind: the checkbox applies and saves the moment
+  it's clicked; the URL only on Enter or Back, so a half-typed address is never used.
+- **Validate the URL on save, or just let "Test connection" tell you?** Validate the *form* on
+  save (an invalid address keeps you on the screen with the reason); whether anything answers
+  there is Test connection's job, so an offline backend can still be saved.
+- **Should the model name be a setting too?** Not yet: still `OLLAMA_MODEL` in `main.py`.
+  Test connection shows which model the backend is using.
+- **Should a Release build be able to turn dev mode on from settings?** Only when started with
+  `--dev`; otherwise the checkbox isn't shown and a saved `devMode: true` is ignored.
+- **Save failures**: shown on the screen (and in the console for `server`), never thrown. The
+  change still applies for the session; on the screen, Back a second time leaves anyway.
 
 ## Depends on / feeds into
 

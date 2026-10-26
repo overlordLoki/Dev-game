@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using Ashenveil.Core.Config;
 
 namespace Ashenveil.Core.Entities.brains.Dialogue
 {
@@ -35,13 +39,61 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
         public TurnDto[] turns { get; set; }   // the same lines, with who said each one
     }
 
+    /// <summary>What GET /health said, boiled down to what the player needs to know.</summary>
+    public enum HealthStatus
+    {
+        Ok,              // backend and Ollama up, model installed
+        ModelMissing,    // backend and Ollama up, but the model isn't pulled
+        OllamaDown,      // backend answered, Ollama didn't
+        Unreachable,     // nothing answered at that address (or it timed out)
+        Error,           // something answered, but not like the backend does
+    }
+
+    /// <summary>The result of a health check: the status, the model asked for, and a line to show.</summary>
+    public record HealthResult(HealthStatus Status, string Model, string Message)
+    {
+        public bool Ok => Status == HealthStatus.Ok;
+    }
+
+    // Mirrors main.py's /health reply.
+    public class HealthDto
+    {
+        public string ollama { get; set; }
+        public string model { get; set; }
+        public bool model_installed { get; set; }
+    }
+
+    /// <summary>
+    /// The game's side of the Python backend. Every request goes to <see cref="BaseUrl"/>, which
+    /// comes from the settings and can change while the game runs: the full address is built per
+    /// request (rather than fixed in HttpClient.BaseAddress, which can't change after the first
+    /// request), so the next request after a change goes to the new address.
+    /// </summary>
     public static class DialogueApi
     {
-        private static readonly HttpClient _http = new() { BaseAddress = new Uri("http://127.0.0.1:8000") };
+        private static HttpClient _http = new();
+        private static volatile string _baseUrl = GameSettings.DefaultBackendUrl;
+
+        /// <summary>Where requests go, without a trailing slash. Set by AshenveilGame.ApplySettings.</summary>
+        public static string BaseUrl
+        {
+            get => _baseUrl;
+            set => _baseUrl = BackendUrl.TryNormalize(value, out var url, out var error)
+                ? url : throw new ArgumentException(error, nameof(value));
+        }
+
+        /// <summary>
+        /// Sends every request through <paramref name="handler"/> instead of the network - the
+        /// tests' way in, like the fake sendChat / requestDecision. Null goes back to the network.
+        /// </summary>
+        public static void UseHandler(HttpMessageHandler handler)
+        {
+            _http = handler == null ? new HttpClient() : new HttpClient(handler);
+        }
 
         public static async Task<ChatMessage[]> RequestAsync(ConversationRequestDto req)
         {
-            var res = await _http.PostAsJsonAsync("/conversation", req);
+            var res = await _http.PostAsJsonAsync(BaseUrl + "/conversation", req);
             res.EnsureSuccessStatusCode();
             var body = await res.Content.ReadFromJsonAsync<ConversationResponseDto>();
             // A 200 with no turns comes back as empty, which Conversation.Poll treats as "no answer".
@@ -52,9 +104,55 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
         // Null on a 200 with an empty body; ApplyDecision treats null as "nothing changed".
         public static async Task<NpcDecisionDto> RequestDecisionAsync(DecisionRequestDto req)
         {
-            var res = await _http.PostAsJsonAsync("/decision", req);
+            var res = await _http.PostAsJsonAsync(BaseUrl + "/decision", req);
             res.EnsureSuccessStatusCode();
             return await res.Content.ReadFromJsonAsync<NpcDecisionDto>();
+        }
+
+        /// <summary>How long a health check waits. /health itself gives Ollama 5 seconds.</summary>
+        public static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(8);
+
+        /// <summary>
+        /// Calls GET /health at <paramref name="baseUrl"/> (or <see cref="BaseUrl"/> if null) - the
+        /// settings screen tests an address before it's saved. Never throws: whatever goes wrong
+        /// comes back as a result with a message to show.
+        /// </summary>
+        public static async Task<HealthResult> CheckHealthAsync(string baseUrl = null)
+        {
+            baseUrl ??= BaseUrl;
+            using var timeout = new CancellationTokenSource(HealthTimeout);
+            try
+            {
+                var res = await _http.GetAsync(baseUrl + "/health", timeout.Token);
+
+                // main.py answers 503 when it's up but can't reach Ollama.
+                if (res.StatusCode == HttpStatusCode.ServiceUnavailable)
+                    return new HealthResult(HealthStatus.OllamaDown, null,
+                        "The backend is up, but it can't reach Ollama. Is Ollama running?");
+                if (!res.IsSuccessStatusCode)
+                    return new HealthResult(HealthStatus.Error, null,
+                        $"{baseUrl} answered {(int)res.StatusCode} {res.ReasonPhrase}. Is that the backend?");
+
+                var body = await res.Content.ReadFromJsonAsync<HealthDto>(timeout.Token);
+                if (body?.model == null)
+                    return new HealthResult(HealthStatus.Error, null, $"{baseUrl} answered, but not like the backend does.");
+                if (!body.model_installed)
+                    return new HealthResult(HealthStatus.ModelMissing, body.model,
+                        $"Connected, but Ollama doesn't have {body.model}. Run: ollama pull {body.model}");
+                return new HealthResult(HealthStatus.Ok, body.model, $"Connected. Model: {body.model}");
+            }
+            catch (OperationCanceledException)
+            {
+                return new HealthResult(HealthStatus.Unreachable, null, $"No answer from {baseUrl} in {HealthTimeout.TotalSeconds:0} seconds.");
+            }
+            catch (HttpRequestException e)
+            {
+                return new HealthResult(HealthStatus.Unreachable, null, $"Can't reach {baseUrl}: {e.Message}");
+            }
+            catch (Exception e) when (e is JsonException or NotSupportedException)
+            {
+                return new HealthResult(HealthStatus.Error, null, $"{baseUrl} answered, but not like the backend does.");
+            }
         }
     }
 }

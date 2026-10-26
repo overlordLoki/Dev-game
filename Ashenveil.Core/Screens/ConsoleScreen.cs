@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Ashenveil.Core.DevConsole;
 using Ashenveil.Core.UI.Widgets;
@@ -35,6 +36,8 @@ namespace Ashenveil.Core.Screens
         // What's been written, oldest first, capped at MaxLines. The source of truth: the
         // ChatLog only draws it, and is rebuilt from it when the window size changes.
         private readonly List<ConsoleLine> _lines = new();
+        // Lines from other threads (a `health` answer), moved into _lines on the game's thread.
+        private readonly ConcurrentQueue<ConsoleLine> _later = new();
         // Commands typed, oldest first. _historyIndex == _history.Count means "not browsing".
         private readonly List<string> _history = new();
         private int _historyIndex;
@@ -75,6 +78,7 @@ namespace Ashenveil.Core.Screens
             _prevKb = AshenveilGame.Input.Keyboard;
             _prevMouse = AshenveilGame.Input.Mouse;
             _historyIndex = _history.Count;
+            WritePending();
         }
 
         // Lays the panel out along the top of the screen. The log is rebuilt from _lines, which
@@ -129,6 +133,17 @@ namespace Ashenveil.Core.Screens
             _log.Add(text, ColorOf(kind));
         }
 
+        /// <summary>
+        /// Adds a line from any thread: it's queued, and written on the game's thread at the next
+        /// Update (or the next Open, if the console was closed meanwhile).
+        /// </summary>
+        public void WriteLater(ConsoleLine line) => _later.Enqueue(line);
+
+        private void WritePending()
+        {
+            while (_later.TryDequeue(out var line)) Write(line.Text, line.Kind);
+        }
+
         public void Clear()
         {
             _lines.Clear();
@@ -153,6 +168,7 @@ namespace Ashenveil.Core.Screens
 
         public void Update(GameTime gameTime)
         {
+            WritePending();
             var mouse = AshenveilGame.Input.Mouse;
             foreach (var w in Widgets) w.Update(mouse, _prevMouse);
             _field.Focused = true;   // the only field here: a click on the output mustn't unfocus it
