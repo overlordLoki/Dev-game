@@ -53,7 +53,26 @@ namespace Ashenveil.Core.Saving
             Level = level,
             X = player.Feet.X,
             Y = player.Feet.Y,
+            Factions = player.Factions.ToList(),
+            // In key order, as SaveStore reads them back, so a save round-trips exactly.
+            Standings = player.Standing.OrderBy(s => s.Key, StringComparer.Ordinal)
+                              .Select(s => new StandingSave { Faction = s.Key, Score = s.Value }).ToList(),
         };
+
+        /// <summary>
+        /// Puts a saved player's factions and standings back. A save from before factions has
+        /// neither: that player starts the way a new one does.
+        /// </summary>
+        public static void FillFactions(Player player, PlayerSave saved, FactionTable table)
+        {
+            if (saved.Standings.Count == 0) player.SeedStanding(table);
+            else foreach (var s in saved.Standings) player.Standing[s.Faction] = s.Score;
+            if (saved.Factions.Count > 0)
+            {
+                player.Factions.Clear();
+                player.Factions.AddRange(saved.Factions);
+            }
+        }
 
         public static NpcSave ToSave(NPC npc, string level) => new()
         {
@@ -69,6 +88,15 @@ namespace Ashenveil.Core.Saving
             Tasks = npc.Tasks.Select(ToSave).Where(t => t != null).ToList(),
             DayEntries = npc.Journal.Days.Select(d => new DayEntrySave { Day = d.Day, Summary = d.Summary }).ToList(),
             LastReflectedDay = npc.Journal.LastReflectedDay,
+            Factions = npc.Factions.ToList(),
+            // People, then factions, each in key order, as SaveStore reads them back.
+            Opinions = npc.Opinions.People
+                .Select(p => new OpinionSave { About = ReflectionSystem.PersonKey(p.Key), Score = p.Value.Score, Why = p.Value.Why })
+                .OrderBy(o => o.About, StringComparer.Ordinal)
+                .Concat(npc.Opinions.Factions
+                    .Select(f => new OpinionSave { About = ReflectionSystem.FactionKey(f.Key), Score = f.Value })
+                    .OrderBy(o => o.About, StringComparer.Ordinal))
+                .ToList(),
         };
 
         // Only what the task needs to carry on. Completed and failed tasks never get here:
@@ -80,15 +108,17 @@ namespace Ashenveil.Core.Saving
             _ => null,
         };
 
-        // SourceId is a transcript or an event id, by Kind; saved in its own column so each can
+        // SourceId is a transcript or an event id (events and rumours), by Kind; saved in its own column so each can
         // be checked against the table it points at.
         public static MemorySave ToSave(Memory memory) => new()
         {
             Text = memory.Text,
             Kind = memory.Kind.ToString(),
-            TranscriptId = memory.Kind == MemoryKind.Event ? null : memory.SourceId,
-            EventId = memory.Kind == MemoryKind.Event ? memory.SourceId : null,
+            TranscriptId = memory.Kind is MemoryKind.Event or MemoryKind.Rumour ? null : memory.SourceId,
+            EventId = memory.Kind is MemoryKind.Event or MemoryKind.Rumour ? memory.SourceId : null,
             Day = memory.Day,
+            TellerId = memory.TellerId,
+            Hops = memory.Hops,
         };
 
         public static EventSave ToSave(GameEvent e) => new()
@@ -140,17 +170,34 @@ namespace Ashenveil.Core.Saving
         /// journal and task queue. Null for a type the game doesn't know - that NPC is left out
         /// rather than failing the whole load. It isn't in any level yet; the caller adds it.
         /// </summary>
-        public static NPC FromSave(NpcSave saved, IReadOnlyDictionary<int, Transcript> transcripts)
+        public static NPC FromSave(NpcSave saved, IReadOnlyDictionary<int, Transcript> transcripts, FactionTable table = null)
         {
             var npc = NpcFactory.Make(saved.Type, saved.Id, saved.Name);
             if (npc == null) return null;
 
             npc.StandAt(new Vector2(saved.X, saved.Y));
             FillJournal(npc.Journal, saved, transcripts);
+            FillFactions(npc, saved, table ?? FactionTable.Default);
             // GiveTask puts the NPC in the Tasked state, as it was when it was saved with work queued.
             foreach (var task in saved.Tasks.Select(FromSave).Where(t => t != null))
                 npc.GiveTask(task);
             return npc;
+        }
+
+        /// <summary>
+        /// Puts a saved NPC's factions and opinions back. One saved before factions has no faction
+        /// opinions: they're seeded from the table, as for a new NPC.
+        /// </summary>
+        public static void FillFactions(NPC npc, NpcSave saved, FactionTable table)
+        {
+            npc.Factions.AddRange(saved.Factions);
+            foreach (var o in saved.Opinions)
+            {
+                if (o.About.StartsWith("faction:")) npc.Opinions.SetFaction(o.About["faction:".Length..], o.Score);
+                else if (o.About.StartsWith("person:") && int.TryParse(o.About["person:".Length..], out int id))
+                    npc.Opinions.SetPerson(id, o.Score, o.Why);
+            }
+            if (npc.Opinions.Factions.Count == 0) npc.Opinions.Seed(npc.Factions, table);
         }
 
         /// <summary>The task a save describes, or null if its type is unknown or it's missing what that type needs.</summary>
@@ -185,8 +232,10 @@ namespace Ashenveil.Core.Saving
             var kind = Enum.TryParse<MemoryKind>(saved.Kind, out var k) ? k : MemoryKind.Event;
             return new Memory(saved.Text, kind)
             {
-                SourceId = kind == MemoryKind.Event ? saved.EventId : saved.TranscriptId,
+                SourceId = kind is MemoryKind.Event or MemoryKind.Rumour ? saved.EventId : saved.TranscriptId,
                 Day = saved.Day,
+                TellerId = saved.TellerId,
+                Hops = saved.Hops,
             };
         }
 

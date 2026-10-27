@@ -32,6 +32,10 @@
     <None Include="..\Ashenveil.Core\Content\levels\**\*.json" Link="Content\levels\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- The faction table: plain data, read at runtime by FactionTable. -->
+    <None Include="..\Ashenveil.Core\Content\factions.json" Link="Content\factions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- The tests' OWN bounds.json (one full-frame box for TestEntity), not the game's,
          so re-tuning a box in the editor can't break a collision test. -->
     <None Update="Content\bounds.json">

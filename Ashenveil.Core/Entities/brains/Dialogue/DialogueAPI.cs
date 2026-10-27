@@ -21,6 +21,8 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
         public List<string> past_conversations { get; set; } = new();  // one-line recaps of earlier chats
         public List<string> events_today { get; set; } = new();  // what they saw happen today, oldest first
         public List<string> recent_days { get; set; } = new();   // diary entries for the last few days, oldest first
+        public List<string> rumours { get; set; } = new();       // what others told them today, as hearsay
+        public List<string> attitudes { get; set; } = new();     // how they feel about each other person there
     }
     public class ConversationRequestDto
     {

@@ -32,6 +32,8 @@ namespace Ashenveil.Core.GameWorld
         public EventLog Events { get; }
         /// <summary>Each NPC looking back on its day, when the day turns over.</summary>
         public ReflectionSystem Reflections { get; }
+        /// <summary>The factions and their default views of each other. Read-only data.</summary>
+        public FactionTable Factions { get; }
 
         /// <summary>The NPCs in the level being played.</summary>
         public IReadOnlyList<NPC> NPCs => Roster.In(location.Name);
@@ -63,19 +65,27 @@ namespace Ashenveil.Core.GameWorld
         public World(Location start,
                      Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> sendChat = null,
                      Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null,
-                     Func<ReflectionRequestDto, System.Threading.Tasks.Task<ReflectionDto>> requestReflection = null)
+                     Func<ReflectionRequestDto, System.Threading.Tasks.Task<ReflectionDto>> requestReflection = null,
+                     FactionTable factions = null)
         {
+            Factions = factions ?? FactionTable.Default;
+            Roster.Factions = Factions;
             Conversations = new ConversationSystem(sendChat, requestDecision);
             Reflections = new ReflectionSystem(requestReflection);
             // Everything that posts events is wired to the one log: NPCs (their tasks) through
             // the roster, conversations directly. The World posts level changes itself.
             Events = new EventLog(() => Clock.TotalDays, Perceive);
             Roster.PostEvent = e => Events.Post(e);
-            Conversations.PostEvent = e => Events.Post(e);
+            Conversations.Events = Events;
+            Conversations.FindPerson = FindPerson;
+            Conversations.Factions = Factions;
+            Reflections.Events = Events;
+            Reflections.FindPerson = FindPerson;
             Clock.DayStarted += day => Reflections.DayStarted(day, Roster.All);
             // Id 0 is this save's owner, not "the player": other players would take ids from
             // the roster like NPCs do, so ask `is Player`, never `Id == 0`.
             this.player = new Player(Vector2.Zero, 0);   // Init stands them on the spawn point
+            player.SeedStanding(Factions);
             SetLocation(start);
         }
 
@@ -112,6 +122,7 @@ namespace Ashenveil.Core.GameWorld
             var world = new World(new Location(owner.Level), sendChat, requestDecision, requestReflection);
             world.player = new Player(Vector2.Zero, owner.Id, owner.Name);
             world.player.StandAt(new Vector2(owner.X, owner.Y));
+            SaveMapper.FillFactions(world.player, owner, world.Factions);
 
             world.Clock.Restore(save.TotalDays, save.SecondsIntoDay);
             world.Roster.Restore(save.NextPersonId, save.PopulatedLevels);
@@ -122,7 +133,7 @@ namespace Ashenveil.Core.GameWorld
             var transcripts = SaveMapper.TranscriptsFrom(save);
             foreach (var saved in save.Npcs)
             {
-                var npc = SaveMapper.FromSave(saved, transcripts);
+                var npc = SaveMapper.FromSave(saved, transcripts, world.Factions);
                 // An NPC elsewhere gets its level loaded now: it needs a Location (and its nav
                 // grid) for its tasks, and the player walking in later finds that same Location.
                 if (npc != null) world.Roster.Add(world.LocationNamed(saved.Level), npc);
@@ -187,6 +198,9 @@ namespace Ashenveil.Core.GameWorld
                                      $"{player.Name} arrived at {location.Name}"));
         }
 
+        /// <summary>A player or NPC by id, in any level; null if there's nobody with that id.</summary>
+        public Entity FindPerson(int id) => id == player.Id ? player : Roster.Find(id);
+
         // Perception: every NPC who saw an event remembers it (see Perception for who that is).
         private void Perceive(GameEvent e)
         {
@@ -222,6 +236,8 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public bool HasUnsavedPlay { get; internal set; }
 
+        private float _untilGossip = Gossip.IntervalSeconds;
+
         /// <summary>One step of the game: time, conversations, decisions, reflections, movement, collision.</summary>
         public void Update(GameTime gameTime)
         {
@@ -229,6 +245,12 @@ namespace Ashenveil.Core.GameWorld
             Clock.Update(gameTime);
             Conversations.Update(Clock.TotalDays);
             Reflections.Update();
+            // Gossip every few seconds, not every frame: it's people chatting, not physics.
+            if ((_untilGossip -= (float)gameTime.ElapsedGameTime.TotalSeconds) <= 0)
+            {
+                _untilGossip = Gossip.IntervalSeconds;
+                Gossip.Step(Roster.Levels, Clock.TotalDays);
+            }
             player.Update(gameTime);
             Bounds.Clamp(player);
             foreach (var npc in NPCs)

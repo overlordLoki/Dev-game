@@ -41,6 +41,12 @@ class Participant(BaseModel):
     events_today: list[str] = []
     # Their diary for the last few days, oldest first ("Yesterday: I waited at the castle door").
     recent_days: list[str] = []
+    # What others told them today, already framed as hearsay ("Marta told you: ..."). Less sure
+    # than what they saw themselves.
+    rumours: list[str] = []
+    # How they feel about each other person present: "Loki: wary (-35) - he attacked me".
+    # Attitudes run hostile / wary / neutral / friendly; the number is -100 to 100.
+    attitudes: list[str] = []
 
 
 class ConversationRequest(BaseModel):
@@ -110,6 +116,12 @@ def build_prompt(req: ConversationRequest) -> str:
         if p.events_today:
             parts.append(f"Earlier today {p.name} saw:")
             parts.extend(f"  - {e}" for e in p.events_today)
+        if p.rumours:
+            parts.append(f"What {p.name} has heard from others today (hearsay, not seen first-hand):")
+            parts.extend(f"  - {r}" for r in p.rumours)
+        if p.attitudes:
+            parts.append(f"How {p.name} feels about the others here (let it colour their tone):")
+            parts.extend(f"  - {a}" for a in p.attitudes)
 
     if req.topic:
         parts.append(f"Topic: {req.topic}")
@@ -243,6 +255,8 @@ class DecisionRequest(BaseModel):
     poi_names: list[str] = []
     max_tasks: int = Field(default=4, ge=0, le=8)
     max_memories: int = Field(default=5, ge=0, le=10)
+    # Factions this NPC could let the people it talked to into. Empty: it can't let anyone in.
+    can_admit: list[str] = []
 
 
 class TaskSpec(BaseModel):
@@ -258,6 +272,8 @@ class DecisionResponse(BaseModel):
     behaviour: str = "resume"
     clear_current_tasks: bool = False
     tasks: list[TaskSpec] = []
+    # A faction to let the others in the conversation into, or None. The game checks it.
+    join_faction: str | None = None
     model: str
 
 
@@ -269,11 +285,11 @@ DECISION_SYSTEM_PROMPT = (
 )
 
 
-def decision_schema(poi_names: list[str]) -> dict:
-    """JSON schema Ollama is held to. The enums stop the model inventing tasks or places."""
+def decision_schema(poi_names: list[str], can_admit: list[str] | None = None) -> dict:
+    """JSON schema Ollama is held to. The enums stop the model inventing tasks, places or factions."""
     # A go_to target is constrained to real POIs when the game sends them.
     target = {"type": "string", "enum": poi_names} if poi_names else {"type": "string"}
-    return {
+    schema = {
         "type": "object",
         "properties": {
             "summary": {"type": "string"},
@@ -295,6 +311,10 @@ def decision_schema(poi_names: list[str]) -> dict:
         },
         "required": ["summary", "behaviour"],
     }
+    # Only offered at all when the NPC can let someone in; "" means no.
+    if can_admit:
+        schema["properties"]["join_faction"] = {"type": "string", "enum": ["", *can_admit]}
+    return schema
 
 
 def build_decision_prompt(req: DecisionRequest) -> str:
@@ -328,12 +348,18 @@ def build_decision_prompt(req: DecisionRequest) -> str:
         f"(then give up to {req.max_tasks} tasks). Set clear_current_tasks true only to drop "
         "what you were already doing."
     )
+    if req.can_admit:
+        parts.append(
+            "You can swear people into: " + ", ".join(req.can_admit) + ". Set join_faction to one of "
+            "these only if the person you spoke to asked to join it and you agreed in the conversation; "
+            'otherwise leave it "".'
+        )
     return "\n".join(parts)
 
 
 @app.post("/decision", response_model=DecisionResponse)
 async def decision(req: DecisionRequest):
-    raw = await ask_ollama(DECISION_SYSTEM_PROMPT, build_decision_prompt(req), decision_schema(req.poi_names))
+    raw = await ask_ollama(DECISION_SYSTEM_PROMPT, build_decision_prompt(req), decision_schema(req.poi_names, req.can_admit))
 
     # The schema guarantees the shape; we still trim to the caps the game asked for and
     # drop blank memories (the game does this too, but cheap to do here as well).
@@ -345,6 +371,8 @@ async def decision(req: DecisionRequest):
         behaviour=raw.get("behaviour", "resume"),
         clear_current_tasks=bool(raw.get("clear_current_tasks", False)),
         tasks=tasks,
+        # Only a faction it was offered; anything else (or "") is no.
+        join_faction=raw.get("join_faction") if raw.get("join_faction") in req.can_admit else None,
         model=OLLAMA_MODEL,
     )
 
@@ -352,6 +380,18 @@ async def decision(req: DecisionRequest):
 # ------------------------------------------------------------- day-end reflection
 # Produced once per NPC per day, when the day turns over: the NPC looks back on what it saw
 # and who it talked to. Mirrors Ashenveil's ReflectionRequestDto / ReflectionDto.
+
+class Known(BaseModel):
+    key: str        # "person:0", "faction:bandit"
+    name: str
+    opinion: int    # how the NPC feels now, -100 to 100
+
+
+class OpinionChange(BaseModel):
+    about: str      # a Known key
+    by: int
+    why: str = ""
+
 
 class ReflectionRequest(BaseModel):
     npc_name: str
@@ -363,6 +403,11 @@ class ReflectionRequest(BaseModel):
     events: list[str] = []
     # One-line summaries of that day's conversations.
     conversations: list[str] = []
+    # What others told them, already framed as hearsay ("Marta told you: ...").
+    rumours: list[str] = []
+    # Who the day was about, and their factions, with the keys an opinion change must use.
+    people: list[Known] = []
+    factions: list[Known] = []
     max_facts: int = Field(default=3, ge=0, le=5)
 
 
@@ -370,7 +415,10 @@ class ReflectionResponse(BaseModel):
     # Drops straight into ReflectionDto (the game ignores the extra `model` field).
     diary: str
     facts: list[str] = []
+    # Proposals only: the game keeps changes about the keys it sent, capped.
+    opinion_changes: list[OpinionChange] = []
     model: str
+
 
 
 REFLECTION_SYSTEM_PROMPT = (
@@ -380,9 +428,9 @@ REFLECTION_SYSTEM_PROMPT = (
 )
 
 
-def reflection_schema() -> dict:
-    """JSON schema Ollama is held to."""
-    return {
+def reflection_schema(keys: list[str] | None = None) -> dict:
+    """JSON schema Ollama is held to. Opinion changes may only name the keys the game sent."""
+    schema = {
         "type": "object",
         "properties": {
             "diary": {"type": "string"},
@@ -390,6 +438,21 @@ def reflection_schema() -> dict:
         },
         "required": ["diary", "facts"],
     }
+    if keys:
+        schema["properties"]["opinion_changes"] = {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "about": {"type": "string", "enum": keys},
+                    "by": {"type": "integer", "minimum": -40, "maximum": 40},
+                    "why": {"type": "string"},
+                },
+                "required": ["about", "by", "why"],
+            },
+        }
+        schema["required"].append("opinion_changes")
+    return schema
 
 
 def build_reflection_prompt(req: ReflectionRequest) -> str:
@@ -407,6 +470,14 @@ def build_reflection_prompt(req: ReflectionRequest) -> str:
     if req.conversations:
         parts.append("Conversations you had:")
         parts.extend(f"  - {c}" for c in req.conversations)
+    if req.rumours:
+        parts.append("What others told you (hearsay - you didn't see it yourself):")
+        parts.extend(f"  - {r}" for r in req.rumours)
+
+    known = req.people + req.factions
+    if known:
+        parts.append("\nWho the day was about, and how you feel about them now (-100 hate to 100 love):")
+        parts.extend(f"  {k.key} ({k.name}): {k.opinion}" for k in known)
 
     parts.append(
         "\nWrite `diary`: your diary entry for the day, in the first person, 1 to 3 sentences, "
@@ -417,16 +488,35 @@ def build_reflection_prompt(req: ReflectionRequest) -> str:
         '"The path to the well is blocked"). Leave out anything that only mattered today, and '
         "give none if nothing lasting happened."
     )
+    if known:
+        parts.append(
+            "Finally, `opinion_changes`: did today change how you feel about any of them? For each "
+            "that it did, name it by its key (like person:0 or faction:bandit), how much (`by`, "
+            "-40 to 40; small for small things, less for hearsay) and `why` in a few words, from "
+            "your point of view. Only change your view of a whole faction if the day was about "
+            "the faction, not just one of its members. Give none if nothing changed."
+        )
     return "\n".join(parts)
 
 
 @app.post("/reflection", response_model=ReflectionResponse)
 async def reflection(req: ReflectionRequest):
-    raw = await ask_ollama(REFLECTION_SYSTEM_PROMPT, build_reflection_prompt(req), reflection_schema())
+    keys = [k.key for k in req.people + req.factions]
+    raw = await ask_ollama(REFLECTION_SYSTEM_PROMPT, build_reflection_prompt(req), reflection_schema(keys))
 
-    # As with decisions: trim to the cap the game asked for and drop blank facts.
+    # As with decisions: trim to the cap the game asked for and drop blank facts. Changes
+    # about keys that weren't sent are dropped here too (the game checks again, and caps).
     facts = [f.strip() for f in raw.get("facts", []) if isinstance(f, str) and f.strip()][: req.max_facts]
-    return ReflectionResponse(diary=str(raw.get("diary", "")).strip(), facts=facts, model=OLLAMA_MODEL)
+    changes = []
+    for c in raw.get("opinion_changes", []) or []:
+        try:
+            change = OpinionChange(**c)
+        except (TypeError, ValueError):
+            continue
+        if change.about in keys and change.by != 0:
+            changes.append(change)
+    return ReflectionResponse(diary=str(raw.get("diary", "")).strip(), facts=facts,
+                              opinion_changes=changes, model=OLLAMA_MODEL)
 
 
 if __name__ == "__main__":

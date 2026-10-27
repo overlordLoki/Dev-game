@@ -34,7 +34,15 @@ public class SaveStoreTests : IDisposable
         NextPersonId = 3,
         NextTranscriptId = 3,
         NextEventId = 3,
-        Players = { new PlayerSave { Id = 0, Name = "Loki", Level = "Medows", X = 2.5f, Y = 2.9f } },
+        Players =
+        {
+            new PlayerSave
+            {
+                Id = 0, Name = "Loki", Level = "Medows", X = 2.5f, Y = 2.9f,
+                Factions = { "traveller", "guard" },
+                Standings = { new StandingSave { Faction = "bandit", Score = -50 }, new StandingSave { Faction = "guard", Score = 30 } },
+            },
+        },
         PopulatedLevels = { "Castle", "Medows" },
         Transcripts =
         {
@@ -61,10 +69,19 @@ public class SaveStoreTests : IDisposable
                     new MemorySave { Text = "The traveller's name is Loki.", Kind = "Conversation", TranscriptId = 1, Day = 10 },
                     new MemorySave { Text = "Saw wolves by the well.", Kind = "Event", EventId = 2, Day = 12 },
                     new MemorySave { Text = "The well path is blocked.", Kind = "Reflection", Day = 11 },
+                    new MemorySave { Text = "Traveller talked with Sir O'Brien", Kind = "Rumour", EventId = 1, Day = 12, TellerId = 2, Hops = 1 },
                 },
                 TranscriptIds = { 1, 2 },
                 DayEntries = { new DayEntrySave { Day = 10, Summary = "I met Loki." }, new DayEntrySave { Day = 11, Summary = "Quiet." } },
                 LastReflectedDay = 11,
+                Factions = { "guard", "village" },
+                Opinions =
+                {
+                    new OpinionSave { About = "person:0", Score = -35, Why = "he shoved me" },
+                    new OpinionSave { About = "person:2", Score = 60 },
+                    new OpinionSave { About = "faction:bandit", Score = -80 },
+                    new OpinionSave { About = "faction:guard", Score = 50 },
+                },
                 Tasks =
                 {
                     new TaskSave { Type = "go_to", X = 3.5f, Y = 1.9f },
@@ -198,7 +215,7 @@ public class SaveStoreTests : IDisposable
     public void A_summary_of_an_empty_save_or_one_with_no_player_says_so()
     {
         _store.Save(FullSave());
-        Sql("DELETE FROM players;");
+        Sql("DELETE FROM standings; DELETE FROM players;");   // standings point at players
         Assert.Contains("no player", _store.ReadSummary().Problem);
 
         Sql("DELETE FROM game;");
@@ -232,6 +249,8 @@ public class SaveStoreTests : IDisposable
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM transcript_lines"));
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM events"));
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM day_entries"));
+        Assert.Equal(0, Scalar("SELECT COUNT(*) FROM opinions"));
+        Assert.Equal(0, Scalar("SELECT COUNT(*) FROM standings"));
     }
 
     [Fact]
@@ -324,6 +343,11 @@ public class SaveStoreTests : IDisposable
         var knight = Assert.Single(save.Npcs);
         Assert.Equal(0, knight.LastReflectedDay);
         Assert.Empty(knight.DayEntries);
+        // A version 2 game's knight was a guard and its player a traveller; opinions come on load.
+        Assert.Equal(new[] { "guard" }, knight.Factions);
+        Assert.Empty(knight.Opinions);
+        Assert.Equal(new[] { "traveller" }, save.Players.Single().Factions);
+        Assert.Empty(save.Players.Single().Standings);
         // A fact from a conversation takes its transcript's day; anything else has none.
         Assert.Equal(new[] { (10, (int?)1, (int?)null), (0, null, null) },
                      knight.Memories.Select(m => (m.Day, m.TranscriptId, m.EventId)));
@@ -349,6 +373,9 @@ public class SaveStoreTests : IDisposable
         var knight = Assert.Single(Load().Npcs);
         Assert.Equal((10, "I met Loki."), (knight.DayEntries.Single().Day, knight.DayEntries.Single().Summary));
         Assert.Equal(10, knight.LastReflectedDay);
+        // Seeded on load and saved with it: the knight sees bandits as a guard does.
+        Assert.Contains(knight.Opinions, o => o.About == "faction:bandit" && o.Score == FactionTable.Default.View("guard", "bandit"));
+        Assert.Contains(Load().Players.Single().Standings, s => s.Faction == "bandit");
     }
 
     [Fact]

@@ -10,6 +10,9 @@ namespace Ashenveil.Core.GameWorld
         TaskDone,
         TaskFailed,
         Talked,
+        Attacked,       // actor attacked target. Combat posts these; until then, the console's `event attack`
+        Joined,         // actor joined a faction (target: who let them in, if anyone)
+        Left,           // actor left a faction
     }
 
     /// <summary>

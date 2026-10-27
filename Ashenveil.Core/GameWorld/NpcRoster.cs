@@ -57,6 +57,9 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public Action<GameEvent> PostEvent { get; set; }
 
+        /// <summary>Seeds the opinions of NPCs spawned here. Set by the World; the game's own table if not.</summary>
+        public FactionTable Factions { get; set; }
+
         /// <summary>Puts an NPC in a level, tells the NPC which level it's in, and where to post events.</summary>
         public void Add(Location level, NPC npc)
         {
@@ -64,6 +67,9 @@ namespace Ashenveil.Core.GameWorld
             npc.Location = level;
             npc.PostEvent = PostEvent;
         }
+
+        /// <summary>Each level's NPCs, one list per level.</summary>
+        public IEnumerable<IReadOnlyList<NPC>> Levels => _byLevel.Values;
 
         /// <summary>Every NPC in every level.</summary>
         public IEnumerable<NPC> All => _byLevel.Values.SelectMany(list => list);
@@ -106,6 +112,8 @@ namespace Ashenveil.Core.GameWorld
             {
                 case "Medows":
                     var knight = new Knight(Vector2.Zero, NextId(), "Sir Lancelot", new KnightBrain());
+                    knight.Factions.Add("guard");
+                    knight.Opinions.Seed(knight.Factions, Factions ?? FactionTable.Default);
                     level.PlaceAt(knight, "Knight_spawn");
                     Add(level, knight);
 

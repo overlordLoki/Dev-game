@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Ashenveil.Core;
 using Ashenveil.Core.Entities;
+using Ashenveil.Core.Entities.brains;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
@@ -146,6 +147,30 @@ public class WorldSaveTests : IDisposable
                      back.Journal.Memories.Select(m => (m.Text, m.Kind, m.Day, m.SourceId)));
         Assert.Equal(new[] { new DayEntry(1, "On Spring 1, Year 1 I met Loki.") }, back.Journal.Days);
         Assert.Equal(1, back.Journal.LastReflectedDay);
+    }
+
+    [Fact]
+    public void Factions_opinions_standings_and_rumours_come_back()
+    {
+        var world = NewGame();
+        var knight = Knight(world);
+        world.player.Join("guard", world.Factions);
+        world.player.ChangeStanding("bandit", -7);
+        knight.ChangeOpinionOf(world.player, 25, "he joined us");
+        knight.Opinions.ChangeFaction("village", -15);
+        knight.Journal.Add(new Memory("Grim robbed the miller", MemoryKind.Rumour) { SourceId = 4, TellerId = 9, Hops = 2, Day = 1 });
+
+        var loaded = Load(SaveMapper.ToSave(world, SavedAt));
+        var back = Knight(loaded);
+
+        Assert.Equal(world.player.Factions, loaded.player.Factions);
+        Assert.Equal(world.player.Standing.OrderBy(s => s.Key), loaded.player.Standing.OrderBy(s => s.Key));
+        Assert.Equal(knight.Factions, back.Factions);
+        Assert.Equal(new PersonalOpinion(knight.OpinionOf(world.player), "he joined us"), back.Opinions.People[loaded.player.Id]);
+        Assert.Equal(knight.Opinions.Factions.OrderBy(f => f.Key), back.Opinions.Factions.OrderBy(f => f.Key));
+        var rumour = back.Journal.Memories.Single(m => m.Kind == MemoryKind.Rumour);
+        Assert.Equal((4, (int?)9, 2), (rumour.SourceId!.Value, rumour.TellerId, rumour.Hops));
+        Assert.True(back.Admits);   // comes with the type, not the save
     }
 
     [Fact]

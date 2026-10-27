@@ -41,6 +41,8 @@ namespace Ashenveil.Core.Entities
             Start();
         }
         public Journal Journal { get; } = new Journal();
+        /// <summary>What this NPC thinks of people and factions.</summary>
+        public brains.Opinions Opinions { get; } = new brains.Opinions();
         public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
         public NPCState State { get; protected set; } = NPCState.Idle;
         // One blackboard per NPC, reused across every tick and every task, so tasks can

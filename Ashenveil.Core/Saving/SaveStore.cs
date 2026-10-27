@@ -25,7 +25,7 @@ namespace Ashenveil.Core.Saving
     public class SaveStore
     {
         /// <summary>The schema this game writes. Bump it when adding a migration.</summary>
-        public const int SchemaVersion = 2;
+        public const int SchemaVersion = 3;
 
         /// <summary>Where the game keeps its saves: a "saves" folder beside settings.json.</summary>
         public static string DefaultFolder => Path.Combine(SettingsStore.DefaultFolder, "saves");
@@ -145,13 +145,38 @@ namespace Ashenveil.Core.Saving
             );
             ALTER TABLE npcs ADD COLUMN last_reflected_day INTEGER NOT NULL DEFAULT 0;
             """,
+
+            // 2 -> 3: factions and opinions (docs/factions-plan.md). Factions are a comma-separated
+            // list. A version 2 game's only NPC type was the knight, a guard; its player a
+            // traveller. Opinions and standings left empty are seeded from the table on load.
+            """
+            ALTER TABLE npcs ADD COLUMN factions TEXT NOT NULL DEFAULT '';
+            ALTER TABLE players ADD COLUMN factions TEXT NOT NULL DEFAULT '';
+            UPDATE npcs SET factions = 'guard' WHERE type = 'Knight';
+            UPDATE players SET factions = 'traveller';
+            CREATE TABLE opinions (
+                owner_id INTEGER NOT NULL REFERENCES npcs(npc_id),
+                about    TEXT    NOT NULL,
+                score    INTEGER NOT NULL,
+                why      TEXT,
+                PRIMARY KEY (owner_id, about)
+            );
+            CREATE TABLE standings (
+                player_id INTEGER NOT NULL REFERENCES players(player_id),
+                faction   TEXT    NOT NULL,
+                score     INTEGER NOT NULL,
+                PRIMARY KEY (player_id, faction)
+            );
+            ALTER TABLE memories ADD COLUMN teller_id INTEGER;
+            ALTER TABLE memories ADD COLUMN hops INTEGER NOT NULL DEFAULT 0;
+            """,
         };
 
         // Every table, children before the tables they point at, so clearing them in this
         // order never leaves a row pointing at one that's gone.
         private static readonly string[] Tables =
         {
-            "day_entries", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
+            "standings", "opinions", "day_entries", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
             "transcript_participants", "transcripts", "npcs", "populated_levels", "players", "game",
         };
 
@@ -198,8 +223,14 @@ namespace Ashenveil.Core.Saving
                 ("$nextEventId", save.NextEventId));
 
             foreach (var p in save.Players)
-                Insert(db, "INSERT INTO players VALUES ($id, $name, $level, $x, $y)",
-                    ("$id", p.Id), ("$name", p.Name), ("$level", p.Level), ("$x", p.X), ("$y", p.Y));
+            {
+                Insert(db, "INSERT INTO players (player_id, name, level, x, y, factions) VALUES ($id, $name, $level, $x, $y, $factions)",
+                    ("$id", p.Id), ("$name", p.Name), ("$level", p.Level), ("$x", p.X), ("$y", p.Y),
+                    ("$factions", string.Join(",", p.Factions)));
+                foreach (var standing in p.Standings)
+                    Insert(db, "INSERT INTO standings (player_id, faction, score) VALUES ($id, $faction, $score)",
+                        ("$id", p.Id), ("$faction", standing.Faction), ("$score", standing.Score));
+            }
 
             foreach (var level in save.PopulatedLevels)
                 Insert(db, "INSERT INTO populated_levels VALUES ($level)", ("$level", level));
@@ -226,17 +257,20 @@ namespace Ashenveil.Core.Saving
 
             foreach (var npc in save.Npcs)
             {
-                Insert(db, "INSERT INTO npcs (npc_id, type, name, level, x, y, last_reflected_day) "
-                         + "VALUES ($id, $type, $name, $level, $x, $y, $lastReflected)",
+                Insert(db, "INSERT INTO npcs (npc_id, type, name, level, x, y, last_reflected_day, factions) "
+                         + "VALUES ($id, $type, $name, $level, $x, $y, $lastReflected, $factions)",
                     ("$id", npc.Id), ("$type", npc.Type), ("$name", npc.Name), ("$level", npc.Level), ("$x", npc.X), ("$y", npc.Y),
-                    ("$lastReflected", npc.LastReflectedDay));
+                    ("$lastReflected", npc.LastReflectedDay), ("$factions", string.Join(",", npc.Factions)));
+                foreach (var o in npc.Opinions)
+                    Insert(db, "INSERT INTO opinions (owner_id, about, score, why) VALUES ($npc, $about, $score, $why)",
+                        ("$npc", npc.Id), ("$about", o.About), ("$score", o.Score), ("$why", o.Why));
                 for (int i = 0; i < npc.Memories.Count; i++)
                 {
                     var m = npc.Memories[i];
-                    Insert(db, "INSERT INTO memories (npc_id, seq, text, kind, transcript_id, day, event_id) "
-                             + "VALUES ($npc, $seq, $text, $kind, $transcript, $day, $event)",
+                    Insert(db, "INSERT INTO memories (npc_id, seq, text, kind, transcript_id, day, event_id, teller_id, hops) "
+                             + "VALUES ($npc, $seq, $text, $kind, $transcript, $day, $event, $teller, $hops)",
                         ("$npc", npc.Id), ("$seq", i), ("$text", m.Text), ("$kind", m.Kind), ("$transcript", m.TranscriptId),
-                        ("$day", m.Day), ("$event", m.EventId));
+                        ("$day", m.Day), ("$event", m.EventId), ("$teller", m.TellerId), ("$hops", m.Hops));
                 }
                 for (int i = 0; i < npc.DayEntries.Count; i++)
                     Insert(db, "INSERT INTO day_entries (npc_id, seq, day, summary) VALUES ($npc, $seq, $day, $summary)",
@@ -362,8 +396,16 @@ namespace Ashenveil.Core.Saving
                 }).SingleOrDefault();
             if (save == null) return null;
 
-            save.Players = Rows(db, "SELECT player_id, name, level, x, y FROM players ORDER BY player_id",
-                r => new PlayerSave { Id = r.GetInt32(0), Name = r.GetString(1), Level = r.GetString(2), X = r.GetFloat(3), Y = r.GetFloat(4) });
+            var standings = Rows(db, "SELECT player_id, faction, score FROM standings ORDER BY player_id, faction",
+                r => (player: r.GetInt32(0), standing: new StandingSave { Faction = r.GetString(1), Score = r.GetInt32(2) }))
+                .ToLookup(s => s.player, s => s.standing);
+            save.Players = Rows(db, "SELECT player_id, name, level, x, y, factions FROM players ORDER BY player_id",
+                r => new PlayerSave
+                {
+                    Id = r.GetInt32(0), Name = r.GetString(1), Level = r.GetString(2), X = r.GetFloat(3), Y = r.GetFloat(4),
+                    Factions = SplitFactions(r.GetString(5)),
+                    Standings = standings[r.GetInt32(0)].ToList(),
+                });
 
             save.PopulatedLevels = Rows(db, "SELECT level FROM populated_levels ORDER BY level", r => r.GetString(0));
 
@@ -401,7 +443,7 @@ namespace Ashenveil.Core.Saving
                 });
 
             // Each NPC's memories, conversations, tasks and diary, then the NPCs themselves.
-            var memories = Rows(db, "SELECT npc_id, text, kind, transcript_id, day, event_id FROM memories ORDER BY npc_id, seq",
+            var memories = Rows(db, "SELECT npc_id, text, kind, transcript_id, day, event_id, teller_id, hops FROM memories ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), memory: new MemorySave
                 {
                     Text = r.GetString(1),
@@ -409,8 +451,14 @@ namespace Ashenveil.Core.Saving
                     TranscriptId = r.IsDBNull(3) ? null : r.GetInt32(3),
                     Day = r.GetInt32(4),
                     EventId = r.IsDBNull(5) ? null : r.GetInt32(5),
+                    TellerId = r.IsDBNull(6) ? null : r.GetInt32(6),
+                    Hops = r.GetInt32(7),
                 }))
                 .ToLookup(m => m.npc, m => m.memory);
+            // People first, then factions, as they were saved; by key within each.
+            var opinions = Rows(db, "SELECT owner_id, about, score, why FROM opinions ORDER BY owner_id, about LIKE 'faction:%', about",
+                r => (npc: r.GetInt32(0), opinion: new OpinionSave { About = r.GetString(1), Score = r.GetInt32(2), Why = r.IsDBNull(3) ? null : r.GetString(3) }))
+                .ToLookup(o => o.npc, o => o.opinion);
             var days = Rows(db, "SELECT npc_id, day, summary FROM day_entries ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), entry: new DayEntrySave { Day = r.GetInt32(1), Summary = r.GetString(2) }))
                 .ToLookup(d => d.npc, d => d.entry);
@@ -427,7 +475,7 @@ namespace Ashenveil.Core.Saving
                     Seconds = r.IsDBNull(4) ? null : r.GetFloat(4),
                 }))
                 .ToLookup(t => t.npc, t => t.task);
-            save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y, last_reflected_day FROM npcs ORDER BY npc_id",
+            save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y, last_reflected_day, factions FROM npcs ORDER BY npc_id",
                 r => new NpcSave
                 {
                     Id = r.GetInt32(0),
@@ -441,10 +489,15 @@ namespace Ashenveil.Core.Saving
                     Tasks = tasks[r.GetInt32(0)].ToList(),
                     DayEntries = days[r.GetInt32(0)].ToList(),
                     LastReflectedDay = r.GetInt32(6),
+                    Factions = SplitFactions(r.GetString(7)),
+                    Opinions = opinions[r.GetInt32(0)].ToList(),
                 });
 
             return save;
         }
+
+        private static List<string> SplitFactions(string text) =>
+            text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
         // ------------------------------------------------------------------ versions
 

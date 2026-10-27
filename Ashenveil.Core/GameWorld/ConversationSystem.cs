@@ -28,6 +28,7 @@ namespace Ashenveil.Core.GameWorld
         // How many of today's events, and how many diary entries (recent days), go in too.
         private const int MaxEventsToday = 8;
         private const int MaxRecalledDays = 3;
+        private const int MaxRumoursToday = 5;
 
         private readonly Func<ConversationRequestDto, Task<ChatMessage[]>> _sendChat;
         private readonly Func<DecisionRequestDto, Task<NpcDecisionDto>> _requestDecision;
@@ -63,10 +64,17 @@ namespace Ashenveil.Core.GameWorld
         }
 
         /// <summary>
-        /// Where a finished conversation is reported as a Talked event (EventLog.Post). Set by
-        /// the World; null posts nothing.
+        /// The world's event log: a finished conversation is posted to it as a Talked event, and
+        /// a faction joined as Joined, and today's grudges are read from it. Set by the World;
+        /// null posts nothing and holds no grudges.
         /// </summary>
-        public Action<GameEvent> PostEvent { get; set; }
+        public EventLog Events { get; set; }
+
+        /// <summary>Finds a person (player or NPC) by id, for naming who told whom and who joins. Set by the World.</summary>
+        public Func<int, Entity> FindPerson { get; set; }
+
+        /// <summary>The faction table, for checking and applying join_faction. Set by the World.</summary>
+        public FactionTable Factions { get; set; }
 
         /// <summary>Conversations still going.</summary>
         public IReadOnlyList<Conversation> Active => _active;
@@ -90,7 +98,7 @@ namespace Ashenveil.Core.GameWorld
             everyone[0] = from;
             others.CopyTo(everyone, 1);
 
-            var convo = new Conversation(everyone, level, BuildRequest(from, others, level, today), _sendChat);
+            var convo = new Conversation(everyone, level, BuildRequest(everyone, others, level, today), _sendChat);
             // A note, not a line: no speaker, so it's never sent to the LLM or remembered.
             convo.Note($"You approach {others[0].Name}.");
 
@@ -100,10 +108,12 @@ namespace Ashenveil.Core.GameWorld
         }
 
         // What the LLM is told about the people in this conversation. The initiator listens
-        // (the player types their own lines); each NPC speaks, with its persona and what it
-        // remembers - attached to that NPC, so the prompt frames it as their own knowledge.
-        private static ConversationRequestDto BuildRequest(Entity from, NPC[] others, Location level, int today)
+        // (the player types their own lines); each NPC speaks, with its persona, what it
+        // remembers and how it feels about everyone else there - attached to that NPC, so the
+        // prompt frames it as their own knowledge.
+        private ConversationRequestDto BuildRequest(Entity[] everyone, NPC[] others, Location level, int today)
         {
+            var from = everyone[0];
             var req = new ConversationRequestDto
             {
                 participants = new List<ParticipantDto> { new() { name = Conversation.NameOf(from), speaks = false } },
@@ -120,6 +130,10 @@ namespace Ashenveil.Core.GameWorld
                     past_conversations = npc.PastConversationsWith(from.Id, MaxRecalledConversations, today).ToList(),
                     events_today = npc.EventsToday(today, MaxEventsToday).ToList(),
                     recent_days = npc.RecentDays(MaxRecalledDays, today).ToList(),
+                    rumours = npc.RumoursToday(today, MaxRumoursToday, NameById).ToList(),
+                    attitudes = everyone.Where(who => who != npc)
+                                        .Select(who => Relations.Describe(npc, who, Conversation.NameOf(who), Events, today))
+                                        .ToList(),
                 });
             return req;
         }
@@ -167,7 +181,7 @@ namespace Ashenveil.Core.GameWorld
 
             var transcript = convo.ToTranscript(_nextTranscriptId++, today);
             foreach (var npc in npcs) npc.RememberConversation(transcript);
-            PostEvent?.Invoke(TalkedEvent(convo, npcs, transcript));
+            Events?.Post(TalkedEvent(convo, npcs, transcript));
             return transcript;
         }
 
@@ -195,6 +209,11 @@ namespace Ashenveil.Core.GameWorld
                 location = transcript.Location,
                 transcript = transcript.Lines.ToArray(),   // already only what was actually said
                 poi_names = convo.Location?.pointsOfInterest.Keys.ToArray() ?? Array.Empty<string>(),
+                // Only factions a player there isn't already in: there's nobody else to let in.
+                can_admit = Factions == null ? Array.Empty<string>()
+                    : npc.Factions.Where(f => npc.CanAdmit(f, Factions)
+                                              && convo.Participants.OfType<Player>().Any(p => !p.Factions.Contains(f)))
+                                  .ToArray(),
             };
             _pending.Add((npc, convo.Location, transcript, _requestDecision(req)));
         }
@@ -209,9 +228,27 @@ namespace Ashenveil.Core.GameWorld
             {
                 var (npc, level, transcript, task) = _pending[i];
                 if (!task.IsCompleted) continue;
-                if (task.IsCompletedSuccessfully) npc.ApplyDecision(task.Result, level, transcript);
+                if (task.IsCompletedSuccessfully)
+                {
+                    npc.ApplyDecision(task.Result, level, transcript);
+                    Admit(npc, task.Result?.join_faction, transcript);
+                }
                 _pending.RemoveAt(i);
             }
         }
+
+        // The decision's join_faction: the NPC lets the players it talked to into a faction. The
+        // LLM only proposes it - it happens only if this NPC can admit people to that faction.
+        private void Admit(NPC npc, string faction, Transcript transcript)
+        {
+            if (string.IsNullOrWhiteSpace(faction) || Factions == null || !npc.CanAdmit(faction, Factions)) return;
+
+            foreach (var player in transcript.Participants.Select(p => FindPerson?.Invoke(p.Id)).OfType<Player>())
+                if (player.Join(faction, Factions))
+                    Events?.Post(GameEvent.Of(EventType.Joined, transcript.Location, player.Feet, player.Id, npc.Id,
+                                              $"{player.Name} joined the {faction}, sworn in by {npc.Name}"));
+        }
+
+        private string NameById(int id) => FindPerson?.Invoke(id) is { } who ? Conversation.NameOf(who) : null;
     }
 }

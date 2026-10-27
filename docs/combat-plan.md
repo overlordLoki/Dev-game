@@ -18,8 +18,9 @@ facing → health → the player's attack → NPCs fight back → death → enem
 **It comes after two other pieces of work.** Combat *posts* what happens to the event log, and
 *reads* opinions to decide who to fight. It owns neither:
 1. The **event log and day-end reflection** ([npc-memory-next-plan.md](npc-memory-next-plan.md)
-   Part B). Fights are stored as events: hot memories that same day, and lasting after-effects
-   at day end.
+   Part B, **done**). Fights are stored as events: hot memories that same day, and lasting
+   after-effects at day end. Combat adds `Attacked` / `Killed` to `EventType` and posts them
+   with `EventLog.Post`.
 2. **Factions and opinions** ([factions-plan.md](factions-plan.md)). Who is hostile to whom,
    for any NPC against any other NPC or the player.
 
@@ -350,7 +351,7 @@ Like the rest of the game, everything is tested in cells and seconds with no win
 - **Depends on:**
   - pathfinding (done) and world units (done);
   - the save system (done);
-  - the event log and reflection (NPC plan, Part B), needed by step 4;
+  - the event log and reflection (NPC plan, Part B; done), needed by step 4;
   - [factions-plan.md](factions-plan.md), needed by step 5.
 
   Steps 0–3 need neither, so they can start while the others are still being built.

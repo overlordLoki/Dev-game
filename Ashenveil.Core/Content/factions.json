@@ -1,0 +1,18 @@
+{
+  "guard": {
+    "joinable": true,
+    "views": { "guard": 50, "bandit": -80, "village": 40, "traveller": 0 }
+  },
+  "bandit": {
+    "joinable": true,
+    "views": { "guard": -80, "bandit": 50, "village": -40, "traveller": -30 }
+  },
+  "village": {
+    "joinable": false,
+    "views": { "guard": 40, "bandit": -60, "village": 40, "traveller": 10 }
+  },
+  "traveller": {
+    "joinable": false,
+    "views": { "guard": 0, "bandit": -20, "village": 10, "traveller": 10 }
+  }
+}

@@ -41,6 +41,7 @@ namespace Ashenveil.Core.Entities
         // still go through the NPC's own methods below.
         public NpcBrain.NPCState State => Brain.State;
         public brains.Memorys.Journal Journal => Brain.Journal;
+        public brains.Opinions Opinions => Brain.Opinions;
         // The task queue, front first. For saving; new tasks still go in through GiveTask.
         public IReadOnlyCollection<brains.Task.ITask> Tasks => Brain.TaskQueue;
         // Where the current go-to task is still heading, in cells; empty when the NPC isn't
@@ -55,6 +56,42 @@ namespace Ashenveil.Core.Entities
         /// wires it up. Null outside a world, and then nothing is posted.
         /// </summary>
         public Action<GameWorld.GameEvent> PostEvent { get; set; }
+
+        /// <summary>
+        /// The factions this NPC belongs to ("guard"). Saved. The first one is what it's mostly
+        /// known as; for judging it, every one counts (the lowest view wins).
+        /// </summary>
+        public List<string> Factions { get; } = new();
+
+        /// <summary>
+        /// Whether this NPC can let people into its own factions (a guard captain can; a
+        /// villager can't). Comes with the NPC's type, so it isn't saved.
+        /// </summary>
+        public bool Admits { get; protected set; }
+
+        /// <summary>Whether this NPC can let someone into <paramref name="faction"/>.</summary>
+        public bool CanAdmit(string faction, GameWorld.FactionTable table) =>
+            Admits && Factions.Contains(faction) && table.IsJoinable(faction);
+
+        /// <summary>
+        /// What this NPC's factions think of someone, with no personal opinion in the way: for a
+        /// player, the standing they have with this NPC's factions; for an NPC, this NPC's view
+        /// of their factions. The lowest wins either way; no factions is 0.
+        /// </summary>
+        public int FactionViewOf(Entity who) => who switch
+        {
+            Player player => GameWorld.FactionTable.Lowest(Factions, player.StandingWith),
+            NPC npc => GameWorld.FactionTable.Lowest(npc.Factions, Opinions.OfFaction),
+            _ => 0,
+        };
+
+        /// <summary>What this NPC thinks of someone: its own opinion if it has one, else its faction view.</summary>
+        public int OpinionOf(Entity who) =>
+            Opinions.TryPersonal(who.Id, out var mine) ? mine.Score : FactionViewOf(who);
+
+        /// <summary>Moves this NPC's opinion of someone, starting a personal one from the faction view if needed.</summary>
+        public int ChangeOpinionOf(Entity who, int by, string why = null) =>
+            Opinions.Change(who.Id, FactionViewOf(who), by, why);
 
         // The brain is private to the NPC, so the World starts and ends talking through these.
         public void StartTalking() => Brain.StartTalking();
@@ -122,6 +159,14 @@ namespace Ashenveil.Core.Entities
         // the facts so a busy day can't push out "the traveller's name is Loki".
         public IEnumerable<string> EventsToday(int today, int count) =>
             Brain.Journal.EventsOn(today).TakeLast(count).Select(m => m.Text);
+
+        // What this NPC heard from others today, the last `count` of it, framed as hearsay
+        // ("Marta told you: the traveller robbed the miller"). `nameOf` names the teller by id.
+        public IEnumerable<string> RumoursToday(int today, int count, Func<int, string> nameOf) =>
+            Brain.Journal.RumoursOn(today).TakeLast(count).Select(m => Hearsay(m, nameOf));
+
+        public static string Hearsay(brains.Memorys.Memory rumour, Func<int, string> nameOf) =>
+            $"{(rumour.TellerId is int id ? nameOf(id) ?? "Someone" : "Someone")} told you: {rumour.Text}";
 
         // Recall from the diary: the last `count` reflected days, oldest first ("Yesterday: I
         // waited at the castle door...").

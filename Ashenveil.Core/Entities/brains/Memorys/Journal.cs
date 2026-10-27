@@ -41,13 +41,17 @@ namespace Ashenveil.Core.Entities.brains.Memorys
             _memories.RemoveAll(gone.Contains);
         }
 
-        /// <summary>The last <paramref name="count"/> facts - every memory but events, which are sent apart.</summary>
-        public IEnumerable<Memory> Recent(int count) => _memories.Where(m => m.Kind != MemoryKind.Event).TakeLast(count);
+        /// <summary>The last <paramref name="count"/> facts - every memory but events and rumours, which are sent apart.</summary>
+        public IEnumerable<Memory> Recent(int count) =>
+            _memories.Where(m => m.Kind is not (MemoryKind.Event or MemoryKind.Rumour)).TakeLast(count);
 
         /// <summary>The events seen on <paramref name="day"/> that are still in the hot tier, oldest first.</summary>
         public IEnumerable<Memory> EventsOn(int day) => _memories.Where(m => m.Kind == MemoryKind.Event && m.Day == day);
 
-        /// <summary>Whether anything happened to this NPC on <paramref name="day"/>: an event seen, or a conversation.</summary>
-        public bool HasAnythingOn(int day) => EventsOn(day).Any() || _transcripts.Any(t => t.Day == day);
+        /// <summary>The rumours heard on <paramref name="day"/> that are still in the hot tier, oldest first.</summary>
+        public IEnumerable<Memory> RumoursOn(int day) => _memories.Where(m => m.Kind == MemoryKind.Rumour && m.Day == day);
+
+        /// <summary>Whether anything happened to this NPC on <paramref name="day"/>: an event seen, a rumour heard, or a conversation.</summary>
+        public bool HasAnythingOn(int day) => EventsOn(day).Any() || RumoursOn(day).Any() || _transcripts.Any(t => t.Day == day);
     }
 }

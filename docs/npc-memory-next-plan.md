@@ -12,9 +12,10 @@ remembers facts and past conversations. This plan is what comes next, in two par
 - **Part B** is the event log and daily reflection: NPCs learning from what *happens*,
   not just from what's *said*.
 
-**Part B is next.** [Factions](factions-plan.md) and [combat](combat-plan.md) both build on
-it: fights are stored as events, and lasting after-effects (opinions) are written by the
-day-end reflection.
+**Part B is built** (2026-10-28). [Factions](factions-plan.md) is next, then
+[combat](combat-plan.md). Both build on it: fights are stored as events, and lasting
+after-effects (opinions) are written by the day-end reflection. Part A stays open, so this plan
+stays out of `Completed/`.
 
 The ground rule from the first plan still holds. The LLM *proposes* at a few controlled
 points; the engine *validates and disposes*; there's no LLM in the per-frame loop.

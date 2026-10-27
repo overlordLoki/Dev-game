@@ -39,6 +39,25 @@ namespace Ashenveil.Core.Saving
         public string Level { get; set; }
         public float X { get; set; }                     // feet, in cells
         public float Y { get; set; }
+        public List<string> Factions { get; set; } = new();          // joined, in order
+        public List<StandingSave> Standings { get; set; } = new();   // one per faction
+    }
+
+    public class StandingSave
+    {
+        public string Faction { get; set; }
+        public int Score { get; set; }
+    }
+
+    /// <summary>
+    /// One of an NPC's opinions. About is "person:&lt;id&gt;" or "faction:&lt;name&gt;", as the
+    /// reflection request keys them; Why is only ever set for a person.
+    /// </summary>
+    public class OpinionSave
+    {
+        public string About { get; set; }
+        public int Score { get; set; }
+        public string Why { get; set; }
     }
 
     public class NpcSave
@@ -54,6 +73,8 @@ namespace Ashenveil.Core.Saving
         public List<TaskSave> Tasks { get; set; } = new();        // the queue, front first
         public List<DayEntrySave> DayEntries { get; set; } = new(); // the diary, oldest first
         public int LastReflectedDay { get; set; }                  // Journal.LastReflectedDay; 0 for none
+        public List<string> Factions { get; set; } = new();        // NPC.Factions, in order
+        public List<OpinionSave> Opinions { get; set; } = new();   // people first, then factions
     }
 
     /// <summary>
@@ -77,6 +98,8 @@ namespace Ashenveil.Core.Saving
         public int? TranscriptId { get; set; }           // Memory.SourceId, for a Conversation memory
         public int? EventId { get; set; }                // Memory.SourceId, for an Event memory
         public int Day { get; set; }                     // Memory.Day
+        public int? TellerId { get; set; }               // a Rumour's teller
+        public int Hops { get; set; }                    // a Rumour's hop count; 0 otherwise
     }
 
     public class DayEntrySave

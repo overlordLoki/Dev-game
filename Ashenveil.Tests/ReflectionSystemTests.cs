@@ -203,4 +203,107 @@ public class ReflectionSystemTests
         _system.Update();
         Assert.Equal(4, npc.Journal.LastReflectedDay);
     }
+
+    // ------------------------------------------------------------------ opinions
+
+    // A knight (a guard) who saw a bandit attack him, and heard a rumour about the player.
+    private (TestNpc knight, TestNpc bandit, Ashenveil.Core.Entities.Player player) DayWithABanditAndARumour()
+    {
+        var player = new Ashenveil.Core.Entities.Player(Microsoft.Xna.Framework.Vector2.Zero, 0);
+        player.SeedStanding(FactionTable.Default);
+        var knight = Npc(1, "Sir Lancelot");
+        knight.Factions.Add("guard");
+        knight.Opinions.Seed(knight.Factions, FactionTable.Default);
+        var bandit = Npc(2, "Grim");
+        bandit.Factions.Add("bandit");
+
+        var log = new EventLog(() => 3);
+        var attack = log.Post(GameEvent.Of(EventType.Attacked, "Medows", default, bandit.Id, knight.Id, "Grim attacked Sir Lancelot"));
+        var theft = log.Post(GameEvent.Of(EventType.TaskDone, "Medows", default, player.Id, null, "Traveller robbed the miller"));
+        knight.Journal.Add(Seen(attack.Text, day: 3, eventId: attack.Id));
+        knight.Journal.Add(new Memory(theft.Text, MemoryKind.Rumour) { Day = 3, SourceId = theft.Id, TellerId = 9, Hops = 1 });
+
+        var people = new Dictionary<int, Ashenveil.Core.Entities.Entity> { [0] = player, [1] = knight, [2] = bandit };
+        _system.Events = log;
+        _system.FindPerson = id => people.GetValueOrDefault(id);
+        _system.Queue(knight, 3);
+        _system.Update();
+        return (knight, bandit, player);
+    }
+
+    private static ReflectionDto Changes(params (string about, int by)[] changes) => new()
+    {
+        diary = "A hard day.",
+        facts = Array.Empty<string>(),
+        opinion_changes = changes.Select(c => new OpinionChangeDto { about = c.about, by = c.by, why = $"because {c.about}" }).ToArray(),
+    };
+
+    [Fact]
+    public void The_request_names_who_the_day_was_about_and_their_factions_with_keys()
+    {
+        DayWithABanditAndARumour();
+
+        var req = Assert.Single(_asked).req;
+        Assert.Equal(new[] { ("person:2", "Grim", -80), ("person:0", "Traveller", 0) },
+                     req.people.Select(k => (k.key, k.name, k.opinion)));
+        Assert.Equal(new[] { "faction:bandit", "faction:traveller" }, req.factions.Select(k => k.key));
+        Assert.Equal(new[] { "Someone told you: Traveller robbed the miller" }, req.rumours);   // the teller isn't known here
+        Assert.DoesNotContain(req.people, k => k.key == "person:1");                           // never itself
+    }
+
+    [Fact]
+    public void Valid_changes_are_applied_and_a_change_about_a_player_moves_their_standing()
+    {
+        var (knight, bandit, player) = DayWithABanditAndARumour();
+        int standing = player.StandingWith("guard");
+
+        _asked[0].answer.SetResult(Changes(("person:2", -10), ("faction:bandit", -5), ("person:0", -12)));
+        _system.Update();
+
+        Assert.Equal(-90, knight.OpinionOf(bandit));
+        Assert.Equal("because person:2", knight.Opinions.People[2].Why);
+        Assert.Equal(-85, knight.Opinions.OfFaction("bandit"));
+        Assert.Equal(-12, knight.OpinionOf(player));
+        Assert.Equal(standing - 12 / ReflectionSystem.StandingShare, player.StandingWith("guard"));
+    }
+
+    [Fact]
+    public void Changes_about_anyone_not_in_the_day_are_dropped()
+    {
+        var (knight, _, _) = DayWithABanditAndARumour();
+
+        _asked[0].answer.SetResult(Changes(("person:1", 50), ("person:77", -30), ("faction:village", -30), ("nonsense", 5)));
+        _system.Update();
+
+        Assert.Empty(knight.Opinions.People);
+        Assert.Equal(40, knight.Opinions.OfFaction("village"));
+        Assert.Single(knight.Journal.Days);   // the rest of the reflection still lands
+    }
+
+    [Fact]
+    public void Changes_are_capped_lower_for_what_was_only_heard_and_repeats_share_the_cap()
+    {
+        var (knight, bandit, player) = DayWithABanditAndARumour();
+        knight.Opinions.SetFaction("bandit", -20);   // room to move before hitting -100
+
+        _asked[0].answer.SetResult(Changes(("person:2", -30), ("person:2", -30), ("person:0", -40)));
+        _system.Update();
+
+        Assert.Equal(-20 - ReflectionSystem.SeenCap, knight.Opinions.People[2].Score);   // -60 asked, 40 allowed
+        Assert.Equal(-ReflectionSystem.HeardCap, knight.OpinionOf(player));             // only a rumour about him
+    }
+
+    [Fact]
+    public void A_failed_call_changes_no_opinions()
+    {
+        var (knight, _, player) = DayWithABanditAndARumour();
+        int standing = player.StandingWith("guard");
+
+        _asked[0].answer.SetException(new HttpRequestException("down"));
+        _system.Update();
+
+        Assert.Empty(knight.Opinions.People);
+        Assert.Equal(standing, player.StandingWith("guard"));
+        Assert.Equal(2, knight.Journal.Memories.Count);   // the event and the rumour are still there
+    }
 }

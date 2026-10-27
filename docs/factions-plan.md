@@ -1,5 +1,23 @@
 # Factions & Opinions — Plan
 
+> **Status (2026-10-28): built**, steps 1–8. Where it differs from the text below:
+> - Personal opinions are keyed by person id (`int`), not a string, and keep the last `why`
+>   (shown in the chat's attitude line, saved in `opinions.why`).
+> - Grudges cover attacks since the NPC's last reflection (today, or yesterday if that isn't
+>   reflected yet), so there's no gap between midnight and the reflection landing.
+> - Gossip: two NPCs must like each other (≥ +20) both ways; runs every 5 s, within 2 cells;
+>   stops at hop 2. Rumours leave the hot list when their day is reflected, like events.
+> - `join_faction` is offered only when the NPC `Admits` people (knights do, by type) to one of
+>   its own factions that's `joinable` in factions.json, and a player there isn't in it yet.
+> - Join/leave shift other standings by a quarter of the table's view of the faction; ±30 for
+>   the faction itself. Reflection moves standing by a quarter of a change about a player.
+> - Save v3: a v2 save's knights become guards and its player a traveller; opinions and
+>   standings left empty are seeded from the table on load.
+> - The bandit check is a plain Ollama test graded in code (`opinion_changes` are keys), not
+>   a judge test.
+>
+> Not yet tried in the running game.
+
 ## Summary
 
 Who likes whom, as data the brains and the LLM can both read. Any NPC can end up fighting
@@ -32,7 +50,7 @@ people they like, so word gets around a village without everyone witnessing ever
 
 The player can **join factions**, and has a **standing** with every faction, member or not.
 
-**Order:** save system (done) → event log (Part B) → this → combat. Combat posts events and
+**Order:** save system (done) → event log (Part B, done) → **this** → combat. Combat posts events and
 reads opinions to choose targets; it doesn't own any of it.
 
 ---
@@ -45,12 +63,27 @@ reads opinions to choose targets; it doesn't own any of it.
 - **People are known by int id:** players and NPCs share one counter, and ids are saved, so
   they're stable across save and load. Transcripts carry ids and names. Opinions key on the
   same ids.
-- **No event log yet:** `MemoryKind.Event` exists but nothing posts one. Part B builds the log,
-  perception, `Memory.Day` and the staggered day-end reflection call. `MemoryKind`'s comment
-  already expects a `Rumour` kind, which gossip will use.
+- **The event log and reflection are built** (Part B, 2026-10-28). What this plan uses:
+  - **`GameEvent`** (`GameWorld/GameEvent.cs`) carries `ActorId`, `TargetId`, `Type`, `Level`,
+    `Where` and `Day`, so "who did what to whom" can be read in code. Build one with
+    `GameEvent.Of(...)`, then `EventLog.Post` gives it its id and day.
+  - **`EventType`** so far: `EnteredLevel`, `LeftLevel`, `TaskDone`, `TaskFailed`, `Talked`.
+    **Nothing hostile yet:** `Attacked` / `Killed` arrive with combat, and this plan adds
+    `Joined` / `Left` for factions.
+  - **`Perception.WhoKnows(e, roster)`**: the actor, the target, and NPCs within 6 cells in the
+    same level. Gossip adds a second way to find out. The player isn't given memories (no
+    journal).
+  - **`MemoryKind`** is `Conversation`, `Event` and `Reflection`. Gossip adds `Rumour`.
+  - **`ReflectionSystem`** queues NPCs on `DayStarted`, with 2 in flight, and catches up after a
+    load. **`ReflectionRequestDto`** sends the day's events and conversation summaries **as text
+    only**. **`ReflectionDto`** returns `diary` and `facts`. Step 5 adds the people and factions
+    met (with keys) to the request, and `opinion_changes` to the response.
+  - **`NPC.EventsToday`** and `Journal.LastReflectedDay` exist; the chat request has
+    `events_today` and `recent_days`.
+  - Console: `events`, `time +<n>d`, `reflect <npc>`. These are enough to try a day's
+    reflection, and its opinion changes, without waiting.
 - **Starting NPCs** are hard-coded in `NpcRoster.SpawnStartingNpcs`, with no faction field.
-- **Saving is built** (schema v1 has shipped), so everything this adds to a save is a
-  `user_version` migration.
+- **Saving is at schema v2** (Part B's migration), so this plan's save step is **v3**.
 
 ---
 
@@ -176,7 +209,7 @@ on again. That's how a village learns you robbed the miller without anyone else 
 
 **Day end (cold, one LLM call per NPC, staggered):**
 - Reflection gets the day's events and rumours and the NPC's current opinions, and returns:
-  - a summary for the cold store (Part B already plans this);
+  - the diary entry and facts, as Part B already returns;
   - **opinion changes**, e.g. `[{ "about": "person:0", "by": -30, "why": "..." },
     { "about": "faction:bandit", "by": -20, "why": "..." }]`.
 - **The game validates before applying**, the same rule as decisions:
@@ -255,7 +288,9 @@ on again. That's how a village learns you robbed the miller without anyone else 
    - console `opinions`, `opinion`, `standing`.
 3. **Opinions in conversation:** each NPC's attitude to each participant goes in the chat
    request (the Python prompt side too). Covers A3.
-4. **Today's grudges:** reading today's events in code (needs Part B's log and perception).
+4. **Today's grudges:** reading today's events from the `EventLog` in code, by `TargetId` and
+   `Type`. There's no hostile event type until combat, so add a dev command to post one (e.g.
+   `event attack <who> <whom>`) and test grudges with that.
 5. **Reflection writes opinion changes:**
    - the reflection request gets the people and factions from the day's events and rumours,
      with keys;
@@ -268,7 +303,7 @@ on again. That's how a village learns you robbed the miller without anyone else 
    - console `rumours <npc>`.
 7. **Joining factions from the game:** a decision field (`join_faction`) that the game checks
    ("can this NPC let people in?").
-8. **Saving** (a `user_version` migration):
+8. **Saving** (schema v3, a migration like Part B's v2):
    - `npcs.factions` and `players.factions`;
    - an `opinions` table (`owner_id`, `about` (`person:<id>` or `faction:<name>`), `score`);
    - a `standings` table (`player_id`, `faction`, `score`);
@@ -325,7 +360,7 @@ Then combat ([combat-plan.md](combat-plan.md)) uses all of it.
 
 - **Depends on:** the [save system](Completed/save-system-plan.md) (done: ids, and somewhere
   to keep opinions); the event log and reflection
-  ([npc-memory-next-plan.md](npc-memory-next-plan.md) Part B).
+  ([npc-memory-next-plan.md](npc-memory-next-plan.md) Part B, done).
 - **Replaces:** A3 disposition in the NPC plan.
 - **Feeds into:**
   - [combat-plan.md](combat-plan.md): target choice, joining fights, enemies;

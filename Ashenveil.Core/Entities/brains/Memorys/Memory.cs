@@ -6,6 +6,7 @@ namespace Ashenveil.Core.Entities.brains.Memorys
         Conversation,   // a fact learned in conversation; SourceId is the transcript
         Event,          // something seen happen; SourceId is the event (EventLog)
         Reflection,     // a lasting fact from the day-end reflection; no SourceId
+        Rumour,         // an event someone else told them about (Gossip); SourceId is the event
     }
 
     /// <summary>
@@ -23,6 +24,10 @@ namespace Ashenveil.Core.Entities.brains.Memorys
         // GameDate.TotalDays when it was formed: the conversation's day, or the event's.
         // 0 for a memory from before days were kept (an old save's facts with no transcript).
         public int Day { get; set; }
+        // For a Rumour: who told them, and how many tellings from a witness it is (1: told by
+        // someone who saw it). 0 / null for everything else.
+        public int? TellerId { get; set; }
+        public int Hops { get; set; }
 
         public Memory(string text, MemoryKind kind)
         {

@@ -185,7 +185,90 @@ def test_reflection_endpoint_trims_blanks_and_caps_the_facts(monkeypatch):
 
     assert r.status_code == 200
     assert r.json() == {"diary": "I never reached the well.", "facts": ["The well path is blocked", "a"],
-                        "model": main.OLLAMA_MODEL}
+                        "opinion_changes": [], "model": main.OLLAMA_MODEL}
+
+
+# ------------------------------------------------------------- unit: factions
+
+def test_prompt_frames_rumours_as_hearsay_and_lists_attitudes():
+    req = ConversationRequest(participants=[
+        {"name": "Loki", "speaks": False},
+        {"name": "Sir Lancelot",
+         "rumours": ["Marta told you: Loki robbed the miller"],
+         "attitudes": ["Loki: wary (-35) - he robbed the miller"]},
+    ])
+    prompt = build_prompt(req)
+
+    assert "What Sir Lancelot has heard from others today (hearsay" in prompt
+    assert "Marta told you: Loki robbed the miller" in prompt
+    assert "How Sir Lancelot feels about the others here" in prompt
+    assert "Loki: wary (-35)" in prompt
+
+
+def test_reflection_schema_limits_opinion_changes_to_the_keys_sent():
+    schema = main.reflection_schema(["person:0", "faction:bandit"])
+    about = schema["properties"]["opinion_changes"]["items"]["properties"]["about"]
+    assert about["enum"] == ["person:0", "faction:bandit"]
+    # No one to change a mind about: no opinion changes asked for at all.
+    assert "opinion_changes" not in main.reflection_schema([])["properties"]
+
+
+def test_reflection_prompt_lists_who_the_day_was_about_with_keys_and_rumours():
+    req = ReflectionRequest(
+        npc_name="Sir Lancelot",
+        events=["Bandit attacked Sir Lancelot"],
+        rumours=["Marta told you: Loki robbed the miller"],
+        people=[{"key": "person:4", "name": "Bandit", "opinion": -80}],
+        factions=[{"key": "faction:bandit", "name": "bandit", "opinion": -80}],
+    )
+    prompt = build_reflection_prompt(req)
+
+    assert "person:4 (Bandit): -80" in prompt
+    assert "faction:bandit (bandit): -80" in prompt
+    assert "Marta told you: Loki robbed the miller" in prompt
+    assert "`opinion_changes`" in prompt
+
+
+def test_reflection_endpoint_drops_changes_about_keys_it_did_not_send(monkeypatch):
+    async def fake_ollama(system, prompt, schema):
+        return {"diary": "A bad day.", "facts": [], "opinion_changes": [
+            {"about": "person:4", "by": -30, "why": "he attacked me"},
+            {"about": "person:99", "by": -30, "why": "made up"},     # never sent
+            {"about": "faction:bandit", "by": 0, "why": "no change"},  # nothing to do
+            {"about": "faction:bandit"},                               # malformed
+        ]}
+    monkeypatch.setattr(main, "ask_ollama", fake_ollama)
+
+    r = client.post("/reflection", json={
+        "npc_name": "Sir Lancelot",
+        "people": [{"key": "person:4", "name": "Bandit", "opinion": -80}],
+        "factions": [{"key": "faction:bandit", "name": "bandit", "opinion": -80}],
+    })
+
+    assert r.status_code == 200
+    assert r.json()["opinion_changes"] == [{"about": "person:4", "by": -30, "why": "he attacked me"}]
+
+
+def test_decision_offers_join_faction_only_when_the_npc_can_admit():
+    assert "join_faction" not in decision_schema([])["properties"]
+    assert decision_schema([], ["guard"])["properties"]["join_faction"]["enum"] == ["", "guard"]
+
+    prompt = build_decision_prompt(DecisionRequest(npc_name="Sir Lancelot", can_admit=["guard"]))
+    assert "You can swear people into: guard" in prompt
+    assert "swear people" not in build_decision_prompt(DecisionRequest(npc_name="Sir Lancelot"))
+
+
+def test_decision_endpoint_keeps_only_an_offered_faction(monkeypatch):
+    answers = iter([{"summary": "s", "behaviour": "resume", "join_faction": "guard"},
+                    {"summary": "s", "behaviour": "resume", "join_faction": "bandit"},
+                    {"summary": "s", "behaviour": "resume", "join_faction": ""}])
+
+    async def fake_ollama(system, prompt, schema):
+        return next(answers)
+    monkeypatch.setattr(main, "ask_ollama", fake_ollama)
+
+    body = {"npc_name": "Sir Lancelot", "can_admit": ["guard"]}
+    assert [client.post("/decision", json=body).json()["join_faction"] for _ in range(3)] == ["guard", None, None]
 
 
 @needs_ollama
@@ -369,6 +452,38 @@ def test_a_day_of_failed_trips_to_the_well_is_in_the_diary():
     diary = r.json()["diary"]
     verdict = judge.judge(WELL_CONTEXT, WELL_QUESTION, diary, WELL_EXPECTATION)
     assert verdict.passed, f"the diary missed the day: {diary!r} - judge: {verdict.reason}"
+
+
+@needs_ollama
+def test_a_day_robbed_by_bandits_turns_the_knight_against_bandits_not_the_player():
+    """Factions' live check: reflection blames the right people. The answer is in keys, so it's
+    graded in code - no judge needed."""
+    r = client.post("/reflection", json={
+        "npc_name": "Sir Lancelot",
+        "persona": "A noble knight sworn to guard these meadows.",
+        "date": "Spring 3, Year 1",
+        "events": [
+            "Grim the bandit attacked Sir Lancelot",
+            "Grim the bandit stole Sir Lancelot's purse",
+            "Loki talked with Sir Lancelot",
+        ],
+        "conversations": ["Loki, a traveller, asked for directions to the well and thanked me."],
+        "people": [
+            {"key": "person:5", "name": "Grim", "opinion": -80},
+            {"key": "person:0", "name": "Loki", "opinion": 0},
+        ],
+        "factions": [
+            {"key": "faction:bandit", "name": "bandit", "opinion": -80},
+            {"key": "faction:traveller", "name": "traveller", "opinion": 0},
+        ],
+    })
+    assert r.status_code == 200
+    changes = {c["about"]: c["by"] for c in r.json()["opinion_changes"]}
+
+    assert changes.get("faction:bandit", 0) < 0 or changes.get("person:5", 0) < 0, \
+        f"no grudge against the bandits: {changes}"
+    assert changes.get("person:0", 0) >= 0, f"blamed the traveller: {changes}"
+    assert changes.get("faction:traveller", 0) >= 0, f"blamed travellers: {changes}"
 
 
 # ------------------------------------------------------------- judge: is the grader sound?
