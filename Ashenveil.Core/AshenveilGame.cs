@@ -146,6 +146,7 @@ namespace Ashenveil.Core
                 () => _screenManager.Pop(),   // Resume
                 SaveFromPause,                // Save
                 LoadFromPause,                // Load
+                MenuFromPause,                // Main Menu
                 QuitFromPause,                // Quit to Desktop
                 w, h);
             // Opened from the main menu's Continue and the pause menu's Save and Load.
@@ -250,6 +251,15 @@ namespace Ashenveil.Core
         private void Continue() => OpenSlots(SaveSlotsScreen.Purpose.Load);
         private void LoadFromPause() => OpenSlots(SaveSlotsScreen.Purpose.Load);
 
+        private void MenuFromPause()
+        {
+            if (!world.HasUnsavedPlay) BackToMenu();
+            else Confirm("You've played since you last saved. Leave without saving?", "Leave", BackToMenu);
+        }
+        private void BackToMenu()
+        {
+            while (_screenManager.Current != null && _screenManager.Current != _menu) _screenManager.Pop();
+        }
         // The pause menu's Save. Checked before the list opens, so the player is never shown
         // saves they can't save over.
         private void SaveFromPause()

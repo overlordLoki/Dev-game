@@ -17,7 +17,7 @@ namespace Ashenveil.Core.Screens
 
         /// <param name="onSave">The only way to save: there's no autosave and no save on quit.</param>
         /// <param name="onLoad">Throws this game away for the saved one (asking first if there's unsaved play).</param>
-        public Pause(SpriteFont font, Action onResume, Action onSave, Action onLoad, Action onQuit, int screenWidth, int screenHeight)
+        public Pause(SpriteFont font, Action onResume, Action onSave, Action onLoad,Action onMenu, Action onQuit, int screenWidth, int screenHeight)
         {
             this.font = font;
 
@@ -27,12 +27,14 @@ namespace Ashenveil.Core.Screens
             var resumeRect  = new Rectangle(centreX, screenHeight / 2 - btnH * 2 - gap * 3 / 2, btnW, btnH);
             var saveRect    = new Rectangle(centreX, resumeRect.Bottom + gap, btnW, btnH);
             var loadRect    = new Rectangle(centreX, saveRect.Bottom + gap, btnW, btnH);
-            var quitRect    = new Rectangle(centreX, loadRect.Bottom + gap, btnW, btnH);
+            var menuRect    = new Rectangle(centreX, loadRect.Bottom + gap, btnW, btnH);
+            var quitRect    = new Rectangle(centreX, menuRect.Bottom + gap, btnW, btnH);
             var messageRect = new Rectangle(0, quitRect.Bottom + gap, screenWidth, btnH);
 
             widgets.Add(new Button(resumeRect, "Resume", "button_brown", onResume));
             widgets.Add(new Button(saveRect,   "Save", "button_brown", onSave));
             widgets.Add(new Button(loadRect,   "Load", "button_brown", onLoad));
+            widgets.Add(new Button(menuRect,   "Main Menu", "button_brown", onMenu));
             widgets.Add(new Button(quitRect,   "Quit to Desktop", "button_brown", onQuit));
             _message = new Label(messageRect, "", Color.White);
             widgets.Add(_message);
