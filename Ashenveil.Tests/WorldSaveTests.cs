@@ -2,6 +2,7 @@ using System.Text.Json;
 using Ashenveil.Core;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.GameWorld.Locations;
@@ -26,6 +27,10 @@ public class WorldSaveTests : IDisposable
 
     private static Task<ChatMessage[]> NoReply(ConversationRequestDto _) => Task.FromResult(Array.Empty<ChatMessage>());
 
+    // Every day-end reflection: a diary entry and one fact.
+    private static Task<ReflectionDto> Reflection(ReflectionRequestDto req) =>
+        Task.FromResult(new ReflectionDto { diary = $"On {req.date} I met Loki.", facts = new[] { "Loki is friendly." } });
+
     public WorldSaveTests()
     {
         NullContentManager.Install();
@@ -37,12 +42,12 @@ public class WorldSaveTests : IDisposable
     // A new game in Medows, as the game starts one.
     private static World NewGame()
     {
-        var world = new World(new Location("Medows"), NoReply, Decision);
+        var world = new World(new Location("Medows"), NoReply, Decision, Reflection);
         world.Init();
         return world;
     }
 
-    private static World Load(SaveData save) => World.FromSave(save, NoReply, Decision);
+    private static World Load(SaveData save) => World.FromSave(save, NoReply, Decision, Reflection);
 
     private static NPC Knight(World world) => Assert.IsType<Knight>(Assert.Single(world.Roster.All));
 
@@ -116,8 +121,44 @@ public class WorldSaveTests : IDisposable
         var loaded = Load(SaveMapper.ToSave(world, SavedAt));
         var knight = Knight(loaded);
 
-        Assert.Equal("The traveller's name is Loki.", Assert.Single(knight.Journal.Memories).Text);
+        Assert.Equal("The traveller's name is Loki.", Assert.Single(knight.Journal.Recent(10)).Text);
         Assert.Equal("Today, at Medows: Met Loki.", Assert.Single(knight.PastConversationsWith(loaded.player.Id, 5, loaded.Clock.TotalDays)));
+    }
+
+    [Fact]
+    public void Events_memory_days_the_diary_and_the_last_reflected_day_come_back()
+    {
+        var world = NewGame();
+        TalkToTheKnight(world);                       // day 1: a Talked event and a fact
+        world.Clock.SkipDays(1);                      // day 2 starts: day 1 is queued...
+        Step(world);                                  // ...asked for...
+        Step(world);                                  // ...and written up
+        Step(world, 1.0);                             // the knight walks on, on day 2
+        var knight = Knight(world);
+        Assert.Single(knight.Journal.Days);           // the reflection did land before saving
+
+        var loaded = Load(SaveMapper.ToSave(world, SavedAt));
+        var back = Knight(loaded);
+
+        Assert.Equal(world.Events.All, loaded.Events.All);
+        Assert.Equal(world.Events.PeekNextId, loaded.Events.PeekNextId);
+        Assert.Equal(knight.Journal.Memories.Select(m => (m.Text, m.Kind, m.Day, m.SourceId)),
+                     back.Journal.Memories.Select(m => (m.Text, m.Kind, m.Day, m.SourceId)));
+        Assert.Equal(new[] { new DayEntry(1, "On Spring 1, Year 1 I met Loki.") }, back.Journal.Days);
+        Assert.Equal(1, back.Journal.LastReflectedDay);
+    }
+
+    [Fact]
+    public void A_new_event_after_loading_does_not_reuse_a_saved_id()
+    {
+        var world = NewGame();
+        TalkToTheKnight(world);
+        var save = SaveMapper.ToSave(world, SavedAt);
+
+        var loaded = Load(save);
+        TalkToTheKnight(loaded);
+
+        Assert.Equal(save.NextEventId, loaded.Events.All.Last().Id);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Collision;
 using Ashenveil.Core.Entities;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.GameWorld.Locations;
 using Microsoft.Xna.Framework;
@@ -11,7 +12,7 @@ namespace Ashenveil.Core.DevConsole
 {
     /// <summary>
     /// The console commands that look at or change the game: where the player is, moving them,
-    /// listing NPCs, reading an NPC's memory. Each is given the World, not the game or a screen,
+    /// listing NPCs, reading an NPC's memory, the event log and the clock. Each is given the World, not the game or a screen,
     /// so they can be tested against a World built from a test level.
     /// </summary>
     public static class WorldCommands
@@ -36,6 +37,71 @@ namespace Ashenveil.Core.DevConsole
                 args => Journal(world(), args[0]), minArgs: 1, maxArgs: 1);
             commands.Register("nav", "", "Shows or hides the blocked cells (red) and each NPC's path (yellow).",
                 _ => ToggleNav());
+            commands.Register("events", "[n]", "Lists the last n events (default 10), with their ids.",
+                args => Events(world(), args.Length == 0 ? null : args[0]), minArgs: 0, maxArgs: 1);
+            commands.Register("time", "[+<n>d|+<n>h]", "Shows the date and time; +2d skips to the start of the day after next, +3h moves on 3 hours.",
+                args => Time(world(), args.Length == 0 ? null : args[0]), minArgs: 0, maxArgs: 1);
+            commands.Register("reflect", "<npc>", "Has an NPC reflect on today now, without waiting for midnight.",
+                args => Reflect(world(), args[0]), minArgs: 1, maxArgs: 1);
+        }
+
+        private const int DefaultEventCount = 10;
+
+        private static IEnumerable<string> Events(World world, string count)
+        {
+            int n = DefaultEventCount;
+            if (count != null && (!int.TryParse(count, out n) || n < 1))
+                throw new CommandException("[n] must be a whole number, 1 or more.");
+
+            if (world.Events.All.Count == 0) { yield return "Nothing has happened yet."; yield break; }
+            foreach (var e in world.Events.Recent(n))
+                yield return Describe(e);
+        }
+
+        /// <summary>One event as a console line: "#3 day 2, Medows: Sir Lancelot reached the entry".</summary>
+        public static string Describe(GameEvent e) =>
+            $"#{e.Id} day {e.Day}{(e.Level != null ? $", {e.Level}" : "")}: {e.Text}";
+
+        private static IEnumerable<string> Time(World world, string skip)
+        {
+            var clock = world.Clock;
+            if (skip != null)
+            {
+                var culture = System.Globalization.CultureInfo.InvariantCulture;
+                string amount = skip.Length > 2 ? skip[1..^1] : "";
+                char unit = char.ToLowerInvariant(skip[^1]);
+                if (!skip.StartsWith('+') || (unit != 'd' && unit != 'h'))
+                    throw new CommandException("Skip forward with +<n>d (days) or +<n>h (hours), like +1d or +6h.");
+
+                if (unit == 'd')
+                {
+                    if (!int.TryParse(amount, System.Globalization.NumberStyles.None, culture, out int days) || days < 1)
+                        throw new CommandException("Days must be a whole number, 1 or more: +1d.");
+                    clock.SkipDays(days);
+                }
+                else
+                {
+                    if (!float.TryParse(amount, System.Globalization.NumberStyles.Float, culture, out float hours) || hours <= 0)
+                        throw new CommandException("Hours must be a number above 0: +6h or +0.5h.");
+                    clock.SkipHours(hours);
+                }
+            }
+
+            // Rounded, so 6.5 hours that comes out as 6.4999995 still reads 06:30.
+            int minutes = Math.Min(24 * 60 - 1, (int)MathF.Round(clock.HourOfDay * 60));
+            yield return $"{clock.DateDisplay} (day {clock.TotalDays}), {minutes / 60:00}:{minutes % 60:00}";
+        }
+
+        private static IEnumerable<string> Reflect(World world, string who)
+        {
+            var npc = FindNpc(world, who);
+            int today = world.Clock.TotalDays;
+            if (!npc.Journal.HasAnythingOn(today))
+                throw new CommandException($"Nothing has happened to {npc.Name} today, so there's nothing to reflect on.");
+
+            yield return world.Reflections.Queue(npc, today)
+                ? $"{npc.Name} will reflect on today once the game is running again. See 'journal {npc.Id}' after."
+                : $"{npc.Name} is already reflecting on today.";
         }
 
         private static IEnumerable<string> ToggleNav()
@@ -113,14 +179,26 @@ namespace Ashenveil.Core.DevConsole
             var npc = FindNpc(world, who);
             var journal = npc.Journal;
 
-            yield return $"{npc.Name} (#{npc.Id}) remembers {journal.Memories.Count} fact(s):";
-            foreach (var m in journal.Memories)
-                yield return $"  - {m.Text}" + (m.SourceId is int id ? $"  (conversation #{id})" : $"  ({m.Kind})");
+            var facts = journal.Memories.Where(m => m.Kind != MemoryKind.Event).ToList();
+            var events = journal.Memories.Where(m => m.Kind == MemoryKind.Event).ToList();
 
-            yield return $"...and {journal.Transcripts.Count} conversation(s):";
+            yield return $"{npc.Name} (#{npc.Id}) remembers {facts.Count} fact(s):";
+            foreach (var m in facts)
+                yield return $"  - {m.Text}  (day {m.Day}, " + (m.SourceId is int id ? $"conversation #{id})" : $"{m.Kind})");
+
+            yield return $"...{events.Count} event(s) not yet reflected on:";
+            foreach (var m in events)
+                yield return $"  - day {m.Day}: {m.Text}" + (m.SourceId is int id ? $"  (event #{id})" : "");
+
+            yield return $"...{journal.Transcripts.Count} conversation(s):";
             foreach (var t in journal.Transcripts)
                 yield return $"  #{t.Id} day {t.Day}{(t.Location != null ? $" at {t.Location}" : "")}"
                            + $" with {string.Join(", ", t.Participants.Select(p => p.Name))}: {t.Summary ?? "(no summary yet)"}";
+
+            yield return $"...and {journal.Days.Count} diary entr{(journal.Days.Count == 1 ? "y" : "ies")}"
+                       + $" (last reflected on day {journal.LastReflectedDay}):";
+            foreach (var d in journal.Days)
+                yield return $"  day {d.Day}: {d.Summary}";
         }
 
         /// <summary>

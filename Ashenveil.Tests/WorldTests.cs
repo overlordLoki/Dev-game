@@ -44,7 +44,8 @@ public class WorldTests : IDisposable
     {
         var world = new World(TestLevels.Location(Level),
             sendChat: _ => Task.FromResult(Array.Empty<ChatMessage>()),
-            requestDecision: req => { _decisionsAsked.Add(req); return Task.FromResult(_decisionReply); });
+            requestDecision: req => { _decisionsAsked.Add(req); return Task.FromResult(_decisionReply); },
+            requestReflection: _ => Task.FromResult<ReflectionDto>(null!));
         world.Init();
         return world;
     }
@@ -272,8 +273,9 @@ public class WorldTests : IDisposable
         Assert.Contains("Traveller: My name is Loki.", Assert.Single(_decisionsAsked).transcript);
         // ...and its answer landed: a summary on the transcript, a fact pointing back to it.
         Assert.Equal("Met Loki.", transcript.Summary);
-        var fact = Assert.Single(brain.Journal.Memories);
+        var fact = Assert.Single(brain.Journal.Recent(10));
         Assert.Equal("The traveller's name is Loki.", fact.Text);
         Assert.Equal(transcript.Id, fact.SourceId);
+        Assert.Equal(transcript.Day, fact.Day);
     }
 }

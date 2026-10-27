@@ -1,5 +1,6 @@
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.GameWorld;
 
 namespace Ashenveil.Tests;
@@ -100,6 +101,36 @@ public class ConversationSystemTests
 
         var npcInPrompt = Assert.Single(_chatsSent).participants.Single(p => p.name == "Test");
         Assert.Contains("The traveller's name is Loki.", npcInPrompt.memories);
+    }
+
+    [Fact]
+    public void Todays_events_are_sent_apart_from_facts_and_other_days_events_are_not()
+    {
+        _brain.Journal.Add(new Memory("The traveller's name is Loki.", MemoryKind.Conversation) { Day = 1 });
+        _brain.Journal.Add(new Memory("Yesterday's trip", MemoryKind.Event) { Day = Today - 1 });
+        for (int i = 1; i <= 10; i++)
+            _brain.Journal.Add(new Memory($"Seen {i}", MemoryKind.Event) { Day = Today });
+
+        var convo = StartWithPlayer();
+        convo.Say(Player.DefaultName, "What happened today?");
+
+        var npcInPrompt = Assert.Single(_chatsSent).participants.Single(p => p.name == "Test");
+        // A busy day doesn't push the name out of the facts...
+        Assert.Equal(new[] { "The traveller's name is Loki." }, npcInPrompt.memories);
+        // ...and only today's events go in, the last 8 of them.
+        Assert.Equal(Enumerable.Range(3, 8).Select(i => $"Seen {i}"), npcInPrompt.events_today);
+    }
+
+    [Fact]
+    public void The_last_three_diary_entries_are_recalled()
+    {
+        for (int day = 1; day < Today; day++) _brain.Journal.Add(new DayEntry(day, $"Day {day}."));
+
+        var convo = StartWithPlayer();
+        convo.Say(Player.DefaultName, "How have you been?");
+
+        var npcInPrompt = Assert.Single(_chatsSent).participants.Single(p => p.name == "Test");
+        Assert.Equal(new[] { "3 days ago: Day 2.", "2 days ago: Day 3.", "Yesterday: Day 4." }, npcInPrompt.recent_days);
     }
 
     // ------------------------------------------------------------------ 2. finish

@@ -36,6 +36,11 @@ class Participant(BaseModel):
     # One-line recaps of earlier conversations with the others present, oldest first
     # ("2 days ago, at Medows: ..."). The cold tier of memory, summarised.
     past_conversations: list[str] = []
+    # What they saw happen today, oldest first ("Sir Lancelot couldn't reach the well"). Kept
+    # apart from memories so a busy day can't push out the facts.
+    events_today: list[str] = []
+    # Their diary for the last few days, oldest first ("Yesterday: I waited at the castle door").
+    recent_days: list[str] = []
 
 
 class ConversationRequest(BaseModel):
@@ -99,6 +104,12 @@ def build_prompt(req: ConversationRequest) -> str:
         if p.past_conversations:
             parts.append(f"Earlier conversations {p.name} had with them:")
             parts.extend(f"  - {c}" for c in p.past_conversations)
+        if p.recent_days:
+            parts.append(f"{p.name}'s last few days, in their own words:")
+            parts.extend(f"  - {d}" for d in p.recent_days)
+        if p.events_today:
+            parts.append(f"Earlier today {p.name} saw:")
+            parts.extend(f"  - {e}" for e in p.events_today)
 
     if req.topic:
         parts.append(f"Topic: {req.topic}")
@@ -137,6 +148,35 @@ def turns_schema(speaker_names: list[str]) -> dict:
     }
 
 
+async def ask_ollama(system: str, prompt: str, schema: dict) -> dict:
+    """One chat call held to `schema`, parsed. Raises the HTTP error the game should see:
+    503 if Ollama can't be reached, 502 if it answered with an error or with unusable JSON."""
+    body = {
+        "model": OLLAMA_MODEL,
+        "stream": False,
+        "think": False,
+        "format": schema,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            res = await client.post(f"{OLLAMA_URL}/api/chat", json=body)
+            res.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise fastapi.HTTPException(502, f"Ollama error: {e.response.text}")
+    except httpx.HTTPError as e:
+        raise fastapi.HTTPException(503, f"Ollama not reachable at {OLLAMA_URL}: {e}")
+
+    try:
+        return json.loads(res.json()["message"]["content"])
+    except (KeyError, ValueError, TypeError) as e:
+        raise fastapi.HTTPException(502, f"Ollama returned something unusable: {e}")
+
+
 # ----------------------------------------------------------------- endpoints
 
 @app.get("/")
@@ -164,28 +204,8 @@ async def conversation(req: ConversationRequest):
     if not speakers:
         raise fastapi.HTTPException(422, "At least one participant must have speaks=true")
 
-    body = {
-        "model": OLLAMA_MODEL,
-        "stream": False,
-        "think": False,
-        "format": turns_schema(speakers),
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_prompt(req)},
-        ],
-    }
-
+    raw = await ask_ollama(SYSTEM_PROMPT, build_prompt(req), turns_schema(speakers))
     try:
-        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-            res = await client.post(f"{OLLAMA_URL}/api/chat", json=body)
-            res.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        raise fastapi.HTTPException(502, f"Ollama error: {e.response.text}")
-    except httpx.HTTPError as e:
-        raise fastapi.HTTPException(503, f"Ollama not reachable at {OLLAMA_URL}: {e}")
-
-    try:
-        raw = json.loads(res.json()["message"]["content"])
         turns = [Turn(**t) for t in raw["turns"]]
     except (KeyError, ValueError, TypeError) as e:
         raise fastapi.HTTPException(502, f"Ollama returned something unusable: {e}")
@@ -313,30 +333,7 @@ def build_decision_prompt(req: DecisionRequest) -> str:
 
 @app.post("/decision", response_model=DecisionResponse)
 async def decision(req: DecisionRequest):
-    body = {
-        "model": OLLAMA_MODEL,
-        "stream": False,
-        "think": False,
-        "format": decision_schema(req.poi_names),
-        "messages": [
-            {"role": "system", "content": DECISION_SYSTEM_PROMPT},
-            {"role": "user", "content": build_decision_prompt(req)},
-        ],
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-            res = await client.post(f"{OLLAMA_URL}/api/chat", json=body)
-            res.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        raise fastapi.HTTPException(502, f"Ollama error: {e.response.text}")
-    except httpx.HTTPError as e:
-        raise fastapi.HTTPException(503, f"Ollama not reachable at {OLLAMA_URL}: {e}")
-
-    try:
-        raw = json.loads(res.json()["message"]["content"])
-    except (KeyError, ValueError, TypeError) as e:
-        raise fastapi.HTTPException(502, f"Ollama returned something unusable: {e}")
+    raw = await ask_ollama(DECISION_SYSTEM_PROMPT, build_decision_prompt(req), decision_schema(req.poi_names))
 
     # The schema guarantees the shape; we still trim to the caps the game asked for and
     # drop blank memories (the game does this too, but cheap to do here as well).
@@ -350,6 +347,86 @@ async def decision(req: DecisionRequest):
         tasks=tasks,
         model=OLLAMA_MODEL,
     )
+
+
+# ------------------------------------------------------------- day-end reflection
+# Produced once per NPC per day, when the day turns over: the NPC looks back on what it saw
+# and who it talked to. Mirrors Ashenveil's ReflectionRequestDto / ReflectionDto.
+
+class ReflectionRequest(BaseModel):
+    npc_name: str
+    persona: str | None = None
+    # The day being looked back on, as the game shows it ("Spring 3, Year 1").
+    date: str | None = None
+    # What the NPC saw happen that day, oldest first, written neutrally
+    # ("Sir Lancelot couldn't reach the well").
+    events: list[str] = []
+    # One-line summaries of that day's conversations.
+    conversations: list[str] = []
+    max_facts: int = Field(default=3, ge=0, le=5)
+
+
+class ReflectionResponse(BaseModel):
+    # Drops straight into ReflectionDto (the game ignores the extra `model` field).
+    diary: str
+    facts: list[str] = []
+    model: str
+
+
+REFLECTION_SYSTEM_PROMPT = (
+    "You are the mind of an NPC in Ashenveil, a top-down fantasy RPG, at the end of a day. "
+    "Look back on the day in character and write it up. Stick to what actually happened: "
+    "never invent events, people or places you were not told about."
+)
+
+
+def reflection_schema() -> dict:
+    """JSON schema Ollama is held to."""
+    return {
+        "type": "object",
+        "properties": {
+            "diary": {"type": "string"},
+            "facts": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["diary", "facts"],
+    }
+
+
+def build_reflection_prompt(req: ReflectionRequest) -> str:
+    parts = [f"You are {req.npc_name}."]
+    if req.persona:
+        parts.append(req.persona)
+    if req.date:
+        parts.append(f"The day: {req.date}")
+
+    parts.append("\nWhat you saw happen, in order:")
+    if req.events:
+        parts.extend(f"  - {e}" for e in req.events)
+    else:
+        parts.append("  (nothing of note)")
+    if req.conversations:
+        parts.append("Conversations you had:")
+        parts.extend(f"  - {c}" for c in req.conversations)
+
+    parts.append(
+        "\nWrite `diary`: your diary entry for the day, in the first person, 1 to 3 sentences, "
+        "in your own voice. The events above are written about you by name; in the diary they "
+        "are things you did or saw (\"I\", not your own name). "
+        f"Then give up to {req.max_facts} `facts`: short standalone statements worth remembering "
+        "for days to come - what you learned about the world or the people in it (for example "
+        '"The path to the well is blocked"). Leave out anything that only mattered today, and '
+        "give none if nothing lasting happened."
+    )
+    return "\n".join(parts)
+
+
+@app.post("/reflection", response_model=ReflectionResponse)
+async def reflection(req: ReflectionRequest):
+    raw = await ask_ollama(REFLECTION_SYSTEM_PROMPT, build_reflection_prompt(req), reflection_schema())
+
+    # As with decisions: trim to the cap the game asked for and drop blank facts.
+    facts = [f.strip() for f in raw.get("facts", []) if isinstance(f, str) and f.strip()][: req.max_facts]
+    return ReflectionResponse(diary=str(raw.get("diary", "")).strip(), facts=facts, model=OLLAMA_MODEL)
 
 
 if __name__ == "__main__":

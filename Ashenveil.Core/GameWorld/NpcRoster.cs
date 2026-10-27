@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Entities;
@@ -50,11 +51,18 @@ namespace Ashenveil.Core.GameWorld
         /// <summary>The NPCs in this level (none yet if it's never been visited).</summary>
         public IReadOnlyList<NPC> In(string levelName) => ListFor(levelName);
 
-        /// <summary>Puts an NPC in a level, and tells the NPC which level it's in.</summary>
+        /// <summary>
+        /// Where NPCs post what happens to them (EventLog.Post). Set by the World; every NPC
+        /// added from then on is wired to it. Null: they post nothing.
+        /// </summary>
+        public Action<GameEvent> PostEvent { get; set; }
+
+        /// <summary>Puts an NPC in a level, tells the NPC which level it's in, and where to post events.</summary>
         public void Add(Location level, NPC npc)
         {
             ListFor(level.Name).Add(npc);
             npc.Location = level;
+            npc.PostEvent = PostEvent;
         }
 
         /// <summary>Every NPC in every level.</summary>

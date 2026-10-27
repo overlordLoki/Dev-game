@@ -19,6 +19,8 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
         public bool speaks { get; set; } = true;
         public List<string> memories { get; set; } = new();  // what they remember from before
         public List<string> past_conversations { get; set; } = new();  // one-line recaps of earlier chats
+        public List<string> events_today { get; set; } = new();  // what they saw happen today, oldest first
+        public List<string> recent_days { get; set; } = new();   // diary entries for the last few days, oldest first
     }
     public class ConversationRequestDto
     {
@@ -107,6 +109,15 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
             var res = await _http.PostAsJsonAsync(BaseUrl + "/decision", req);
             res.EnsureSuccessStatusCode();
             return await res.Content.ReadFromJsonAsync<NpcDecisionDto>();
+        }
+
+        // Asked for once per NPC per day, at day end: a diary entry and lasting facts.
+        // Null on a 200 with an empty body; ApplyReflection treats null as "nothing changed".
+        public static async Task<ReflectionDto> RequestReflectionAsync(ReflectionRequestDto req)
+        {
+            var res = await _http.PostAsJsonAsync(BaseUrl + "/reflection", req);
+            res.EnsureSuccessStatusCode();
+            return await res.Content.ReadFromJsonAsync<ReflectionDto>();
         }
 
         /// <summary>How long a health check waits. /health itself gives Ollama 5 seconds.</summary>

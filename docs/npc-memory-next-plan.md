@@ -119,6 +119,17 @@ summary. Only matters once NPCs chat in groups.
 
 ## Part B — Event log & daily reflection
 
+> **Status (2026-10-28): built**, steps 1–7, with these small departures from the text below:
+> - `GameEvent` has an optional `TranscriptId` (and `events` a `transcript_id` column), so a
+>   `Talked` event really does point at its transcript.
+> - Reflected facts are `MemoryKind.Reflection` (a fact like any other, but traceable).
+> - `day_entries` is keyed `(npc_id, seq)`, not by day: `reflect` can write a second entry for a day.
+> - The chat request also gains `recent_days` (the diary recall), next to `events_today`.
+> - `memories.event_id` has no `REFERENCES`, like `transcript_id`, so one bad pointer can't fail a save.
+> - New saves are created at v1 and migrated, so there's one path to every version.
+>
+> The judge tests (`pytest -m judge`, 12 including Part B's 6) all pass, run from a terminal.
+
 **Goal:** NPCs learn from the world, not just from conversations. Something happens, the NPCs
 who were there remember it **that day** (hot), and at the end of the day each one **reflects**
 on its day with one LLM call (cold). Factions and combat plug into both ends later.

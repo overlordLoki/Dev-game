@@ -1,5 +1,8 @@
 using System.Text.Json;
+using Ashenveil.Core.Entities.brains.Dialogue;
+using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Saving;
+using Microsoft.Xna.Framework;
 using Microsoft.Data.Sqlite;
 
 namespace Ashenveil.Tests;
@@ -18,6 +21,7 @@ public class SaveStoreTests : IDisposable
 
     public void Dispose()
     {
+        Ashenveil.Core.AshenveilGame.Input = new Ashenveil.Core.Utility.Input.LiveInput();
         if (Directory.Exists(_folder)) Directory.Delete(_folder, recursive: true);
     }
 
@@ -29,6 +33,7 @@ public class SaveStoreTests : IDisposable
         SecondsIntoDay = 123.25f,
         NextPersonId = 3,
         NextTranscriptId = 3,
+        NextEventId = 3,
         Players = { new PlayerSave { Id = 0, Name = "Loki", Level = "Medows", X = 2.5f, Y = 2.9f } },
         PopulatedLevels = { "Castle", "Medows" },
         Transcripts =
@@ -53,10 +58,13 @@ public class SaveStoreTests : IDisposable
                 Id = 1, Type = "Knight", Name = "Sir O'Brien", Level = "Medows", X = 1.5f, Y = 3.9f,
                 Memories =
                 {
-                    new MemorySave { Text = "The traveller's name is Loki.", Kind = "Conversation", TranscriptId = 1 },
-                    new MemorySave { Text = "Saw wolves by the well.", Kind = "Event", TranscriptId = null },
+                    new MemorySave { Text = "The traveller's name is Loki.", Kind = "Conversation", TranscriptId = 1, Day = 10 },
+                    new MemorySave { Text = "Saw wolves by the well.", Kind = "Event", EventId = 2, Day = 12 },
+                    new MemorySave { Text = "The well path is blocked.", Kind = "Reflection", Day = 11 },
                 },
                 TranscriptIds = { 1, 2 },
+                DayEntries = { new DayEntrySave { Day = 10, Summary = "I met Loki." }, new DayEntrySave { Day = 11, Summary = "Quiet." } },
+                LastReflectedDay = 11,
                 Tasks =
                 {
                     new TaskSave { Type = "go_to", X = 3.5f, Y = 1.9f },
@@ -65,6 +73,11 @@ public class SaveStoreTests : IDisposable
                 },
             },
             new NpcSave { Id = 2, Type = "Knight", Name = "Sir Kay", Level = "Castle", X = 4.5f, Y = 4.9f, TranscriptIds = { 1 } },
+        },
+        Events =
+        {
+            new EventSave { Id = 1, Day = 10, Level = "Medows", X = 2.5f, Y = 2.9f, Type = "Talked", ActorId = 0, TargetId = 1, TranscriptId = 1, Text = "Traveller talked with Sir O'Brien" },
+            new EventSave { Id = 2, Day = 12, Level = null, X = 0, Y = 0, Type = "TaskFailed", Text = "Wolves by the well" },
         },
     };
 
@@ -217,6 +230,8 @@ public class SaveStoreTests : IDisposable
         AssertSame(second, Load());
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM tasks"));
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM transcript_lines"));
+        Assert.Equal(0, Scalar("SELECT COUNT(*) FROM events"));
+        Assert.Equal(0, Scalar("SELECT COUNT(*) FROM day_entries"));
     }
 
     [Fact]
@@ -278,6 +293,63 @@ public class SaveStoreTests : IDisposable
     }
 
     // ------------------------------------------------------------------ versions
+
+    // A version 1 save as a version 1 game wrote it: one knight who met Loki on day 10, and an
+    // event memory from before events had ids.
+    private void WriteVersion1Save() => Sql(SaveStore.Version1Schema + """
+        PRAGMA user_version = 1;
+        INSERT INTO game VALUES (1, '2026-10-27T09:30:15.0000000Z', 12, 123.25, 2, 2);
+        INSERT INTO players VALUES (0, 'Loki', 'Medows', 2.5, 2.9);
+        INSERT INTO populated_levels VALUES ('Medows');
+        INSERT INTO npcs VALUES (1, 'Knight', 'Sir Lancelot', 'Medows', 3.5, 7.9);
+        INSERT INTO transcripts VALUES (1, 10, 'Medows', 'Met Loki.');
+        INSERT INTO transcript_participants VALUES (1, 0, 0, 'Loki'), (1, 1, 1, 'Sir Lancelot');
+        INSERT INTO transcript_lines VALUES (1, 0, 'Loki: my name is Loki');
+        INSERT INTO journal_transcripts VALUES (1, 1);
+        INSERT INTO memories VALUES (1, 0, 'The traveller''s name is Loki.', 'Conversation', 1),
+                                    (1, 1, 'An old note.', 'Event', NULL);
+        INSERT INTO tasks VALUES (1, 0, 'wait', NULL, NULL, 2.0);
+        """);
+
+    [Fact]
+    public void A_version_1_save_is_upgraded_as_it_is_opened()
+    {
+        WriteVersion1Save();
+
+        var save = Load();
+
+        Assert.Equal(SaveStore.SchemaVersion, Scalar("PRAGMA user_version"));
+        Assert.Equal(1, save.NextEventId);
+        Assert.Empty(save.Events);
+        var knight = Assert.Single(save.Npcs);
+        Assert.Equal(0, knight.LastReflectedDay);
+        Assert.Empty(knight.DayEntries);
+        // A fact from a conversation takes its transcript's day; anything else has none.
+        Assert.Equal(new[] { (10, (int?)1, (int?)null), (0, null, null) },
+                     knight.Memories.Select(m => (m.Day, m.TranscriptId, m.EventId)));
+    }
+
+    [Fact]
+    public void A_version_1_save_plays_reflects_on_the_days_it_missed_and_saves_as_version_2()
+    {
+        WriteVersion1Save();
+        NullContentManager.Install();
+        Ashenveil.Core.AshenveilGame.Input = new FakeInput();
+        var asked = new List<ReflectionRequestDto>();
+        var world = World.FromSave(Load(),
+            sendChat: _ => Task.FromResult(Array.Empty<ChatMessage>()),
+            requestDecision: _ => Task.FromResult<NpcDecisionDto>(null!),
+            requestReflection: req => { asked.Add(req); return Task.FromResult(new ReflectionDto { diary = "I met Loki.", facts = Array.Empty<string>() }); });
+
+        for (int i = 0; i < 3; i++) world.Update(new GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1 / 60.0)));
+        _store.Save(SaveMapper.ToSave(world, DateTime.UtcNow));
+
+        // Day 10 had a conversation and was never reflected on (version 1 couldn't): caught up.
+        Assert.Equal(new[] { "Spring 10, Year 1" }, asked.Select(r => r.date));
+        var knight = Assert.Single(Load().Npcs);
+        Assert.Equal((10, "I met Loki."), (knight.DayEntries.Single().Day, knight.DayEntries.Single().Summary));
+        Assert.Equal(10, knight.LastReflectedDay);
+    }
 
     [Fact]
     public void A_save_from_a_newer_game_is_refused_and_never_overwritten()

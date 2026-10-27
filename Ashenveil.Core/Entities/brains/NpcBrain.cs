@@ -6,6 +6,7 @@ using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.Entities.brains.Task;
 using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
+using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.GameWorld.Locations;
 
 namespace Ashenveil.Core.Entities
@@ -118,11 +119,28 @@ namespace Ashenveil.Core.Entities
                 Blackboard = _blackboard,
                 DeltaTime = dt,
                 Nav = Npc.Location?.Nav,
+                Post = Npc.PostEvent,
             });
 
-            // A failed task is dropped the same way, so the NPC moves on to the next one.
-            // TODO: remember failures ("couldn't reach the well") once there's an event log.
-            if (task.State is TaskState.Completed or TaskState.Failed) TaskQueue.Dequeue();
+            // A failed task is dropped the same way, so the NPC moves on to the next one. Either
+            // way the world hears about it - but only for trips: a wait is never news.
+            if (task.State is TaskState.Completed or TaskState.Failed)
+            {
+                TaskQueue.Dequeue();
+                if (task is GoToTask go) Npc.PostEvent?.Invoke(TripEvent(go));
+            }
+        }
+
+        // "Sir Lancelot reached the entry" / "Sir Lancelot couldn't reach the well". The task only
+        // knows a point, so the place is the POI standing there, if any.
+        private GameEvent TripEvent(GoToTask go)
+        {
+            var poi = Npc.Location?.pointsOfInterest.Values
+                .FirstOrDefault(p => Vector2.Distance(p.StandingSpot(), go.Target) < 0.01f);
+            string place = poi != null ? $"the {poi.Name.Replace('_', ' ')}" : $"({go.Target.X:0.0}, {go.Target.Y:0.0})";
+            bool done = go.State == TaskState.Completed;
+            return GameEvent.Of(done ? EventType.TaskDone : EventType.TaskFailed, Npc.Location?.Name, Npc.Feet,
+                                Npc.Id, null, done ? $"{Npc.Name} reached {place}" : $"{Npc.Name} couldn't reach {place}");
         }
 
         // TODO (separate feature): combat — enemy detection, targeting, a Combat state.
@@ -145,20 +163,9 @@ namespace Ashenveil.Core.Entities
             if (transcript != null && transcript.Summary == null && !string.IsNullOrWhiteSpace(decision.summary))
                 transcript.Summary = decision.summary.Trim();
 
-            // 1. Remember: each extracted fact becomes a discrete Memory (the hot tier), stamped
-            // with the transcript it came from.
-            // Facts already in the journal (ignoring case and edge whitespace) are skipped, so
-            // repeats don't push real memories out of the injected window. Reworded duplicates
-            // still get through; merging those is the consolidation pass (plan, Phase 6).
-            foreach (var fact in (decision.memories ?? Array.Empty<string>())
-                         .Where(m => !string.IsNullOrWhiteSpace(m))
-                         .Select(m => m.Trim())
-                         .Take(5))
-            {
-                bool known = Journal.Memories.Any(m =>
-                    string.Equals(m.Text, fact, StringComparison.OrdinalIgnoreCase));
-                if (!known) Journal.Add(new Memory(fact, MemoryKind.Conversation) { SourceId = transcript?.Id });
-            }
+            // 1. Remember: each extracted fact becomes a hot memory, stamped with the transcript
+            // it came from and its day.
+            Remember(decision.memories, 5, MemoryKind.Conversation, transcript?.Id, transcript?.Day ?? 0);
 
             // 2. Optionally drop whatever the NPC was doing.
             if (decision.clear_current_tasks) TaskQueue.Clear();
@@ -179,6 +186,39 @@ namespace Ashenveil.Core.Entities
             State = TaskQueue.Count > 0 ? NPCState.Tasked
                 : decision.behaviour == "idle" ? NPCState.Idle
                 : NPCState.Walking;
+        }
+
+        /// <summary>
+        /// The day-end reflection on <paramref name="day"/> has come back: the diary entry goes in
+        /// the cold tier, the lasting facts in the hot tier, and the raw events it was written
+        /// from (<paramref name="reflected"/>) leave the hot tier - the entry stands in for them,
+        /// and they're still in the event log.
+        /// </summary>
+        public void ApplyReflection(ReflectionDto reflection, int day, IEnumerable<Memory> reflected)
+        {
+            if (reflection == null) return;
+
+            if (!string.IsNullOrWhiteSpace(reflection.diary)) Journal.Add(new DayEntry(day, reflection.diary.Trim()));
+            Remember(reflection.facts, 3, MemoryKind.Reflection, null, day);
+            Journal.Forget(reflected);
+            Journal.LastReflectedDay = Math.Max(Journal.LastReflectedDay, day);
+        }
+
+        // Each fact becomes a discrete Memory (the hot tier), at most `max` of them, stamped with
+        // where it came from and the day. Facts already in the journal (ignoring case and edge
+        // whitespace) are skipped, so repeats don't push real memories out of the injected
+        // window. Reworded duplicates still get through; merging those is consolidation (A4).
+        private void Remember(IEnumerable<string> facts, int max, MemoryKind kind, int? sourceId, int day)
+        {
+            foreach (var fact in (facts ?? Array.Empty<string>())
+                         .Where(m => !string.IsNullOrWhiteSpace(m))
+                         .Select(m => m.Trim())
+                         .Take(max))
+            {
+                bool known = Journal.Memories.Any(m =>
+                    string.Equals(m.Text, fact, StringComparison.OrdinalIgnoreCase));
+                if (!known) Journal.Add(new Memory(fact, kind) { SourceId = sourceId, Day = day });
+            }
         }
 
         // A go_to survives only if its target names a real POI in this level.

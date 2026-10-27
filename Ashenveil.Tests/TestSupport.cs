@@ -67,6 +67,9 @@ public class TestNpc : NPC
     // A specific id, for tests that look NPCs up by id.
     public TestNpc(float x, float y, int id) : base(new Vector2(x, y), id, "Test", new WanderBrain()) { }
 
+    // A specific id and name, with the brain kept (perception and reflection tests).
+    public TestNpc(float x, float y, int id, string name, NpcBrain brain) : base(new Vector2(x, y), id, name, brain) { }
+
     protected override float SizeInCells => 1f;
     protected override string BoundsKey => nameof(TestEntity);
 }

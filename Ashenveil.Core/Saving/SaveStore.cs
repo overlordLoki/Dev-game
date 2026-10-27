@@ -25,7 +25,7 @@ namespace Ashenveil.Core.Saving
     public class SaveStore
     {
         /// <summary>The schema this game writes. Bump it when adding a migration.</summary>
-        public const int SchemaVersion = 1;
+        public const int SchemaVersion = 2;
 
         /// <summary>Where the game keeps its saves: a "saves" folder beside settings.json.</summary>
         public static string DefaultFolder => Path.Combine(SettingsStore.DefaultFolder, "saves");
@@ -40,8 +40,10 @@ namespace Ashenveil.Core.Saving
         // ------------------------------------------------------------------ schema
 
         // Version 1, as in docs/save-system-plan.md. Never edit this once saves exist in the wild:
-        // change the schema with a migration instead, so older files can catch up.
-        private const string CreateSchema = """
+        // change the schema with a migration instead, so older files can catch up. A new file is
+        // made at version 1 and then migrated like any other, so there's one way to every version.
+        // Public so the tests can write a version 1 file the way a version 1 game did.
+        public const string Version1Schema = """
             CREATE TABLE game (
                 id                 INTEGER PRIMARY KEY CHECK (id = 1),
                 saved_at           TEXT    NOT NULL,
@@ -111,15 +113,46 @@ namespace Ashenveil.Core.Saving
 
         // One entry per version after the first: Migrations[0] takes a version 1 file to
         // version 2, and so on. Each is a few ALTER TABLE / CREATE TABLE statements. Adding one
-        // means adding it here and bumping SchemaVersion; CreateSchema stays as version 1.
-        private static readonly string[] Migrations = { };
+        // means adding it here and bumping SchemaVersion; Version1Schema stays as version 1.
+        private static readonly string[] Migrations =
+        {
+            // 1 -> 2: the event log and daily reflection (docs/npc-memory-next-plan.md, Part B).
+            // A version 1 memory has no day: one from a conversation takes its transcript's.
+            """
+            CREATE TABLE events (
+                event_id      INTEGER PRIMARY KEY,
+                day           INTEGER NOT NULL,
+                level         TEXT,
+                x             REAL    NOT NULL,
+                y             REAL    NOT NULL,
+                type          TEXT    NOT NULL,
+                actor_id      INTEGER,
+                target_id     INTEGER,
+                transcript_id INTEGER,
+                text          TEXT    NOT NULL
+            );
+            ALTER TABLE game ADD COLUMN next_event_id INTEGER NOT NULL DEFAULT 1;
+            ALTER TABLE memories ADD COLUMN day INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE memories ADD COLUMN event_id INTEGER;
+            UPDATE memories SET day = (SELECT day FROM transcripts WHERE id = memories.transcript_id)
+                WHERE transcript_id IN (SELECT id FROM transcripts);
+            CREATE TABLE day_entries (
+                npc_id  INTEGER NOT NULL REFERENCES npcs(npc_id),
+                seq     INTEGER NOT NULL,
+                day     INTEGER NOT NULL,
+                summary TEXT    NOT NULL,
+                PRIMARY KEY (npc_id, seq)
+            );
+            ALTER TABLE npcs ADD COLUMN last_reflected_day INTEGER NOT NULL DEFAULT 0;
+            """,
+        };
 
         // Every table, children before the tables they point at, so clearing them in this
         // order never leaves a row pointing at one that's gone.
         private static readonly string[] Tables =
         {
-            "tasks", "journal_transcripts", "memories", "transcript_lines", "transcript_participants",
-            "transcripts", "npcs", "populated_levels", "players", "game",
+            "day_entries", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
+            "transcript_participants", "transcripts", "npcs", "populated_levels", "players", "game",
         };
 
         // ------------------------------------------------------------------ save
@@ -139,8 +172,12 @@ namespace Ashenveil.Core.Saving
 
             int version = ReadVersion(db);
             if (version > SchemaVersion) throw new InvalidDataException(TooNewMessage(version));
-            if (version == 0) Run(db, CreateSchema + $"PRAGMA user_version = {SchemaVersion};");   // a new file
-            else Migrate(db, version);
+            if (version == 0)   // a new file
+            {
+                Run(db, Version1Schema);
+                version = 1;
+            }
+            Migrate(db, version);
 
             foreach (var table in Tables) Run(db, $"DELETE FROM {table};");
             Write(db, save);
@@ -149,12 +186,16 @@ namespace Ashenveil.Core.Saving
 
         private static void Write(SqliteConnection db, SaveData save)
         {
-            Insert(db, "INSERT INTO game VALUES (1, $savedAt, $totalDays, $secondsIntoDay, $nextPersonId, $nextTranscriptId)",
+            // Columns are named wherever a migration has added one: ADD COLUMN puts it last, and
+            // naming them doesn't depend on that.
+            Insert(db, "INSERT INTO game (id, saved_at, total_days, seconds_into_day, next_person_id, next_transcript_id, next_event_id) "
+                     + "VALUES (1, $savedAt, $totalDays, $secondsIntoDay, $nextPersonId, $nextTranscriptId, $nextEventId)",
                 ("$savedAt", save.SavedAt.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)),
                 ("$totalDays", save.TotalDays),
                 ("$secondsIntoDay", save.SecondsIntoDay),
                 ("$nextPersonId", save.NextPersonId),
-                ("$nextTranscriptId", save.NextTranscriptId));
+                ("$nextTranscriptId", save.NextTranscriptId),
+                ("$nextEventId", save.NextEventId));
 
             foreach (var p in save.Players)
                 Insert(db, "INSERT INTO players VALUES ($id, $name, $level, $x, $y)",
@@ -176,16 +217,30 @@ namespace Ashenveil.Core.Saving
                         ("$t", t.Id), ("$seq", i), ("$text", t.Lines[i]));
             }
 
+            // Events before the memories that point at them.
+            foreach (var e in save.Events)
+                Insert(db, "INSERT INTO events (event_id, day, level, x, y, type, actor_id, target_id, transcript_id, text) "
+                         + "VALUES ($id, $day, $level, $x, $y, $type, $actor, $target, $transcript, $text)",
+                    ("$id", e.Id), ("$day", e.Day), ("$level", e.Level), ("$x", e.X), ("$y", e.Y), ("$type", e.Type),
+                    ("$actor", e.ActorId), ("$target", e.TargetId), ("$transcript", e.TranscriptId), ("$text", e.Text));
+
             foreach (var npc in save.Npcs)
             {
-                Insert(db, "INSERT INTO npcs VALUES ($id, $type, $name, $level, $x, $y)",
-                    ("$id", npc.Id), ("$type", npc.Type), ("$name", npc.Name), ("$level", npc.Level), ("$x", npc.X), ("$y", npc.Y));
+                Insert(db, "INSERT INTO npcs (npc_id, type, name, level, x, y, last_reflected_day) "
+                         + "VALUES ($id, $type, $name, $level, $x, $y, $lastReflected)",
+                    ("$id", npc.Id), ("$type", npc.Type), ("$name", npc.Name), ("$level", npc.Level), ("$x", npc.X), ("$y", npc.Y),
+                    ("$lastReflected", npc.LastReflectedDay));
                 for (int i = 0; i < npc.Memories.Count; i++)
                 {
                     var m = npc.Memories[i];
-                    Insert(db, "INSERT INTO memories VALUES ($npc, $seq, $text, $kind, $transcript)",
-                        ("$npc", npc.Id), ("$seq", i), ("$text", m.Text), ("$kind", m.Kind), ("$transcript", m.TranscriptId));
+                    Insert(db, "INSERT INTO memories (npc_id, seq, text, kind, transcript_id, day, event_id) "
+                             + "VALUES ($npc, $seq, $text, $kind, $transcript, $day, $event)",
+                        ("$npc", npc.Id), ("$seq", i), ("$text", m.Text), ("$kind", m.Kind), ("$transcript", m.TranscriptId),
+                        ("$day", m.Day), ("$event", m.EventId));
                 }
+                for (int i = 0; i < npc.DayEntries.Count; i++)
+                    Insert(db, "INSERT INTO day_entries (npc_id, seq, day, summary) VALUES ($npc, $seq, $day, $summary)",
+                        ("$npc", npc.Id), ("$seq", i), ("$day", npc.DayEntries[i].Day), ("$summary", npc.DayEntries[i].Summary));
                 foreach (var transcriptId in npc.TranscriptIds)
                     Insert(db, "INSERT INTO journal_transcripts VALUES ($npc, $transcript)",
                         ("$npc", npc.Id), ("$transcript", transcriptId));
@@ -295,7 +350,7 @@ namespace Ashenveil.Core.Saving
         // Null if the game row is missing (a file with the tables but nothing saved in them).
         private static SaveData Read(SqliteConnection db)
         {
-            var save = Rows(db, "SELECT saved_at, total_days, seconds_into_day, next_person_id, next_transcript_id FROM game WHERE id = 1",
+            var save = Rows(db, "SELECT saved_at, total_days, seconds_into_day, next_person_id, next_transcript_id, next_event_id FROM game WHERE id = 1",
                 r => new SaveData
                 {
                     SavedAt = ParseSavedAt(r.GetString(0)),
@@ -303,6 +358,7 @@ namespace Ashenveil.Core.Saving
                     SecondsIntoDay = r.GetFloat(2),
                     NextPersonId = r.GetInt32(3),
                     NextTranscriptId = r.GetInt32(4),
+                    NextEventId = r.GetInt32(5),
                 }).SingleOrDefault();
             if (save == null) return null;
 
@@ -329,15 +385,35 @@ namespace Ashenveil.Core.Saving
                     Lines = lines[r.GetInt32(0)].ToList(),
                 });
 
-            // Each NPC's memories, conversations and tasks, then the NPCs themselves.
-            var memories = Rows(db, "SELECT npc_id, text, kind, transcript_id FROM memories ORDER BY npc_id, seq",
+            save.Events = Rows(db, "SELECT event_id, day, level, x, y, type, actor_id, target_id, transcript_id, text FROM events ORDER BY event_id",
+                r => new EventSave
+                {
+                    Id = r.GetInt32(0),
+                    Day = r.GetInt32(1),
+                    Level = r.IsDBNull(2) ? null : r.GetString(2),
+                    X = r.GetFloat(3),
+                    Y = r.GetFloat(4),
+                    Type = r.GetString(5),
+                    ActorId = r.IsDBNull(6) ? null : r.GetInt32(6),
+                    TargetId = r.IsDBNull(7) ? null : r.GetInt32(7),
+                    TranscriptId = r.IsDBNull(8) ? null : r.GetInt32(8),
+                    Text = r.GetString(9),
+                });
+
+            // Each NPC's memories, conversations, tasks and diary, then the NPCs themselves.
+            var memories = Rows(db, "SELECT npc_id, text, kind, transcript_id, day, event_id FROM memories ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), memory: new MemorySave
                 {
                     Text = r.GetString(1),
                     Kind = r.GetString(2),
                     TranscriptId = r.IsDBNull(3) ? null : r.GetInt32(3),
+                    Day = r.GetInt32(4),
+                    EventId = r.IsDBNull(5) ? null : r.GetInt32(5),
                 }))
                 .ToLookup(m => m.npc, m => m.memory);
+            var days = Rows(db, "SELECT npc_id, day, summary FROM day_entries ORDER BY npc_id, seq",
+                r => (npc: r.GetInt32(0), entry: new DayEntrySave { Day = r.GetInt32(1), Summary = r.GetString(2) }))
+                .ToLookup(d => d.npc, d => d.entry);
             // Transcript ids only count up, so in id order is the order the NPC heard them in.
             var journals = Rows(db, "SELECT npc_id, transcript_id FROM journal_transcripts ORDER BY npc_id, transcript_id",
                 r => (npc: r.GetInt32(0), transcript: r.GetInt32(1)))
@@ -351,7 +427,7 @@ namespace Ashenveil.Core.Saving
                     Seconds = r.IsDBNull(4) ? null : r.GetFloat(4),
                 }))
                 .ToLookup(t => t.npc, t => t.task);
-            save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y FROM npcs ORDER BY npc_id",
+            save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y, last_reflected_day FROM npcs ORDER BY npc_id",
                 r => new NpcSave
                 {
                     Id = r.GetInt32(0),
@@ -363,6 +439,8 @@ namespace Ashenveil.Core.Saving
                     Memories = memories[r.GetInt32(0)].ToList(),
                     TranscriptIds = journals[r.GetInt32(0)].ToList(),
                     Tasks = tasks[r.GetInt32(0)].ToList(),
+                    DayEntries = days[r.GetInt32(0)].ToList(),
+                    LastReflectedDay = r.GetInt32(6),
                 });
 
             return save;

@@ -28,6 +28,10 @@ namespace Ashenveil.Core.GameWorld
         public GameClock Clock { get; } = new GameClock();
         /// <summary>Which NPCs exist, and which level each one is in.</summary>
         public NpcRoster Roster { get; } = new NpcRoster();
+        /// <summary>Everything meaningful that's happened. Posting one tells whoever saw it.</summary>
+        public EventLog Events { get; }
+        /// <summary>Each NPC looking back on its day, when the day turns over.</summary>
+        public ReflectionSystem Reflections { get; }
 
         /// <summary>The NPCs in the level being played.</summary>
         public IReadOnlyList<NPC> NPCs => Roster.In(location.Name);
@@ -55,11 +59,20 @@ namespace Ashenveil.Core.GameWorld
         /// <param name="start">The level the game begins in.</param>
         /// <param name="sendChat">How a chat reply is asked for. Defaults to the real API.</param>
         /// <param name="requestDecision">How an end-of-conversation decision is asked for. Defaults to the real API.</param>
+        /// <param name="requestReflection">How a day-end reflection is asked for. Defaults to the real API.</param>
         public World(Location start,
                      Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> sendChat = null,
-                     Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
+                     Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null,
+                     Func<ReflectionRequestDto, System.Threading.Tasks.Task<ReflectionDto>> requestReflection = null)
         {
             Conversations = new ConversationSystem(sendChat, requestDecision);
+            Reflections = new ReflectionSystem(requestReflection);
+            // Everything that posts events is wired to the one log: NPCs (their tasks) through
+            // the roster, conversations directly. The World posts level changes itself.
+            Events = new EventLog(() => Clock.TotalDays, Perceive);
+            Roster.PostEvent = e => Events.Post(e);
+            Conversations.PostEvent = e => Events.Post(e);
+            Clock.DayStarted += day => Reflections.DayStarted(day, Roster.All);
             // Id 0 is this save's owner, not "the player": other players would take ids from
             // the roster like NPCs do, so ask `is Player`, never `Id == 0`.
             this.player = new Player(Vector2.Zero, 0);   // Init stands them on the spawn point
@@ -89,19 +102,21 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public static World FromSave(SaveData save,
                                      Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> sendChat = null,
-                                     Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
+                                     Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null,
+                                     Func<ReflectionRequestDto, System.Threading.Tasks.Task<ReflectionDto>> requestReflection = null)
         {
             // The save's owner. Other players are a multiplayer feature and would join here.
             var owner = save.Players.FirstOrDefault()
                 ?? throw new System.IO.InvalidDataException("The save has no player in it.");
 
-            var world = new World(new Location(owner.Level), sendChat, requestDecision);
+            var world = new World(new Location(owner.Level), sendChat, requestDecision, requestReflection);
             world.player = new Player(Vector2.Zero, owner.Id, owner.Name);
             world.player.StandAt(new Vector2(owner.X, owner.Y));
 
             world.Clock.Restore(save.TotalDays, save.SecondsIntoDay);
             world.Roster.Restore(save.NextPersonId, save.PopulatedLevels);
             world.Conversations.Restore(save.NextTranscriptId);
+            world.Events.Restore(save.NextEventId, save.Events.Select(SaveMapper.FromSave));
 
             // One dictionary for every NPC, so a conversation two of them had is one object again.
             var transcripts = SaveMapper.TranscriptsFrom(save);
@@ -112,6 +127,9 @@ namespace Ashenveil.Core.GameWorld
                 // grid) for its tasks, and the player walking in later finds that same Location.
                 if (npc != null) world.Roster.Add(world.LocationNamed(saved.Level), npc);
             }
+
+            // Reflections in flight when it was saved were lost: ask for any day an NPC missed.
+            world.Reflections.CatchUp(world.Roster.All, world.Clock.TotalDays);
             return world;
         }
 
@@ -160,9 +178,19 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public void UseExit(ExitData exit)
         {
+            Events.Post(GameEvent.Of(EventType.LeftLevel, location.Name, player.Feet, player.Id, null,
+                                     $"{player.Name} left {location.Name}"));
             SetLocation(LocationNamed(exit.to));
             Roster.Populate(location);   // first visit spawns, return visit reuses
             location.PlaceAt(player, exit.arriveAt);
+            Events.Post(GameEvent.Of(EventType.EnteredLevel, location.Name, player.Feet, player.Id, null,
+                                     $"{player.Name} arrived at {location.Name}"));
+        }
+
+        // Perception: every NPC who saw an event remembers it (see Perception for who that is).
+        private void Perceive(GameEvent e)
+        {
+            foreach (var npc in Perception.WhoKnows(e, Roster)) npc.Witness(e);
         }
 
         /// <summary>
@@ -194,12 +222,13 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public bool HasUnsavedPlay { get; internal set; }
 
-        /// <summary>One step of the game: time, conversations, decisions, movement, collision.</summary>
+        /// <summary>One step of the game: time, conversations, decisions, reflections, movement, collision.</summary>
         public void Update(GameTime gameTime)
         {
             HasUnsavedPlay = true;
             Clock.Update(gameTime);
             Conversations.Update(Clock.TotalDays);
+            Reflections.Update();
             player.Update(gameTime);
             Bounds.Clamp(player);
             foreach (var npc in NPCs)

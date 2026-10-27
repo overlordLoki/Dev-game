@@ -32,6 +32,7 @@ namespace Ashenveil.Core.Saving
                 SecondsIntoDay = world.Clock.SecondsIntoDay,
                 NextPersonId = world.Roster.PeekNextId,
                 NextTranscriptId = world.Conversations.PeekNextTranscriptId,
+                NextEventId = world.Events.PeekNextId,
                 // The player is always in the level being played.
                 Players = { ToSave(world.player, world.location.Name) },
                 PopulatedLevels = world.Roster.PopulatedLevels.ToList(),
@@ -41,6 +42,7 @@ namespace Ashenveil.Core.Saving
                                   .DistinctBy(t => t.Id)
                                   .Select(ToSave)
                                   .ToList(),
+                Events = world.Events.All.Select(ToSave).ToList(),
             };
         }
 
@@ -65,6 +67,8 @@ namespace Ashenveil.Core.Saving
             TranscriptIds = npc.Journal.Transcripts.Select(t => t.Id).ToList(),
             // A task type saving doesn't know is left out, so the rest of the queue still loads.
             Tasks = npc.Tasks.Select(ToSave).Where(t => t != null).ToList(),
+            DayEntries = npc.Journal.Days.Select(d => new DayEntrySave { Day = d.Day, Summary = d.Summary }).ToList(),
+            LastReflectedDay = npc.Journal.LastReflectedDay,
         };
 
         // Only what the task needs to carry on. Completed and failed tasks never get here:
@@ -76,11 +80,29 @@ namespace Ashenveil.Core.Saving
             _ => null,
         };
 
+        // SourceId is a transcript or an event id, by Kind; saved in its own column so each can
+        // be checked against the table it points at.
         public static MemorySave ToSave(Memory memory) => new()
         {
             Text = memory.Text,
             Kind = memory.Kind.ToString(),
-            TranscriptId = memory.SourceId,
+            TranscriptId = memory.Kind == MemoryKind.Event ? null : memory.SourceId,
+            EventId = memory.Kind == MemoryKind.Event ? memory.SourceId : null,
+            Day = memory.Day,
+        };
+
+        public static EventSave ToSave(GameEvent e) => new()
+        {
+            Id = e.Id,
+            Day = e.Day,
+            Level = e.Level,
+            X = e.Where.X,
+            Y = e.Where.Y,
+            Type = e.Type.ToString(),
+            ActorId = e.ActorId,
+            TargetId = e.TargetId,
+            TranscriptId = e.TranscriptId,
+            Text = e.Text,
         };
 
         public static TranscriptSave ToSave(Transcript transcript) => new()
@@ -146,6 +168,8 @@ namespace Ashenveil.Core.Saving
         public static void FillJournal(Journal journal, NpcSave saved, IReadOnlyDictionary<int, Transcript> transcripts)
         {
             foreach (var memory in saved.Memories) journal.Add(FromSave(memory));
+            foreach (var day in saved.DayEntries) journal.Add(new DayEntry(day.Day, day.Summary));
+            journal.LastReflectedDay = saved.LastReflectedDay;
             foreach (var id in saved.TranscriptIds)
             {
                 // A journal pointing at a transcript that isn't in the save is a damaged file:
@@ -154,12 +178,28 @@ namespace Ashenveil.Core.Saving
             }
         }
 
-        public static Memory FromSave(MemorySave saved) =>
+        public static Memory FromSave(MemorySave saved)
+        {
             // An unknown kind can't come from this version's saves (a newer file is refused
             // before it's read), so falling back to Event only covers a hand-edited file.
-            new(saved.Text, Enum.TryParse<MemoryKind>(saved.Kind, out var kind) ? kind : MemoryKind.Event)
+            var kind = Enum.TryParse<MemoryKind>(saved.Kind, out var k) ? k : MemoryKind.Event;
+            return new Memory(saved.Text, kind)
             {
-                SourceId = saved.TranscriptId,
+                SourceId = kind == MemoryKind.Event ? saved.EventId : saved.TranscriptId,
+                Day = saved.Day,
             };
+        }
+
+        public static GameEvent FromSave(EventSave saved) => new(
+            saved.Id,
+            saved.Day,
+            saved.Level,
+            new Vector2(saved.X, saved.Y),
+            // As with memory kinds, an unknown type only comes from a hand-edited file.
+            Enum.TryParse<EventType>(saved.Type, out var type) ? type : EventType.TaskDone,
+            saved.ActorId,
+            saved.TargetId,
+            saved.Text,
+            saved.TranscriptId);
     }
 }

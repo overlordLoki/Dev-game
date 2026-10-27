@@ -25,6 +25,9 @@ namespace Ashenveil.Core.GameWorld
         // summaries), to put in front of the LLM when a conversation starts.
         private const int MaxInjectedMemories = 5;
         private const int MaxRecalledConversations = 3;
+        // How many of today's events, and how many diary entries (recent days), go in too.
+        private const int MaxEventsToday = 8;
+        private const int MaxRecalledDays = 3;
 
         private readonly Func<ConversationRequestDto, Task<ChatMessage[]>> _sendChat;
         private readonly Func<DecisionRequestDto, Task<NpcDecisionDto>> _requestDecision;
@@ -58,6 +61,12 @@ namespace Ashenveil.Core.GameWorld
             _sendChat = sendChat ?? DialogueApi.RequestAsync;
             _requestDecision = requestDecision ?? DialogueApi.RequestDecisionAsync;
         }
+
+        /// <summary>
+        /// Where a finished conversation is reported as a Talked event (EventLog.Post). Set by
+        /// the World; null posts nothing.
+        /// </summary>
+        public Action<GameEvent> PostEvent { get; set; }
 
         /// <summary>Conversations still going.</summary>
         public IReadOnlyList<Conversation> Active => _active;
@@ -109,6 +118,8 @@ namespace Ashenveil.Core.GameWorld
                     persona = npc.Persona,
                     memories = npc.RecentMemories(MaxInjectedMemories).ToList(),
                     past_conversations = npc.PastConversationsWith(from.Id, MaxRecalledConversations, today).ToList(),
+                    events_today = npc.EventsToday(today, MaxEventsToday).ToList(),
+                    recent_days = npc.RecentDays(MaxRecalledDays, today).ToList(),
                 });
             return req;
         }
@@ -156,7 +167,21 @@ namespace Ashenveil.Core.GameWorld
 
             var transcript = convo.ToTranscript(_nextTranscriptId++, today);
             foreach (var npc in npcs) npc.RememberConversation(transcript);
+            PostEvent?.Invoke(TalkedEvent(convo, npcs, transcript));
             return transcript;
+        }
+
+        // "Sir Lancelot talked with the traveller" - so the day as reflection sees it includes
+        // conversations, and an NPC standing nearby overhears that it happened. The initiator
+        // is the actor; the first NPC they approached is the target.
+        private static GameEvent TalkedEvent(Conversation convo, List<NPC> npcs, Transcript transcript)
+        {
+            var from = convo.Participants[0];
+            var others = convo.Participants.Skip(1).Select(Conversation.NameOf);
+            return GameEvent.Of(EventType.Talked, convo.Location?.Name, from.Feet, from.Id,
+                                npcs.FirstOrDefault(n => n != from)?.Id,
+                                $"{Conversation.NameOf(from)} talked with {string.Join(" and ", others)}",
+                                transcript.Id);
         }
 
         // Fire-and-hold: start the LLM call and keep the Task; ApplyArrivedDecisions picks up

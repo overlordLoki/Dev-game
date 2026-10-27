@@ -20,6 +20,7 @@ namespace Ashenveil.Core.Saving
         public float SecondsIntoDay { get; set; }        // GameClock.SecondsIntoDay
         public int NextPersonId { get; set; }            // NpcRoster.PeekNextId: the next player or NPC id
         public int NextTranscriptId { get; set; }        // ConversationSystem.PeekNextTranscriptId
+        public int NextEventId { get; set; } = 1;        // EventLog.PeekNextId
 
         // A list, not one player, so multiplayer won't need a new format. Players[0] is the owner today.
         public List<PlayerSave> Players { get; set; } = new();
@@ -27,6 +28,8 @@ namespace Ashenveil.Core.Saving
         public List<NpcSave> Npcs { get; set; } = new();
         // Each conversation once, however many NPCs remember it. NpcSave.TranscriptIds points here.
         public List<TranscriptSave> Transcripts { get; set; } = new();
+        // The whole event log, oldest first. MemorySave.EventId points here.
+        public List<EventSave> Events { get; set; } = new();
     }
 
     public class PlayerSave
@@ -49,6 +52,8 @@ namespace Ashenveil.Core.Saving
         public List<MemorySave> Memories { get; set; } = new();   // oldest first
         public List<int> TranscriptIds { get; set; } = new();     // oldest first
         public List<TaskSave> Tasks { get; set; } = new();        // the queue, front first
+        public List<DayEntrySave> DayEntries { get; set; } = new(); // the diary, oldest first
+        public int LastReflectedDay { get; set; }                  // Journal.LastReflectedDay; 0 for none
     }
 
     /// <summary>
@@ -68,8 +73,31 @@ namespace Ashenveil.Core.Saving
     public class MemorySave
     {
         public string Text { get; set; }
-        public string Kind { get; set; }                 // MemoryKind's name: "Conversation", "Event"
-        public int? TranscriptId { get; set; }           // Memory.SourceId
+        public string Kind { get; set; }                 // MemoryKind's name: "Conversation", "Event", "Reflection"
+        public int? TranscriptId { get; set; }           // Memory.SourceId, for a Conversation memory
+        public int? EventId { get; set; }                // Memory.SourceId, for an Event memory
+        public int Day { get; set; }                     // Memory.Day
+    }
+
+    public class DayEntrySave
+    {
+        public int Day { get; set; }
+        public string Summary { get; set; }
+    }
+
+    /// <summary>One GameEvent, as plain values.</summary>
+    public class EventSave
+    {
+        public int Id { get; set; }
+        public int Day { get; set; }
+        public string Level { get; set; }                // null if it happened nowhere in particular
+        public float X { get; set; }                     // in cells
+        public float Y { get; set; }
+        public string Type { get; set; }                 // EventType's name: "TaskDone", "Talked", ...
+        public int? ActorId { get; set; }
+        public int? TargetId { get; set; }
+        public int? TranscriptId { get; set; }           // a Talked event's conversation
+        public string Text { get; set; }
     }
 
     public class TranscriptSave

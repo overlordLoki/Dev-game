@@ -41,5 +41,8 @@ namespace Ashenveil.Core.Entities.brains.Task
         // The owner's level's walkable cells, for tasks that route round obstacles. Null when
         // the owner isn't in a level (tests): tasks fall back to walking straight.
         public Navigation.NavGrid Nav { get; init; }
+        // How the owner tells the world something happened (EventLog.Post). Null when it isn't
+        // wired to a world (tests that don't care): nothing is posted.
+        public System.Action<GameWorld.GameEvent> Post { get; init; }
     }
 }

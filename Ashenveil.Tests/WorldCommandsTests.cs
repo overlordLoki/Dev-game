@@ -173,19 +173,26 @@ public class WorldCommandsTests : IDisposable
     // ------------------------------------------------------------------ journal
 
     [Fact]
-    public void Journal_shows_an_NPCs_facts_and_conversations()
+    public void Journal_shows_an_NPCs_facts_events_conversations_and_diary()
     {
         var (_, brain) = AddNpc();
-        brain.Journal.Add(new Memory("The traveller's name is Loki.", MemoryKind.Conversation) { SourceId = 1 });
+        brain.Journal.Add(new Memory("The traveller's name is Loki.", MemoryKind.Conversation) { SourceId = 1, Day = 3 });
+        brain.Journal.Add(new Memory("Sir Lancelot couldn't reach the well", MemoryKind.Event) { SourceId = 4, Day = 3 });
         brain.Journal.Add(new Transcript(1, 3, "Medows", new[] { new Participant(0, "Traveller"), new Participant(1, "Test") }, new[] { "Traveller: hi" }));
+        brain.Journal.Add(new DayEntry(2, "A quiet day at the gate."));
+        brain.Journal.LastReflectedDay = 2;
 
         var lines = Run("journal Test");
 
         Assert.Equal("Test (#0) remembers 1 fact(s):", lines[0]);
         Assert.Contains("The traveller's name is Loki.", lines[1]);
-        Assert.Contains("conversation #1", lines[1]);
-        Assert.Equal("...and 1 conversation(s):", lines[2]);
-        Assert.Equal("  #1 day 3 at Medows with Traveller, Test: (no summary yet)", lines[3]);
+        Assert.Contains("day 3, conversation #1", lines[1]);
+        Assert.Equal("...1 event(s) not yet reflected on:", lines[2]);
+        Assert.Equal("  - day 3: Sir Lancelot couldn't reach the well  (event #4)", lines[3]);
+        Assert.Equal("...1 conversation(s):", lines[4]);
+        Assert.Equal("  #1 day 3 at Medows with Traveller, Test: (no summary yet)", lines[5]);
+        Assert.Equal("...and 1 diary entry (last reflected on day 2):", lines[6]);
+        Assert.Equal("  day 2: A quiet day at the gate.", lines[7]);
     }
 
     [Fact]

@@ -11,7 +11,7 @@ namespace Ashenveil.Core.DevConsole
         Input,    // what was typed, echoed back
         Output,   // what a command said
         Error,    // what went wrong
-        Event,    // something the game reports by itself (later: the Phase 8 event log)
+        Event,    // something the game reports by itself (a GameEvent being posted)
     }
 
     /// <summary>One line of console output.</summary>

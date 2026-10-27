@@ -50,6 +50,12 @@ namespace Ashenveil.Core.Entities
                 ? go.RemainingWaypoints
                 : Array.Empty<Vector2>();
 
+        /// <summary>
+        /// How this NPC tells the world something happened to it (EventLog.Post): NpcRoster.Add
+        /// wires it up. Null outside a world, and then nothing is posted.
+        /// </summary>
+        public Action<GameWorld.GameEvent> PostEvent { get; set; }
+
         // The brain is private to the NPC, so the World starts and ends talking through these.
         public void StartTalking() => Brain.StartTalking();
         public void StopTalking() => Brain.StopTalking();
@@ -95,10 +101,32 @@ namespace Ashenveil.Core.Entities
             Brain.ApplyDecision(decision, location, transcript);
         }
 
+        /// <summary>
+        /// This NPC saw <paramref name="e"/> happen (or it happened to them): a hot memory of it,
+        /// with its day and the event's id. Perception decides who calls this.
+        /// </summary>
+        public void Witness(GameWorld.GameEvent e) =>
+            Brain.Journal.Add(new brains.Memorys.Memory(e.Text, brains.Memorys.MemoryKind.Event) { SourceId = e.Id, Day = e.Day });
+
+        // The day-end reflection came back; see NpcBrain.ApplyReflection.
+        public void ApplyReflection(brains.Dialogue.ReflectionDto reflection, int day,
+                                    IEnumerable<brains.Memorys.Memory> reflected) =>
+            Brain.ApplyReflection(reflection, day, reflected);
+
         // The last few remembered facts as prompt lines, so a new conversation can open
-        // with the NPC remembering past ones.
+        // with the NPC remembering past ones. Events aren't facts: they go in EventsToday.
         public IEnumerable<string> RecentMemories(int count) =>
             Brain.Journal.Recent(count).Select(m => m.Text);
+
+        // What this NPC saw happen today, the last `count` of it, oldest first. Kept apart from
+        // the facts so a busy day can't push out "the traveller's name is Loki".
+        public IEnumerable<string> EventsToday(int today, int count) =>
+            Brain.Journal.EventsOn(today).TakeLast(count).Select(m => m.Text);
+
+        // Recall from the diary: the last `count` reflected days, oldest first ("Yesterday: I
+        // waited at the castle door...").
+        public IEnumerable<string> RecentDays(int count, int today) =>
+            Brain.Journal.Days.TakeLast(count).Select(d => $"{DaysAgo(today - d.Day)}: {d.Summary}");
 
         // Recall from the cold tier: one line per earlier conversation with the person whose
         // entity Id is `personId`, oldest first, the last `count` of them ("2 days ago, at

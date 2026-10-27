@@ -125,7 +125,7 @@ namespace Ashenveil.Core.Screens
             foreach (var line in _commands.Execute(text)) Write(line.Text, line.Kind);
         }
 
-        /// <summary>Adds a line to the output. Also the way in for game events later (Phase 8).</summary>
+        /// <summary>Adds a line to the output. Also how posted game events reach the console.</summary>
         public void Write(string text, LineKind kind)
         {
             _lines.Add(new ConsoleLine(text, kind));

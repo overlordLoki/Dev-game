@@ -203,6 +203,8 @@ namespace Ashenveil.Core
         private void Play(World next)
         {
             world = next;
+            // Everything that happens shows in the console as it happens, open or not.
+            world.Events.Posted += e => _console.Write(WorldCommands.Describe(e), LineKind.Event);
             _gameplayScreen = new GameplayScreen(world,
                 OpenPause,
                 // Built fresh each time, from the window as it is now, so the box fits after a resize.

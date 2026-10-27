@@ -21,9 +21,11 @@ from main import (
     TASK_TYPES,
     ConversationRequest,
     DecisionRequest,
+    ReflectionRequest,
     app,
     build_decision_prompt,
     build_prompt,
+    build_reflection_prompt,
     decision_schema,
 )
 
@@ -109,12 +111,81 @@ def test_prompt_lists_earlier_conversations_under_their_own_heading():
     assert prompt.index("Loki asked about the wolves.") < prompt.index("Already said:")
 
 
+def test_prompt_frames_todays_events_apart_from_memories():
+    req = ConversationRequest(
+        participants=[
+            {"name": "Traveller", "speaks": False},
+            {"name": "Sir Lancelot",
+             "memories": ["The traveller's name is Loki"],
+             "events_today": ["Sir Lancelot couldn't reach the well"]},
+        ],
+        history=["Traveller: how was your day?"],
+    )
+    prompt = build_prompt(req)
+
+    assert "Earlier today Sir Lancelot saw:" in prompt
+    # Its own heading, after the memories and before what's been said.
+    assert prompt.index("The traveller's name is Loki") < prompt.index("Earlier today")
+    assert prompt.index("couldn't reach the well") < prompt.index("Already said:")
+
+
+def test_prompt_lists_recent_days_from_the_diary():
+    req = ConversationRequest(participants=[
+        {"name": "Traveller", "speaks": False},
+        {"name": "Sir Lancelot", "recent_days": ["Yesterday: I waited at the castle door."]},
+    ])
+    prompt = build_prompt(req)
+
+    assert "Sir Lancelot's last few days, in their own words:" in prompt
+    assert "I waited at the castle door." in prompt
+
+
 def test_listeners_memories_are_not_rendered():
     req = ConversationRequest(participants=[
         {"name": "Traveller", "speaks": False, "memories": ["should not appear"]},
         {"name": "Sir Lancelot"},
     ])
     assert "should not appear" not in build_prompt(req)
+
+
+# ------------------------------------------------------------- unit: reflection
+
+def test_reflection_prompt_has_the_persona_date_events_and_conversations():
+    req = ReflectionRequest(
+        npc_name="Sir Lancelot",
+        persona="A weary knight.",
+        date="Spring 3, Year 1",
+        events=["Sir Lancelot couldn't reach the well", "The traveller arrived at Medows"],
+        conversations=["Loki asked about the wolves."],
+        max_facts=2,
+    )
+    prompt = build_reflection_prompt(req)
+
+    for text in ["Sir Lancelot", "A weary knight.", "Spring 3, Year 1", "couldn't reach the well",
+                 "Loki asked about the wolves.", "up to 2 `facts`"]:
+        assert text in prompt
+    # Events in the order they happened.
+    assert prompt.index("couldn't reach the well") < prompt.index("The traveller arrived")
+
+
+def test_reflection_prompt_says_so_when_nothing_was_seen():
+    prompt = build_reflection_prompt(ReflectionRequest(npc_name="Sir Lancelot"))
+    assert "(nothing of note)" in prompt
+    assert "Conversations you had:" not in prompt
+
+
+def test_reflection_endpoint_trims_blanks_and_caps_the_facts(monkeypatch):
+    """Shape only: Ollama is replaced by a canned answer."""
+    async def fake_ollama(system, prompt, schema):
+        assert set(schema["required"]) == {"diary", "facts"}
+        return {"diary": "  I never reached the well.  ", "facts": ["The well path is blocked", " ", "a", "b", "c"]}
+    monkeypatch.setattr(main, "ask_ollama", fake_ollama)
+
+    r = client.post("/reflection", json={"npc_name": "Sir Lancelot", "events": ["x"], "max_facts": 2})
+
+    assert r.status_code == 200
+    assert r.json() == {"diary": "I never reached the well.", "facts": ["The well path is blocked", "a"],
+                        "model": main.OLLAMA_MODEL}
 
 
 @needs_ollama
@@ -235,6 +306,71 @@ def test_npc_recalls_what_an_earlier_conversation_was_about():
     assert verdict.passed, f"knight did not recall the earlier chat: {reply!r} - judge: {verdict.reason}"
 
 
+@needs_ollama
+def test_reflection_is_well_formed():
+    r = client.post("/reflection", json={
+        "npc_name": "Sir Lancelot",
+        "persona": "A weary knight.",
+        "date": "Spring 3, Year 1",
+        "events": ["The traveller arrived at Medows"],
+        "max_facts": 3,
+    })
+    assert r.status_code == 200
+    d = r.json()
+    assert d["diary"].strip()
+    assert len(d["facts"]) <= 3
+
+
+@pytest.mark.judge
+@needs_claude
+@needs_ollama
+def test_npc_mentions_what_it_saw_earlier_today():
+    """Part B's hot tier: an event from today reaches the conversation and gets used."""
+    r = client.post("/conversation", json={
+        "participants": [
+            {"name": "Traveller", "speaks": False},
+            {"name": "Sir Lancelot",
+             "persona": "A noble knight sworn to protect the realm.",
+             "events_today": ["Sir Lancelot couldn't reach the well",
+                              "Sir Lancelot couldn't reach the well"]},
+        ],
+        "location": "Medows",
+        "history": ["Traveller: How has your day been, Sir Knight?"],
+        "max_lines": 1,
+    })
+    assert r.status_code == 200
+    reply = " ".join(r.json()["lines"])
+    verdict = judge.judge(
+        "Earlier today the knight twice tried and failed to reach the well.",
+        "How has your day been, Sir Knight?",
+        reply,
+        "the reply mentions the well, or failing to get somewhere he was trying to go",
+    )
+    assert verdict.passed, f"knight did not mention what he saw: {reply!r} - judge: {verdict.reason}"
+
+
+WELL_CONTEXT = "A knight's day: three times he set out for the well and three times he couldn't reach it."
+WELL_QUESTION = "Write the knight's diary entry for the day."
+WELL_EXPECTATION = "the diary entry mentions the well, or not being able to get somewhere (or another word for it)"
+
+
+@pytest.mark.judge
+@needs_claude
+@needs_ollama
+def test_a_day_of_failed_trips_to_the_well_is_in_the_diary():
+    """Part B's cold tier: the day-end reflection writes up what actually happened."""
+    r = client.post("/reflection", json={
+        "npc_name": "Sir Lancelot",
+        "persona": "A noble knight sworn to protect the realm.",
+        "date": "Spring 3, Year 1",
+        "events": ["Sir Lancelot couldn't reach the well"] * 3,
+    })
+    assert r.status_code == 200
+    diary = r.json()["diary"]
+    verdict = judge.judge(WELL_CONTEXT, WELL_QUESTION, diary, WELL_EXPECTATION)
+    assert verdict.passed, f"the diary missed the day: {diary!r} - judge: {verdict.reason}"
+
+
 # ------------------------------------------------------------- judge: is the grader sound?
 # Before trusting the judge on the model's replies, check it against hand-written ones
 # where we already know the right answer. A judge that passes everything looks like
@@ -257,3 +393,16 @@ RECALL_EXPECTATION = "the reply recalls that the player asked about getting a sw
 def test_judge_grades_known_replies_correctly(reply, should_pass):
     verdict = judge.judge(RECALL_CONTEXT, RECALL_QUESTION, reply, RECALL_EXPECTATION)
     assert verdict.passed == should_pass, f"judge got {reply!r} wrong: {verdict.reason}"
+
+
+@pytest.mark.judge
+@needs_claude
+@pytest.mark.parametrize("diary, should_pass", [
+    ("Thrice I set out for the well today, and thrice the way was barred.", True),
+    ("I could not reach the water today, try as I might.", True),
+    ("A fine day. I polished my armour and ate well.", False),                  # 'well', wrong sense
+    ("I slew a dragon at the gate.", False),                                     # invented
+])
+def test_judge_grades_known_diaries_correctly(diary, should_pass):
+    verdict = judge.judge(WELL_CONTEXT, WELL_QUESTION, diary, WELL_EXPECTATION)
+    assert verdict.passed == should_pass, f"judge got {diary!r} wrong: {verdict.reason}"

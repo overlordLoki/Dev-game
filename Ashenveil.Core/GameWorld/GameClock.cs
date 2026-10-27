@@ -35,15 +35,46 @@ namespace Ashenveil.Core.GameWorld
         }
 
         // Called every frame: turns real seconds into game days (10 real minutes = 1 day).
-        public void Update(GameTime gameTime)
+        public void Update(GameTime gameTime) => Advance((float)gameTime.ElapsedGameTime.TotalSeconds);
+
+        /// <summary>The time of day on a 24-hour clock, from 0 (midnight) up to 24.</summary>
+        public float HourOfDay => _elapsedSeconds / SecondsPerDay * 24f;
+
+        /// <summary>
+        /// Jumps to the very start of the day <paramref name="days"/> from now (the console's
+        /// `time +1d`), raising DayStarted for every day passed, as if they'd been played.
+        /// </summary>
+        public void SkipDays(int days)
         {
-            _elapsedSeconds += (float)gameTime.ElapsedGameTime.TotalSeconds;
+            for (int i = 0; i < days; i++)
+            {
+                _elapsedSeconds = 0f;
+                StartNextDay();
+            }
+        }
+
+        /// <summary>Moves the clock on by game hours, raising DayStarted if midnight is passed.</summary>
+        public void SkipHours(float hours)
+        {
+            if (hours <= 0) return;
+            Advance(hours / 24f * SecondsPerDay);
+        }
+
+        // Moves time on by real seconds; every midnight crossed starts a day.
+        private void Advance(float seconds)
+        {
+            _elapsedSeconds += seconds;
             while (_elapsedSeconds >= SecondsPerDay)
             {
                 _elapsedSeconds -= SecondsPerDay;
-                CurrentDate.AdvanceDay();
-                DayStarted?.Invoke(TotalDays);
+                StartNextDay();
             }
+        }
+
+        private void StartNextDay()
+        {
+            CurrentDate.AdvanceDay();
+            DayStarted?.Invoke(TotalDays);
         }
 
     }
