@@ -16,18 +16,24 @@ namespace Ashenveil.Core.DevConsole
     /// </summary>
     public static class WorldCommands
     {
-        public static void Register(CommandRegistry commands, World world)
+        public static void Register(CommandRegistry commands, World world) => Register(commands, () => world);
+
+        /// <param name="world">
+        /// The world being played, asked for each time a command runs: Continue or the `load`
+        /// command swap in a different World, and the commands should follow it.
+        /// </param>
+        public static void Register(CommandRegistry commands, Func<World> world)
         {
             commands.Register("where", "[npc]", "Shows the level, cell and x,y (in cells) of the player's feet, or an NPC's.",
-                args => Where(world, args.Length == 0 ? null : args[0]), minArgs: 0, maxArgs: 1);
+                args => Where(world(), args.Length == 0 ? null : args[0]), minArgs: 0, maxArgs: 1);
             commands.Register("tp", "<col> <row>", "Stands the player on a cell of this level (as if spawned there).",
-                args => Teleport(world, args), minArgs: 2, maxArgs: 2);
+                args => Teleport(world(), args), minArgs: 2, maxArgs: 2);
             commands.Register("tpxy", "<x> <y>", "Moves the player's feet to an exact x,y in cells (e.g. 3.25 4.5).",
-                args => TeleportXY(world, args), minArgs: 2, maxArgs: 2);
+                args => TeleportXY(world(), args), minArgs: 2, maxArgs: 2);
             commands.Register("npcs", "", "Lists every NPC in every level: id, name, level, state.",
-                _ => Npcs(world));
+                _ => Npcs(world()));
             commands.Register("journal", "<npc>", "Shows what an NPC remembers. <npc> is an id or a name.",
-                args => Journal(world, args[0]), minArgs: 1, maxArgs: 1);
+                args => Journal(world(), args[0]), minArgs: 1, maxArgs: 1);
             commands.Register("nav", "", "Shows or hides the blocked cells (red) and each NPC's path (yellow).",
                 _ => ToggleNav());
         }
@@ -114,7 +120,7 @@ namespace Ashenveil.Core.DevConsole
             yield return $"...and {journal.Transcripts.Count} conversation(s):";
             foreach (var t in journal.Transcripts)
                 yield return $"  #{t.Id} day {t.Day}{(t.Location != null ? $" at {t.Location}" : "")}"
-                           + $" with {string.Join(", ", t.Participants)}: {t.Summary ?? "(no summary yet)"}";
+                           + $" with {string.Join(", ", t.Participants.Select(p => p.Name))}: {t.Summary ?? "(no summary yet)"}";
         }
 
         /// <summary>

@@ -36,6 +36,13 @@ namespace Ashenveil.Core.Entities.brains.Task
         public GoToTask(Vector2 target) => _target = target;
 
         /// <summary>
+        /// Where the feet are headed, in cells. All saving keeps: the route and stuck timers
+        /// aren't saved, because the first Execute after loading plans again from wherever the
+        /// NPC is, as it does for any task that's just starting.
+        /// </summary>
+        public Vector2 Target => _target;
+
+        /// <summary>
         /// The waypoints still to walk, in cells, starting with the one being headed for.
         /// Empty until the first Execute plans the route. For debug drawing.
         /// </summary>

@@ -151,7 +151,7 @@ public class ApplyDecisionTests
     // --------------------------------------------------------------- the transcript link
 
     private static Transcript NewTranscript(int id = 4) =>
-        new(id, day: 1, "Medows", new[] { "Traveller", "Test" }, new[] { "Traveller: my name is Loki" });
+        new(id, day: 1, "Medows", new[] { new Participant(0, "Traveller"), new Participant(1, "Test") }, new[] { "Traveller: my name is Loki" });
 
     [Fact]
     public void The_decision_summary_labels_the_transcript()

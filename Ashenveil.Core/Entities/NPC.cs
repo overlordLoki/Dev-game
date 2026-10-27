@@ -41,6 +41,8 @@ namespace Ashenveil.Core.Entities
         // still go through the NPC's own methods below.
         public NpcBrain.NPCState State => Brain.State;
         public brains.Memorys.Journal Journal => Brain.Journal;
+        // The task queue, front first. For saving; new tasks still go in through GiveTask.
+        public IReadOnlyCollection<brains.Task.ITask> Tasks => Brain.TaskQueue;
         // Where the current go-to task is still heading, in cells; empty when the NPC isn't
         // walking to anything. For the `nav` debug drawing.
         public IReadOnlyList<Vector2> CurrentPath =>
@@ -98,12 +100,14 @@ namespace Ashenveil.Core.Entities
         public IEnumerable<string> RecentMemories(int count) =>
             Brain.Journal.Recent(count).Select(m => m.Text);
 
-        // Recall from the cold tier: one line per earlier conversation with `person`, oldest
-        // first, the last `count` of them ("2 days ago, at Medows: ..."). Transcripts without
-        // a summary (the decision never came back) are skipped - there's nothing to say.
-        public IEnumerable<string> PastConversationsWith(string person, int count, int today) =>
+        // Recall from the cold tier: one line per earlier conversation with the person whose
+        // entity Id is `personId`, oldest first, the last `count` of them ("2 days ago, at
+        // Medows: ..."). By id, not name, so a rename or two people with the same name can't
+        // mix memories up. Transcripts without a summary (the decision never came back) are
+        // skipped - there's nothing to say.
+        public IEnumerable<string> PastConversationsWith(int personId, int count, int today) =>
             Brain.Journal.Transcripts
-                .Where(t => t.Summary != null && t.Participants.Contains(person))
+                .Where(t => t.Summary != null && t.Participants.Any(p => p.Id == personId))
                 .TakeLast(count)
                 .Select(t => $"{DaysAgo(today - t.Day)}{(t.Location != null ? $", at {t.Location}" : "")}: {t.Summary}");
 

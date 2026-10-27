@@ -1,12 +1,13 @@
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
+using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Tests;
 
 /// <summary>
 /// Conversation.ToTranscript turns a live conversation into plain data for the cold tier.
-/// It must keep only what was said, use names rather than entities, and be a snapshot -
+/// It must keep only what was said, use ids and names rather than entities, and be a snapshot -
 /// nothing said afterwards may leak into it.
 /// </summary>
 public class TranscriptTests
@@ -31,7 +32,7 @@ public class TranscriptTests
     {
         var c = NewConversation(Answer("Well met."));
         c.Add("Test", "Halt.");
-        c.Say(Conversation.PlayerName, "Hello.");
+        c.Say(Player.DefaultName, "Hello.");
         c.Poll();
 
         var t = c.ToTranscript(id: 1, day: 3);
@@ -43,7 +44,7 @@ public class TranscriptTests
     public void Game_notes_like_no_answer_are_left_out()
     {
         var c = NewConversation(Task.FromResult(System.Array.Empty<ChatMessage>()));   // API answers nothing
-        c.Say(Conversation.PlayerName, "Hello?");
+        c.Say(Player.DefaultName, "Hello?");
         c.Poll();                                                                       // adds "(no answer)"
 
         var t = c.ToTranscript(1, 1);
@@ -52,11 +53,28 @@ public class TranscriptTests
     }
 
     [Fact]
-    public void Participants_are_names_with_the_player_as_Traveller()
+    public void A_transcript_records_each_participants_id_and_name()
     {
-        var t = NewConversation(Answer("")).ToTranscript(1, 1);
+        var player = new Player(new Vector2(0, 0), id: 0);
+        var c = new Conversation(new Entity[] { player, new TestNpc(1, 0, id: 3) }, location: null,
+            new ConversationRequestDto { participants = new() }, _ => Answer(""));
 
-        Assert.Equal(new[] { Conversation.PlayerName, "Test" }, t.Participants);
+        var t = c.ToTranscript(1, 1);
+
+        Assert.Equal(new[] { new Participant(0, Player.DefaultName), new Participant(3, "Test") }, t.Participants);
+    }
+
+    [Fact]
+    public void A_transcript_keeps_the_name_someone_had_at_the_time()
+    {
+        var player = new Player(new Vector2(0, 0), id: 0);
+        var c = new Conversation(new Entity[] { player, new TestNpc(1, 0, id: 3) }, location: null,
+            new ConversationRequestDto { participants = new() }, _ => Answer(""));
+        var t = c.ToTranscript(1, 1);
+
+        player.Name = "Loki";
+
+        Assert.Equal(Player.DefaultName, t.Participants[0].Name);
     }
 
     [Fact]
@@ -94,7 +112,7 @@ public class TranscriptTests
     public void Journal_keeps_transcripts_in_the_cold_tier_apart_from_memories()
     {
         var journal = new Journal();
-        journal.Add(new Transcript(1, 1, "Medows", new[] { "Traveller" }, new[] { "Traveller: hi" }));
+        journal.Add(new Transcript(1, 1, "Medows", new[] { new Participant(0, "Traveller") }, new[] { "Traveller: hi" }));
 
         Assert.Single(journal.Transcripts);
         Assert.Empty(journal.Memories);

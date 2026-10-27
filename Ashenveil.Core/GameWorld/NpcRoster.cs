@@ -29,6 +29,24 @@ namespace Ashenveil.Core.GameWorld
         /// <summary>A fresh, never-used NPC id.</summary>
         public int NextId() => _nextId++;
 
+        /// <summary>The id NextId will hand out next, without using it up. For saving.</summary>
+        public int PeekNextId => _nextId;
+
+        /// <summary>Levels whose starting NPCs have already spawned. For saving.</summary>
+        public IReadOnlyCollection<string> PopulatedLevels => _populated;
+
+        /// <summary>
+        /// Picks up a saved game's counter and spawned levels, before its NPCs are added back.
+        /// Without this a loaded game would hand out ids the saved NPCs already have, and
+        /// respawn every level's starting NPCs on top of the saved ones.
+        /// </summary>
+        public void Restore(int nextId, IEnumerable<string> populatedLevels)
+        {
+            _nextId = nextId;
+            _populated.Clear();
+            _populated.UnionWith(populatedLevels);
+        }
+
         /// <summary>The NPCs in this level (none yet if it's never been visited).</summary>
         public IReadOnlyList<NPC> In(string levelName) => ListFor(levelName);
 

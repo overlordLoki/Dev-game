@@ -12,9 +12,17 @@ namespace Ashenveil.Core.Entities
             Talking,
         }
         public PlayerState State { get; set; } = PlayerState.Idle;
-        
-        public Player(Vector2 position, int id) : base(position, id)
+
+        // What a new player is called until there's a way to choose a name.
+        public const string DefaultName = "Traveller";
+
+        // What the player is called: in the transcript, and in what the LLM is told. Can
+        // change, so memories never point at it - they point at Id, which doesn't.
+        public string Name { get; set; }
+
+        public Player(Vector2 position, int id, string name = DefaultName) : base(position, id)
         {
+            Name = name;
             Speed = 1.4f;   // cells per second (was 200px/s at 720p's 144px cells)
             AddAnimation("idle", Assets.PLAYERIDLE, 0.15);
         }

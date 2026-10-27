@@ -13,8 +13,6 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
 
     public class Conversation
     {
-        // What the player is called, both in the transcript and in what the LLM is told.
-        public const string PlayerName = "Traveller";
         // Shown in place of a reply when the API is down or answers with nothing.
         public const string NoReply = "(no answer)";
 
@@ -109,9 +107,20 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
             id,
             day,
             Location?.Name,
-            Participants.Select(p => p is NPC npc ? npc.Name : PlayerName).ToList(),
+            Participants.Select(p => new Participant(p.Id, NameOf(p))).ToList(),
             Messages.Where(m => m.Speaker != null)
                     .Select(m => $"{m.Speaker}: {m.Text}")
                     .ToList());
+
+        /// <summary>
+        /// What someone in a conversation is called right now. Only NPCs and players have
+        /// names; anything else (tests use plain entities) is shown by its id.
+        /// </summary>
+        public static string NameOf(Entity who) => who switch
+        {
+            NPC npc => npc.Name,
+            Player player => player.Name,
+            _ => $"#{who.Id}",
+        };
     }
 }

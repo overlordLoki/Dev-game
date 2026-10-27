@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Ashenveil.Core.Saving;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Levels;
@@ -58,6 +60,8 @@ namespace Ashenveil.Core.GameWorld
                      Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
         {
             Conversations = new ConversationSystem(sendChat, requestDecision);
+            // Id 0 is this save's owner, not "the player": other players would take ids from
+            // the roster like NPCs do, so ask `is Player`, never `Id == 0`.
             this.player = new Player(Vector2.Zero, 0);   // Init stands them on the spawn point
             SetLocation(start);
         }
@@ -71,6 +75,44 @@ namespace Ashenveil.Core.GameWorld
         {
             location.PlaceAt(player, "Player_spawn");
             Roster.Populate(location);
+        }
+
+        /// <summary>
+        /// The other way to start: carry on a saved game instead of calling <see cref="Init"/>.
+        /// Puts back the player (id, name, level, feet), the clock, both id counters, which
+        /// levels have spawned their NPCs, and every saved NPC in its own level, with its
+        /// journal and task queue.
+        ///
+        /// Levels themselves come from their files as always. Throws (IOException, or
+        /// JsonException for a broken file) if a level the save names can't be read, and
+        /// InvalidDataException if the save has no player - the caller says so and stays in the menu.
+        /// </summary>
+        public static World FromSave(SaveData save,
+                                     Func<ConversationRequestDto, System.Threading.Tasks.Task<ChatMessage[]>> sendChat = null,
+                                     Func<DecisionRequestDto, System.Threading.Tasks.Task<NpcDecisionDto>> requestDecision = null)
+        {
+            // The save's owner. Other players are a multiplayer feature and would join here.
+            var owner = save.Players.FirstOrDefault()
+                ?? throw new System.IO.InvalidDataException("The save has no player in it.");
+
+            var world = new World(new Location(owner.Level), sendChat, requestDecision);
+            world.player = new Player(Vector2.Zero, owner.Id, owner.Name);
+            world.player.StandAt(new Vector2(owner.X, owner.Y));
+
+            world.Clock.Restore(save.TotalDays, save.SecondsIntoDay);
+            world.Roster.Restore(save.NextPersonId, save.PopulatedLevels);
+            world.Conversations.Restore(save.NextTranscriptId);
+
+            // One dictionary for every NPC, so a conversation two of them had is one object again.
+            var transcripts = SaveMapper.TranscriptsFrom(save);
+            foreach (var saved in save.Npcs)
+            {
+                var npc = SaveMapper.FromSave(saved, transcripts);
+                // An NPC elsewhere gets its level loaded now: it needs a Location (and its nav
+                // grid) for its tasks, and the player walking in later finds that same Location.
+                if (npc != null) world.Roster.Add(world.LocationNamed(saved.Level), npc);
+            }
+            return world;
         }
 
         /// <summary>
@@ -123,9 +165,15 @@ namespace Ashenveil.Core.GameWorld
             location.PlaceAt(player, exit.arriveAt);
         }
 
-        /// <summary>The level with this name: the one already visited, or loaded from disk on first visit.</summary>
-        private Location LocationNamed(string name) =>
-            _visited.TryGetValue(name, out var known) ? known : new Location(name);
+        /// <summary>
+        /// The level with this name: the one already loaded, or read from disk the first time
+        /// (and kept, so the next ask gets the same Location).
+        /// </summary>
+        private Location LocationNamed(string name)
+        {
+            if (!_visited.TryGetValue(name, out var level)) _visited[name] = level = new Location(name);
+            return level;
+        }
 
         /// <summary>
         /// The one place a conversation begins, whoever starts it. The ConversationSystem does
@@ -139,9 +187,17 @@ namespace Ashenveil.Core.GameWorld
             return convo;
         }
 
+        /// <summary>
+        /// Whether the game has run since it was last saved (or loaded, or started), so quitting
+        /// should ask first. Any frame of play counts: NPCs walk and time passes even with the
+        /// player standing still. Cleared by a successful save.
+        /// </summary>
+        public bool HasUnsavedPlay { get; internal set; }
+
         /// <summary>One step of the game: time, conversations, decisions, movement, collision.</summary>
         public void Update(GameTime gameTime)
         {
+            HasUnsavedPlay = true;
             Clock.Update(gameTime);
             Conversations.Update(Clock.TotalDays);
             player.Update(gameTime);

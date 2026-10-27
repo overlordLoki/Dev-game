@@ -30,6 +30,9 @@ namespace Ashenveil.Core.Screens
         private Conversation _conversation;
         private Action _onClose;
         private NPC _speaker;
+        // The player typing here. Taken from the conversation rather than the World, so it's
+        // whichever player is in this chat.
+        private Player _player;
         private ChatLog _log;
         private TextField _textField;
 
@@ -67,6 +70,7 @@ namespace Ashenveil.Core.Screens
 
             // The portrait is whoever the player walked up to (the first NPC in the conversation).
             _speaker = conversation.Participants.OfType<NPC>().FirstOrDefault();
+            _player = conversation.Participants.OfType<Player>().First();   // only opened for the player's chats
 
             _textField = new TextField(input, "button_brown", _ => Send(), placeholder: "Say something...", maxLength: 200)
             {
@@ -96,7 +100,7 @@ namespace Ashenveil.Core.Screens
         private void Send()
         {
             if (_conversation.IsLoading || _textField.Text.Trim().Length == 0) return;
-            _conversation.Say(Conversation.PlayerName, _textField.Text.Trim());
+            _conversation.Say(_player.Name, _textField.Text.Trim());
             _textField.Text = "";   // the owner decides to clear, not the widget
         }
 
@@ -148,7 +152,7 @@ namespace Ashenveil.Core.Screens
                 var m = messages[_shown];
                 if (m.Speaker == null) _log.Add(m.Text, Color.LightGray);
                 else _log.Add(m.Text, Color.White, m.Speaker,
-                              m.Speaker == Conversation.PlayerName ? Color.LightSkyBlue : Color.Gold);
+                              m.Speaker == _player.Name ? Color.LightSkyBlue : Color.Gold);
             }
         }
     }

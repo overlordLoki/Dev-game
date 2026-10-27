@@ -15,8 +15,9 @@ public class FakeInput : IInput
     /// <summary>These keys are down and every other key is up. Hold() with nothing releases them all.</summary>
     public void Hold(params Keys[] keys) => Keyboard = new KeyboardState(keys);
 
-    public void MoveMouse(int x, int y, bool leftDown = false) =>
-        Mouse = new MouseState(x, y, 0,
+    /// <param name="wheel">The scroll wheel's running total; 120 a notch, up is positive.</param>
+    public void MoveMouse(int x, int y, bool leftDown = false, int wheel = 0) =>
+        Mouse = new MouseState(x, y, wheel,
             leftDown ? ButtonState.Pressed : ButtonState.Released,
             ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released);
 }

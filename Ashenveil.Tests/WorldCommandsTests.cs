@@ -177,7 +177,7 @@ public class WorldCommandsTests : IDisposable
     {
         var (_, brain) = AddNpc();
         brain.Journal.Add(new Memory("The traveller's name is Loki.", MemoryKind.Conversation) { SourceId = 1 });
-        brain.Journal.Add(new Transcript(1, 3, "Medows", new[] { "Traveller", "Test" }, new[] { "Traveller: hi" }));
+        brain.Journal.Add(new Transcript(1, 3, "Medows", new[] { new Participant(0, "Traveller"), new Participant(1, "Test") }, new[] { "Traveller: hi" }));
 
         var lines = Run("journal Test");
 

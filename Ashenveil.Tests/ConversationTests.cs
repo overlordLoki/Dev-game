@@ -15,7 +15,7 @@ public class ConversationTests
 {
     private const string Npc = "Sir Lancelot";
     private const string Greeting = "Hello, traveller.";
-    private const string Player = Conversation.PlayerName;
+    private const string Player = Ashenveil.Core.Entities.Player.DefaultName;
 
     private readonly ConversationRequestDto _request = new() { participants = new() };
     private int _requestsSent;

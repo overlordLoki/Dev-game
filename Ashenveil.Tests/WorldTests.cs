@@ -261,7 +261,7 @@ public class WorldTests : IDisposable
             "resume", false, Array.Empty<TaskSpecDto>());
         var convo = world.Interact();
 
-        convo.Add(Conversation.PlayerName, "My name is Loki.");
+        convo.Add(Player.DefaultName, "My name is Loki.");
         convo.End();
         Step(world, 1 / 60.0);
 

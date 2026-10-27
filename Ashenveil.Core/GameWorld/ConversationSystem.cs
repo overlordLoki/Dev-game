@@ -41,6 +41,15 @@ namespace Ashenveil.Core.GameWorld
         // right conversation.
         private int _nextTranscriptId = 1;
 
+        /// <summary>The id the next transcript will get. For saving.</summary>
+        public int PeekNextTranscriptId => _nextTranscriptId;
+
+        /// <summary>
+        /// Carries on a saved game's transcript ids, so a new conversation never gets the id of
+        /// a saved one (memories find their transcript by that id).
+        /// </summary>
+        public void Restore(int nextTranscriptId) => _nextTranscriptId = nextTranscriptId;
+
         /// <param name="sendChat">How a chat reply is asked for. Defaults to the real API.</param>
         /// <param name="requestDecision">How an end-of-conversation decision is asked for. Defaults to the real API.</param>
         public ConversationSystem(Func<ConversationRequestDto, Task<ChatMessage[]>> sendChat = null,
@@ -86,10 +95,9 @@ namespace Ashenveil.Core.GameWorld
         // remembers - attached to that NPC, so the prompt frames it as their own knowledge.
         private static ConversationRequestDto BuildRequest(Entity from, NPC[] others, Location level, int today)
         {
-            string initiator = (from as NPC)?.Name ?? Conversation.PlayerName;
             var req = new ConversationRequestDto
             {
-                participants = new List<ParticipantDto> { new() { name = initiator, speaks = false } },
+                participants = new List<ParticipantDto> { new() { name = Conversation.NameOf(from), speaks = false } },
                 location = level?.Name,
                 // One reply per thing said, so it reads as a back-and-forth.
                 max_lines = others.Length,
@@ -100,7 +108,7 @@ namespace Ashenveil.Core.GameWorld
                     name = npc.Name,
                     persona = npc.Persona,
                     memories = npc.RecentMemories(MaxInjectedMemories).ToList(),
-                    past_conversations = npc.PastConversationsWith(initiator, MaxRecalledConversations, today).ToList(),
+                    past_conversations = npc.PastConversationsWith(from.Id, MaxRecalledConversations, today).ToList(),
                 });
             return req;
         }

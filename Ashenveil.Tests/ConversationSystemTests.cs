@@ -41,7 +41,7 @@ public class ConversationSystemTests
     private Conversation FinishedChat()
     {
         var convo = StartWithPlayer();
-        convo.Add(Conversation.PlayerName, "My name is Loki.");
+        convo.Add(Player.DefaultName, "My name is Loki.");
         convo.End();
         return convo;
     }
@@ -73,7 +73,7 @@ public class ConversationSystemTests
     {
         var convo = StartWithPlayer();
 
-        convo.Say(Conversation.PlayerName, "Hello.");
+        convo.Say(Player.DefaultName, "Hello.");
 
         Assert.Equal(new[] { "Traveller: Hello." }, Assert.Single(_chatsSent).history);
     }
@@ -96,7 +96,7 @@ public class ConversationSystemTests
             "The traveller's name is Loki.", Ashenveil.Core.Entities.brains.Memorys.MemoryKind.Conversation));
 
         var convo = StartWithPlayer();
-        convo.Say(Conversation.PlayerName, "Do you remember me?");   // sends the request
+        convo.Say(Player.DefaultName, "Do you remember me?");   // sends the request
 
         var npcInPrompt = Assert.Single(_chatsSent).participants.Single(p => p.name == "Test");
         Assert.Contains("The traveller's name is Loki.", npcInPrompt.memories);
