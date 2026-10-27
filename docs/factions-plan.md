@@ -42,8 +42,9 @@ reads opinions to choose targets; it doesn't own any of it.
 - **Nothing about factions or opinions exists.** The NPC plan's A3 "disposition"
   (`friendly | neutral | wary | hostile` on the decision) was the placeholder; this plan
   replaces it.
-- **People are known by id:** NPCs by stable key, players by `PlayerId` (save system decision
-  13). Transcripts carry ids and names. Opinions key on the same ids.
+- **People are known by int id:** players and NPCs share one counter, and ids are saved, so
+  they're stable across save and load. Transcripts carry ids and names. Opinions key on the
+  same ids.
 - **No event log yet:** `MemoryKind.Event` exists but nothing posts one. Part B builds the log,
   perception, `Memory.Day` and the staggered day-end reflection call. `MemoryKind`'s comment
   already expects a `Rumour` kind, which gossip will use.
@@ -63,7 +64,7 @@ reads opinions to choose targets; it doesn't own any of it.
 
 public class Opinions                       // one per NPC, in the brain next to Journal
 {
-    // About single people (NPC key or PlayerId). Once an entry exists it's this NPC's own
+    // About single people, by person id (player or NPC). Once an entry exists it's this NPC's own
     // view and only changes through what happens - it never fades back to the faction view.
     private readonly Dictionary<string, int> _people = new();
     // About whole factions. Seeded from the faction table when the NPC is created.
@@ -176,7 +177,7 @@ on again. That's how a village learns you robbed the miller without anyone else 
 **Day end (cold, one LLM call per NPC, staggered):**
 - Reflection gets the day's events and rumours and the NPC's current opinions, and returns:
   - a summary for the cold store (Part B already plans this);
-  - **opinion changes**, e.g. `[{ "about": "player:3f2a…", "by": -30, "why": "..." },
+  - **opinion changes**, e.g. `[{ "about": "person:0", "by": -30, "why": "..." },
     { "about": "faction:bandit", "by": -20, "why": "..." }]`.
 - **The game validates before applying**, the same rule as decisions:
   - `about` must be a person or faction from that day's events or rumours (the NPC is handed
@@ -269,7 +270,7 @@ on again. That's how a village learns you robbed the miller without anyone else 
    ("can this NPC let people in?").
 8. **Saving** (a `user_version` migration):
    - `npcs.factions` and `players.factions`;
-   - an `opinions` table (`owner_key`, `about` (a person key or `faction:<name>`), `score`);
+   - an `opinions` table (`owner_id`, `about` (`person:<id>` or `faction:<name>`), `score`);
    - a `standings` table (`player_id`, `faction`, `score`);
    - rumours are stored as journal events, with columns for the teller and hop count.
 
