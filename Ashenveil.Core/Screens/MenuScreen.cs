@@ -15,8 +15,12 @@ namespace Ashenveil.Core.Screens
         private MouseState prevMouse;
         private Label _message;
 
-        /// <param name="onContinue">Carries on the saved game. Null when there's no save: no Continue button.</param>
-        public Menu(SpriteFont font, Action onContinue, Action action, Action onSettings, int screenWidth, int screenHeight)
+        /// <param name="onContinue">
+        /// Opens the save list to carry one on. Always shown, even with no saves (the list says
+        /// "No saves yet."): the menu is built once, so a button that came and went with the
+        /// saves would be wrong as soon as one was made or deleted.
+        /// </param>
+        public Menu(SpriteFont font, Action onContinue, Action action, Action onSettings, Action onQuit, int screenWidth, int screenHeight)
         {
             this.font = font;
 
@@ -25,12 +29,14 @@ namespace Ashenveil.Core.Screens
             var continueRect = new Rectangle(centreX, screenHeight / 2 - btnH / 2 - btnH - gap, btnW, btnH);
             var newGameRect  = new Rectangle(centreX, screenHeight / 2 - btnH / 2, btnW, btnH);
             var settingsRect = new Rectangle(centreX, newGameRect.Bottom + gap, btnW, btnH);
-            var messageRect  = new Rectangle(0, settingsRect.Bottom + gap, screenWidth, btnH);
+            var quitRect     = new Rectangle(centreX, settingsRect.Bottom + gap, btnW, btnH);
+            var messageRect  = new Rectangle(0, quitRect.Bottom + gap, screenWidth, btnH);
 
             // Adding a button is now one line here — no field, no hit-test, no Draw call.
-            if (onContinue != null) widgets.Add(new Button(continueRect, "Continue", "button_brown", onContinue));
+            widgets.Add(new Button(continueRect, "Continue", "button_brown", onContinue));
             widgets.Add(new Button(newGameRect,  "New Game", "button_brown", action));
             widgets.Add(new Button(settingsRect, "Settings", "button_brown", onSettings));
+            widgets.Add(new Button(quitRect, "Quit Game", "button_brown", onQuit));
             _message = new Label(messageRect, "", Color.Salmon);
             widgets.Add(_message);
         }

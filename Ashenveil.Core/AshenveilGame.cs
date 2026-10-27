@@ -178,14 +178,16 @@ namespace Ashenveil.Core
 
             _menu = new Menu(
                 font,
-                _saves.HasSaves ? Continue : null,           // Continue (pick a save), only if there are any
+                Continue,                                    // Continue: the save list ("No saves yet." if empty)
                 NewGame,                                     // New Game
                 () =>                                        // Settings
                 {
                     _settings.Open(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
                     _screenManager.Push(_settings);
                 },
+                QuitGame,                                    // Quit Game
                 w, h);
+                
 
             // start on the menu
             _screenManager.Push(_menu);
@@ -279,6 +281,11 @@ namespace Ashenveil.Core
         {
             if (_saves.TrySaveNew(world, out var message)) Saved(message);
             else _slots.ShowMessage(message, good: false);
+        }
+        // from Main menu quit the game to desktop
+        private void QuitGame()
+        {
+            Exit();
         }
 
         // A save was picked: overwrite it, or carry it on - each asking first.
