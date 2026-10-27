@@ -15,6 +15,14 @@ grudges are the LLM's job.
 It's a big feature, so it's split into phases that each leave the game playable and testable:
 facing → health → the player's attack → NPCs fight back → death → enemies → saving it.
 
+**It comes after two other pieces of work.** Combat *posts* what happens to the event log, and
+*reads* opinions to decide who to fight. It owns neither:
+1. The **event log and day-end reflection** ([npc-memory-next-plan.md](npc-memory-next-plan.md)
+   Part B). Fights are stored as events: hot memories that same day, and lasting after-effects
+   at day end.
+2. **Factions and opinions** ([factions-plan.md](factions-plan.md)). Who is hostile to whom,
+   for any NPC against any other NPC or the player.
+
 ---
 
 ## Where things are now
@@ -55,9 +63,9 @@ facing → health → the player's attack → NPCs fight back → death → enem
 - **Debug:** `Debug.SHOWBOUNDS` outlines collision boxes; the console has `where`, `tp`,
   `npcs` and `journal`, built from `CommandRegistry`.
 - **Input keys used:** E interact, P pause, \` / Oem8 console.
-- **The save system is being built** in a separate chat. Steps 0–2 below touch `Player.cs`,
-  `NPC.cs`, `Entity.cs` and `World.cs`, which that work is also changing. **Start coding after
-  the save work is merged**, or expect conflicts.
+- **Saving is built** ([Completed/save-system-plan.md](Completed/save-system-plan.md), with
+  slots in [Completed/save-slots-plan.md](Completed/save-slots-plan.md)). Schema v1 has
+  shipped, so anything combat adds to a save is a migration.
 
 ---
 
@@ -160,8 +168,10 @@ It's given the list of combatants rather than the whole `World`, so tests can bu
    ends by resuming it, just like `StopTalking`; `NPCState.Dead` stops everything.
    - Not a task in the queue: a fight has to interrupt whatever the NPC was doing, and come
      back to it after.
-8. **Friendly NPCs can be attacked**, and it has consequences: they fight back, and they
-   remember it. That's the most interesting thing combat adds to an LLM-memory game.
+8. **Anyone can fight anyone.** Combat code has no teams: a swing hits whatever is in its
+   hitbox (friendly fire is on). Who a brain *chooses* to attack comes from its opinions
+   ([factions-plan.md](factions-plan.md)). Attacking a friendly NPC has consequences: they
+   fight back now, and remember it (events, then reflection).
 9. **No talking during a fight.** `World.Interact` skips NPCs that are fighting or dead.
    Getting hit while the chat box is open can't happen, because the chat screen stops the
    world updating.
@@ -254,17 +264,24 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 
 - **Player death:** the death animation, then respawn (open question 1).
 - **NPC death or knockout:** per open question 2.
-- **Memory without the LLM:** when a fight ends, the World adds a plain memory to each NPC that
-  took part, e.g. "The traveller attacked me" or "I fought the traveller and lost". It's a
-  `MemoryKind` of its own (`Event`), so it shows in `journal` and is injected into the next
-  chat like any other fact, and the knight brings it up. This is the payoff step.
-- *Later hook:* disposition (A3 in the NPC plan) reads these memories; the event log (Part B)
-  records fights properly.
+- **Fights become events.** `CombatSystem`'s `Hit` and `Died` are posted to the event log
+  (Part B) as structured events: attacked, wounded, killed, fled, with attacker and victim
+  ids. Perception decides who saw them.
+  - **That same day**, they're hot memories (`MemoryKind.Event`), so the knight says "you
+    struck me this morning", and today's grudges make him hostile straight away.
+  - **At day end**, reflection turns them into lasting opinion changes, about you or about a
+    whole faction ([factions-plan.md](factions-plan.md)).
 
-### Step 5 — Enemies
+  This is the payoff step, and combat writes no memory code of its own.
 
-- Hostility: a `Faction` (or `Hostile` flag) on `NPC`. A hostile NPC that sees the player within
-  an aggro radius (and later, with line of sight on the `NavGrid`) enters Fighting.
+### Step 5 — Picking fights: opinions and enemies
+
+- **Brains choose targets from opinions.** A few times a second, an NPC looks at the people it
+  can perceive and attacks anyone it's hostile to (opinion or today's grudge). That covers NPC
+  against NPC too: the knight goes for a bandit with nobody telling him to.
+- **Joining in:** an NPC that sees a fight joins the side it likes more: friendly to the
+  victim, or hostile to the attacker.
+- Aggro radius, and later line of sight on the `NavGrid`.
 - A first enemy type (e.g. `Bandit : NPC` or `Wolf : NPC`) with an `EnemyBrain` (wander, aggro,
   fight, leash back home).
 - Spawning from the level JSON instead of the hard-coded `NpcRoster.SpawnStartingNpcs` switch
@@ -275,8 +292,8 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - Health for players and NPCs; dead / knocked-out state (and knock-out time left).
 - Fights in progress aren't saved, like conversations: you can only save from the pause menu,
   so the World isn't running. Health persists; who you were fighting doesn't.
-- If save schema v1 has shipped by then, this is the first real `user_version` migration (v1 →
-  v2: add the `hp` columns). That's a good test of the migration path.
+- Save schema v1 has shipped, so this is a `user_version` migration (add the `hp` columns),
+  unless the factions work's migration has already gone in first; then they share one.
 
 ### Later (not planned in detail)
 
@@ -284,7 +301,6 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - Weapons and items changing `AttackData` (needs an inventory).
 - The LLM starting fights: a decision `behaviour: "hostile"` or a task `attack <who>` sets
   Fighting with a target. That's one new arm in `ApplyDecision`, like `go_to`.
-- Group fights: the knight helps the player against bandits (needs factions, step 5).
 - Hit-stop, damage numbers, screen shake, sounds.
 
 ---
@@ -320,7 +336,8 @@ Like the rest of the game, everything is tested in cells and seconds with no win
 - **`WorldTests`:**
   - press Space next to the knight (`FakeInput`), step a few frames, and his health drops;
   - a dead NPC can't be talked to;
-  - after a fight, the knight's journal has the event memory.
+  - after a fight, the event log has it, and the knight's journal has it as a hot event memory;
+  - two NPCs that are hostile to each other fight with no player involved.
 - **`WorldCommandsTests`:** `hp`, `damage`, `heal`, `kill`, `god`, `aggro`.
 - **By hand:** how the swing feels (timings, reach, knockback) can only be tuned by playing.
   Keep those numbers in one place (`AttackData` values on each class) so tuning is a one-line
@@ -330,10 +347,15 @@ Like the rest of the game, everything is tested in cells and seconds with no win
 
 ## Depends on / feeds into
 
-- **Depends on:** pathfinding (done); world units (done); the save system (in progress; only
-  step 6 needs it, but let it merge before touching the shared files).
+- **Depends on:**
+  - pathfinding (done) and world units (done);
+  - the save system (done);
+  - the event log and reflection (NPC plan, Part B), needed by step 4;
+  - [factions-plan.md](factions-plan.md), needed by step 5.
+
+  Steps 0–3 need neither, so they can start while the others are still being built.
 - **Feeds into:**
-  - [npc-memory-next-plan.md](npc-memory-next-plan.md): A2 `follow` (same chase code), A3
-    disposition (fights are the obvious input), Part B event log (fights are events).
+  - [npc-memory-next-plan.md](npc-memory-next-plan.md): A2 `follow` (same chase code), and
+    Part B (fights are the most important events it gets).
   - [draw-layers-plan.md](draw-layers-plan.md): health bars over heads and hitbox debug
     drawing are overlay-layer drawing.

@@ -71,8 +71,9 @@ the walking ones can reuse it:
 - Each should fail cleanly (`TaskState.Failed`) when there's no route, like `GoToTask`.
 
 ### A3. Disposition
-`friendly | neutral | wary | hostile` on the decision: the hook for the knight warming to,
-or souring on, the player. Injected into the conversation prompt like memories.
+**Replaced by [factions-plan.md](factions-plan.md).** Disposition became an opinion score
+per person and per faction, changed at day end by reflection (Part B), and injected into the
+conversation prompt as an attitude line.
 
 ### A4. Memory consolidation
 Dedupe and merge facts (an LLM job), and pick the most relevant N to inject, once journals
@@ -93,8 +94,9 @@ summary. Only matters once NPCs chat in groups.
 - **Hidden thinking** (`think: True`) on the decision step, to compare fact extraction quality.
   Keep it off for live dialogue, where it's just latency.
 - **`TaskContext` as a struct**, if NPC crowds appear (avoids a heap allocation per tick).
-- **Persistence** is the [save system plan](save-system-plan.md)'s job: journals and tasks
-  keyed by a stable string id (`"medows_knight"`), not the runtime int.
+- **Persistence** is done ([Completed/save-system-plan.md](Completed/save-system-plan.md)):
+  journals and tasks keyed by a stable string id (`"medows_knight"`), not the runtime int.
+  New memory data (events, `Memory.Day`) needs a schema migration.
 
 ---
 
@@ -102,8 +104,15 @@ summary. Only matters once NPCs chat in groups.
 
 **Goal:** NPCs learn from the world, not just conversations.
 
-1. **Structured `EventLog`**: `GameEvent { Day, Location, Actor, Text }` ("Loki killed 2
-   zombies at the well"). Game systems post to it.
+**Build this before combat and factions.** Fights are stored as events. Same day, they're
+hot memories; at day end, reflection writes the lasting after-effects (opinions, including
+of whole factions). See [factions-plan.md](factions-plan.md) and [combat-plan.md](combat-plan.md).
+
+1. **Structured `EventLog`**: `GameEvent { Day, Location, Type, ActorId, TargetId, Text }`
+   ("Loki killed 2 zombies at the well"). Game systems post to it.
+   - **Ids, not just text:** the engine reads events in code (today's grudges, who to fight),
+     so who did what to whom must be data. `Text` is for prompts and the console.
+   - **`Type`** is a small enum that grows: `Attacked`, `Killed`, `TaskFailed`, `Joined`...
    - Build the data first, not console text.
    - **The console is one consumer:** `ConsoleScreen.Write(text, LineKind.Event)` already
      exists for this.
@@ -114,6 +123,9 @@ summary. Only matters once NPCs chat in groups.
    memory channel as facts (`MemoryKind.Event`). No LLM call per event.
 4. **Cold at day end:** on `GameClock.DayStarted`, each NPC makes one reflection call that
    summarises the day's events into the cold store, as a daily entry alongside transcripts.
+   - It also returns **opinion changes** about the people and factions met that day. The
+     engine validates and applies them ([factions-plan.md](factions-plan.md), step 5).
+   - Build the summary first; opinion changes come with the factions work.
 5. **Stagger the day-end calls:** every NPC wants a call at once, so queue them through
    fire-and-poll with one or two in flight, not a stampede. (`ConversationSystem`'s pending
    list is the pattern.)
