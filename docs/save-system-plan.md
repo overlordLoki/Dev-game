@@ -41,7 +41,8 @@ meant to be hand-editable.
 - **Each NPC** has `Name`, `Persona`, `Location` (set by `NpcRoster.Add`) and a brain holding:
   - a `Journal`: memories (hot) and transcripts (cold), plain data by design;
   - a task queue (`GoToTask` targets in cells, `WaitTask` seconds).
-- **NPCs have a runtime `Id`** (1, 2, 3… by spawn order), which isn't stable across runs.
+- **NPCs have a runtime `Id`** (1, 2, 3… by spawn order; the player is 0), which isn't
+  saved yet, so isn't stable across runs.
   `Journal` and `Transcript` say who someone is by **name** ("Traveller", "Sir Lancelot").
 - **Starting NPCs are hard-coded** in `NpcRoster.SpawnStartingNpcs` (Medows: the knight).
 - **`World` is created once in `AshenveilGame.LoadContent` and started with `Init()`.** There's
@@ -73,9 +74,9 @@ The save classes are the boundary between the two.
 | Saved | Not saved | Why not |
 |---|---|---|
 | Clock (`CurrentDate` + time into the day) | Level tiles, objects, POIs | Already in the level JSON; save only what changes |
-| Players: stable id, name, level, feet position | Conversations in progress | Saving is blocked while a chat is open |
-| Each visited level's NPCs: type, stable key, name, position, journal | Decisions waiting on the LLM | Lost; the NPC just misses learning from one chat |
-| Id counters (`NpcRoster._nextId`, `ConversationSystem._nextTranscriptId`), populated levels (`NpcRoster._populated`) | Window size, cell size, textures, nav grids, the `_visited` level cache | Rebuilt at startup / from the level files |
+| Players: id, name, level, feet position | Conversations in progress | Saving is blocked while a chat is open |
+| Each visited level's NPCs: type, id, name, position, journal | Decisions waiting on the LLM | Lost; the NPC just misses learning from one chat |
+| Id counters (`NpcRoster._nextId`, which now numbers people, not just NPCs; `ConversationSystem._nextTranscriptId`), populated levels (`NpcRoster._populated`) | Window size, cell size, textures, nav grids, the `_visited` level cache | Rebuilt at startup / from the level files |
 | Each NPC's task queue (`go_to` targets, `wait` time left), in order | A task's planned path and stuck timers | Replanned on the first tick after loading |
 
 ---
@@ -84,9 +85,12 @@ The save classes are the boundary between the two.
 
 ### Agreed / recommended
 
-1. **Stable NPC keys.** Each NPC gets a permanent key (`"medows_knight"`) assigned where
-   it's spawned (`NpcRoster.SpawnStartingNpcs` now, the level JSON later). Saves refer to NPCs by key;
-   the runtime `Id` stays for in-session lookups only.
+1. **Ids are saved, so they're stable.** Every person's `IEntity.Id` comes from one counter
+   that only counts up and is itself saved, so an id is never reused within a save. The
+   save's owner is player `0`; NPCs (and, later, other players) take the next number. Saves
+   refer to everyone by that id, and loading rebuilds each one with it.
+   *(Changed 2026-10-27: this replaces stable string keys like `"medows_knight"` and player
+   GUIDs. Ids only need to be unique within one save, which the saved counter guarantees.)*
 2. **Positions in cells** ✅: guaranteed by the world-units refactor, which is done.
 3. **NPC factory.** A lookup from saved type name to constructor:
    `"Knight" → (pos, id, name) => new Knight(..., new KnightBrain())`. One line per NPC type.
@@ -149,9 +153,17 @@ The save classes are the boundary between the two.
     decision code *and* one in the save mapping. New types (`patrol`, `follow`...) add their
     columns or rows when they're built.
 13. **People are known by id, not by name.**
-    - **Players:** a `Player` gets a stable `PlayerId`, a new GUID created with a new game and
-      kept forever after, plus a `Name` ("Traveller" until there's a way to choose one).
-    - **NPCs:** the stable key from decision 1 (`"medows_knight"`) is their id.
+    - **Ids:** the saved `IEntity.Id` from decision 1, for players and NPCs alike. The save's
+      owner is `0`.
+    - **Players** get a `Name` ("Traveller" until there's a way to choose one).
+    - **Keep multiplayer easy:** `0` only means "this save's owner", never "the player". Ask
+      `is Player`, not `Id == 0`, and get *which* player from the conversation (its
+      initiator / participants), not from `World.player`.
+    - **Later, not now:**
+      - recognising a *returning* multiplayer guest needs something stable from their side
+        (an account or GUID) mapped to their id: one new column via a migration;
+      - an NPC's id depends on spawn order in each new game, so when hand-written content
+        (level JSON, quests) needs to name "the knight", add a key column then.
     - **This changes game code before saving.** Today a transcript's `Participants` are
       **names**, `Conversation.PlayerName` is the constant `"Traveller"`, and
       `NPC.PastConversationsWith(person)` matches by name. So renaming the player, or two
@@ -168,8 +180,8 @@ The save classes are the boundary between the two.
 
 ## Database shape (schema version 1)
 
-Plain tables, one row per thing. Names are `snake_case`, the SQL convention. `npc_key` is
-the stable key from decision 1.
+Plain tables, one row per thing. Names are `snake_case`, the SQL convention. Every id is
+a person's saved `IEntity.Id` (decision 1); players and NPCs share one numbering.
 
 ```sql
 -- One row: everything there's only one of.
@@ -178,14 +190,14 @@ CREATE TABLE game (
     saved_at           TEXT    NOT NULL,   -- ISO 8601, UTC
     total_days         INTEGER NOT NULL,   -- GameClock.CurrentDate
     seconds_into_day   REAL    NOT NULL,   -- GameClock._elapsedSeconds
-    next_npc_id        INTEGER NOT NULL,   -- NpcRoster._nextId
+    next_person_id     INTEGER NOT NULL,   -- NpcRoster._nextId: the next player or NPC id
     next_transcript_id INTEGER NOT NULL    -- ConversationSystem._nextTranscriptId
 );
 
 -- Every player (one for now; a list so multiplayer doesn't need a new format).
 CREATE TABLE players (
-    player_id TEXT PRIMARY KEY,   -- a GUID made with the new game, never changes
-    name      TEXT NOT NULL,      -- "Traveller" until names can be chosen
+    player_id INTEGER PRIMARY KEY,   -- IEntity.Id; 0 is the save's owner
+    name      TEXT NOT NULL,         -- "Traveller" until names can be chosen
     level     TEXT NOT NULL,
     x         REAL NOT NULL,      -- feet, in cells
     y         REAL NOT NULL
@@ -195,8 +207,8 @@ CREATE TABLE players (
 CREATE TABLE populated_levels (level TEXT PRIMARY KEY);
 
 CREATE TABLE npcs (
-    npc_key TEXT PRIMARY KEY,   -- "medows_knight"
-    type    TEXT NOT NULL,      -- "Knight", for the NPC factory
+    npc_id  INTEGER PRIMARY KEY,   -- IEntity.Id
+    type    TEXT NOT NULL,         -- "Knight", for the NPC factory
     name    TEXT NOT NULL,
     level   TEXT NOT NULL,
     x       REAL NOT NULL,      -- feet, in cells
@@ -205,12 +217,12 @@ CREATE TABLE npcs (
 
 -- Hot tier: facts, in the order they were learned.
 CREATE TABLE memories (
-    npc_key       TEXT    NOT NULL REFERENCES npcs(npc_key),
+    npc_id        INTEGER NOT NULL REFERENCES npcs(npc_id),
     seq           INTEGER NOT NULL,
     text          TEXT    NOT NULL,
     kind          TEXT    NOT NULL,   -- MemoryKind name: "Conversation", "Event"
     transcript_id INTEGER,            -- Memory.SourceId; NULL if it didn't come from a chat
-    PRIMARY KEY (npc_key, seq)
+    PRIMARY KEY (npc_id, seq)
 );
 
 -- Cold tier: each conversation stored once...
@@ -223,7 +235,7 @@ CREATE TABLE transcripts (
 CREATE TABLE transcript_participants (
     transcript_id INTEGER NOT NULL REFERENCES transcripts(id),
     seq           INTEGER NOT NULL,
-    person_id     TEXT    NOT NULL,   -- a player_id or an npc_key: who it was
+    person_id     INTEGER NOT NULL,   -- a player_id or an npc_id: who it was
     name          TEXT    NOT NULL,   -- what they were called at the time
     PRIMARY KEY (transcript_id, seq)
 );
@@ -235,21 +247,21 @@ CREATE TABLE transcript_lines (
 );
 -- ...and each NPC's journal lists the ones it holds.
 CREATE TABLE journal_transcripts (
-    npc_key       TEXT    NOT NULL REFERENCES npcs(npc_key),
+    npc_id        INTEGER NOT NULL REFERENCES npcs(npc_id),
     transcript_id INTEGER NOT NULL REFERENCES transcripts(id),
-    PRIMARY KEY (npc_key, transcript_id)
+    PRIMARY KEY (npc_id, transcript_id)
 );
 
 -- Each NPC's task queue, front first. Each type fills the columns it uses:
 --   go_to: x, y (the target, in cells)      wait: seconds (time left)
 CREATE TABLE tasks (
-    npc_key TEXT    NOT NULL REFERENCES npcs(npc_key),
+    npc_id  INTEGER NOT NULL REFERENCES npcs(npc_id),
     seq     INTEGER NOT NULL,       -- 0 = the front of the queue
     type    TEXT    NOT NULL,       -- "go_to", "wait": the decision schema's names
     x       REAL,
     y       REAL,
     seconds REAL,
-    PRIMARY KEY (npc_key, seq)
+    PRIMARY KEY (npc_id, seq)
 );
 ```
 
@@ -267,15 +279,21 @@ journal that lists it, just as it was shared before saving.
 
 ## Steps
 
-1. **Identity** (game code, before any saving):
-   - stable NPC keys in spawning (`NpcRoster.SpawnStartingNpcs`);
-   - `Player.PlayerId` (a GUID made with a new game) and `Player.Name`, replacing the
-     `Conversation.PlayerName` constant;
-   - `Transcript` gets participant ids alongside the names;
-   - `PastConversationsWith` matches by id.
+1. **Identity** (game code, before any saving). Everyone is known by their `IEntity.Id`
+   (decision 13), so no new id fields:
+   - `Player.Name` ("Traveller" for now), replacing the `Conversation.PlayerName` constant.
+     Its users: `ConversationSystem.BuildRequest` (the initiator's name for the prompt, its
+     id for recall) and `Chat.cs` (the player's lines and their colour);
+   - `Transcript.Participants` becomes `(Id, Name)` pairs: who it was, and what they were
+     called then. Kept as pairs so the two can't drift apart (it's also the
+     `transcript_participants` table's shape);
+   - `NPC.PastConversationsWith(int personId, ...)` matches by id;
+   - the `journal` console command can keep printing names.
 
    The existing tests show what changes: anything comparing with `"Traveller"` or a
-   participant name.
+   participant name, and every `new Transcript(...)`. Worth adding: recall still finds a
+   conversation after the player is renamed; two people with the same name aren't mixed
+   up; a transcript records each participant's id and name.
 2. **Save classes** + **`SaveMapper`**: game → save classes and back (memories, transcripts,
    NPCs, player, clock). Round-trip tests.
 3. **NPC factory** (type name → constructor + brain) and **task mapping** (`"go_to"` ↔
