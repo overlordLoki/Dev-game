@@ -22,7 +22,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
         // Where the feet go, in order, in cells. Null until the first Execute plans the route.
         private List<Vector2> _waypoints;
         private int _next;                           // index of the waypoint being walked to
-
+        private readonly Route _route = new();
         // Getting stuck: no closer to the waypoint for StuckSeconds means replan; more than
         // MaxReplans replans means give up. Closer by less than ProgressEpsilon cells
         // doesn't count, so jittering against something isn't mistaken for progress.
@@ -104,7 +104,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
         // waypoint. False (and the job Failed) if there's no way through.
         private bool StartRoute(NavGrid nav, NPC npc)
         {
-            _waypoints = Plan(nav, npc.Feet);
+            _waypoints = _route.Plan(nav, npc.Feet, _target);
             _next = 0;
             ResetProgress();
             if (_waypoints != null) return true;
@@ -126,42 +126,5 @@ namespace Ashenveil.Core.Entities.brains.Jobs
             State = JobState.Failed;
         }
 
-        // The cell centres along the route, then the exact target, smoothed into straight
-        // runs; null if there's no way through. Without a grid it's just the target: the old
-        // straight-line walk.
-        private List<Vector2> Plan(NavGrid nav, Vector2 feet)
-        {
-            if (nav == null) return new List<Vector2> { _target };
-
-            Point goal = NavGrid.CellAt(_target);
-            List<Point> path = Pathfinder.FindPath(nav, NavGrid.CellAt(feet), goal);
-            if (path == null) return null;
-
-            // Skip path[0]: the feet are already in that cell, and heading for its centre
-            // first could mean stepping backwards.
-            var waypoints = new List<Vector2>();
-            for (int i = 1; i < path.Count; i++)
-                waypoints.Add(NavGrid.CentreOf(path[i]));
-
-            // The path ends on the goal cell: finish on the exact target, not its centre.
-            // If the goal was blocked (a POI on a tree), the path stops next to it, and the
-            // centre of that cell is as close as the NPC can get.
-            if (path[^1] == goal)
-            {
-                if (waypoints.Count > 0) waypoints[^1] = _target;
-                else waypoints.Add(_target);   // already in the goal cell
-            }
-            else if (waypoints.Count == 0)
-            {
-                waypoints.Add(NavGrid.CentreOf(path[0]));   // already next to a blocked goal
-            }
-
-            // Smooth the zig-zags out, starting from the feet themselves (not their cell's
-            // centre), then drop the feet again: they're where the NPC is, not somewhere to go.
-            waypoints.Insert(0, feet);
-            List<Vector2> smoothed = Pathfinder.Smooth(nav, waypoints);
-            smoothed.RemoveAt(0);
-            return smoothed;
-        }
     }
 }
