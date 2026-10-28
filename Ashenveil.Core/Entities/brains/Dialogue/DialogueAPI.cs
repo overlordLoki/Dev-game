@@ -78,7 +78,7 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
         private static HttpClient _http = new();
         private static volatile string _baseUrl = GameSettings.DefaultBackendUrl;
 
-        /// <summary>Where requests go, without a trailing slash. Set by AshenveilGame.ApplySettings.</summary>
+        /// <summary>Where requests go, without a trailing slash. Set by AppSettings.Apply.</summary>
         public static string BaseUrl
         {
             get => _baseUrl;

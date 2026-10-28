@@ -19,7 +19,7 @@ namespace Ashenveil.Core.Screens
     ///  - Dev mode: a checkbox, applied the moment it's clicked. Only shown where dev mode is
     ///    allowed at all (Debug builds, or Release started with --dev).
     /// Back (or Escape) takes the address and saves. Changing a setting goes through the commit
-    /// action (AshenveilGame.CommitSettings: apply, then save), which throws if it can't save.
+    /// action (AppSettings.Commit: apply, then save), which throws if it can't save.
     ///
     /// Built once and kept; <see cref="Open"/> lays it out for the window and refills the field
     /// from the settings each time it's shown.

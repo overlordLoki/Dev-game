@@ -4,7 +4,7 @@ namespace Ashenveil.Core.Config
     /// What the player (or developer) has chosen, as saved in settings.json. Plain data like the
     /// level DTOs: property names are the JSON keys, and the initial values are the defaults, so a
     /// key missing from the file keeps its default. Loading and saving is SettingsStore's job;
-    /// putting the values into effect is AshenveilGame.ApplySettings.
+    /// putting the values into effect is AppSettings.Apply.
     ///
     /// Belongs to the machine, not to a playthrough, so it's a separate file from save games.
     /// </summary>

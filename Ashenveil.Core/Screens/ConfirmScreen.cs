@@ -18,6 +18,19 @@ namespace Ashenveil.Core.Screens
         private readonly SpriteFont _font;
         private MouseState _prevMouse;
 
+        /// <summary>
+        /// Asks a yes/no question over whatever's on top. The no button just closes the
+        /// question; the yes button closes it, then does <paramref name="onYes"/>.
+        /// </summary>
+        public static void Ask(ScreenManager screens, SpriteFont font, string question, string yesText, Action onYes,
+                               int screenWidth, int screenHeight)
+        {
+            screens.Push(new ConfirmScreen(font, question,
+                yesText, () => { screens.Pop(); onYes(); },
+                "Cancel", () => screens.Pop(),
+                screenWidth, screenHeight));
+        }
+
         public ConfirmScreen(SpriteFont font, string question, string yesText, Action onYes, string noText, Action onNo,
                              int screenWidth, int screenHeight)
         {

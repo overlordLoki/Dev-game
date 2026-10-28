@@ -11,7 +11,7 @@ namespace Ashenveil.Core.Utility
         // The nav grid's blocked cells and each NPC's path (the `nav` console command).
         public static bool SHOWNAV = false;
         // Dev-only tools, like the ` console. Set from the settings (GameSettings.devMode) by
-        // AshenveilGame.ApplySettings, and only ever on where DevModeAllowed.
+        // AppSettings.Apply, and only ever on where DevModeAllowed.
         public static bool DEVMODE = false;
 
         // Whether dev mode can be turned on at all, and so whether the settings screen offers
