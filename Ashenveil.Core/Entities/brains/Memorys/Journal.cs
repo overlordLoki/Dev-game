@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -30,7 +31,37 @@ namespace Ashenveil.Core.Entities.brains.Memorys
         /// </summary>
         public int LastReflectedDay { get; set; }
 
-        public void Add(Memory memory) => _memories.Add(memory);
+        /// <summary>
+        /// How long an event stays known after reflection takes its memory out of the hot tier:
+        /// the day it was learned and this many after. Gossip only passes news on until two days
+        /// after the event (a witness tells the next day at the latest, and whoever they told
+        /// passes it on the day after), so nothing older can come round again.
+        /// </summary>
+        public const int KnownEventDays = 2;
+
+        // Every event this NPC saw or heard about lately, by id, with the day it learned of it.
+        // Outlives the memory, so gossip can't tell it the same news again once it's reflected
+        // on - that would count the event twice. Saved; trimmed as new events come in.
+        private readonly Dictionary<int, int> _knownEvents = new();
+        public IReadOnlyDictionary<int, int> KnownEvents => _knownEvents;
+
+        public void Add(Memory memory)
+        {
+            _memories.Add(memory);
+            if (memory.Kind is MemoryKind.Event or MemoryKind.Rumour && memory.SourceId is int eventId)
+                Know(eventId, memory.Day);
+        }
+
+        /// <summary>Whether this NPC has seen or heard about an event lately, even if it's reflected on it since.</summary>
+        public bool Knows(int eventId) => _knownEvents.ContainsKey(eventId);
+
+        /// <summary>Records an event as known from <paramref name="day"/>, and drops ones too old to come round again.</summary>
+        public void Know(int eventId, int day)
+        {
+            _knownEvents[eventId] = Math.Max(day, _knownEvents.GetValueOrDefault(eventId));
+            foreach (var old in _knownEvents.Where(k => k.Value < day - KnownEventDays).Select(k => k.Key).ToList())
+                _knownEvents.Remove(old);
+        }
         public void Add(Transcript transcript) => _transcripts.Add(transcript);
         public void Add(DayEntry day) => _days.Add(day);
 

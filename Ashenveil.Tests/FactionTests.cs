@@ -343,6 +343,34 @@ public class FactionTests : IDisposable
     }
 
     [Fact]
+    public void An_NPC_is_not_told_an_event_again_after_reflecting_on_it()
+    {
+        var marta = Npc(1, "Marta", "village");
+        var hans = Npc(2, "Hans", "village");
+        marta.Journal.Add(Saw(7));               // Marta hasn't reflected on day 1 yet
+        var seen = Saw(7);
+        hans.Journal.Add(seen);
+        hans.Journal.Forget(new[] { seen });     // Hans has: the memory left his hot tier
+
+        Assert.Equal(0, Gossip.Share(marta, hans, today: 2));
+        Assert.Empty(Rumours(hans));
+    }
+
+    [Fact]
+    public void Known_events_are_only_kept_while_gossip_could_bring_them_round()
+    {
+        var journal = new Journal();
+        journal.Add(Saw(7, day: 1));
+        journal.Add(Saw(8, day: 1 + Journal.KnownEventDays));
+        Assert.True(journal.Knows(7));
+
+        journal.Add(Saw(9, day: 2 + Journal.KnownEventDays));
+
+        Assert.False(journal.Knows(7));
+        Assert.True(journal.Knows(8));
+    }
+
+    [Fact]
     public void Gossip_runs_in_the_world_every_few_seconds()
     {
         var world = NewWorld();

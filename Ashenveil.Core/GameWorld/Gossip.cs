@@ -15,7 +15,8 @@ namespace Ashenveil.Core.GameWorld
     ///   - A rumour is a weaker event: MemoryKind.Rumour, with who told them and a hop count.
     ///     A witness passes it on at hop 1, a hearer at hop 2, and it stops there.
     ///   - Trust filters it: an NPC only tells people it likes, and only believes people it likes.
-    ///   - An NPC keeps an event once, however many people tell them (or if they saw it).
+    ///   - An NPC keeps an event once, however many people tell them (or if they saw it), and
+    ///     isn't told it again after reflecting on it (Journal.Knows).
     /// </summary>
     public static class Gossip
     {
@@ -57,9 +58,9 @@ namespace Ashenveil.Core.GameWorld
             int taken = 0;
             foreach (var m in news)
             {
-                bool known = hearer.Journal.Memories.Any(h =>
-                    h.SourceId == m.SourceId && h.Kind is MemoryKind.Event or MemoryKind.Rumour);
-                if (known) continue;
+                // Known even if it's been reflected on and left the hot tier: hearing it again
+                // would count it twice.
+                if (hearer.Journal.Knows(m.SourceId.Value)) continue;
 
                 hearer.Journal.Add(new Memory(m.Text, MemoryKind.Rumour)
                 {

@@ -45,6 +45,13 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public const int StandingShare = 4;
 
+        /// <summary>
+        /// The least an attack lowers the victim's opinion of the attacker, whatever the LLM
+        /// proposes. The grudge ends once the day is reflected on, so without this an attacker
+        /// the LLM forgot to mention would be forgiven by morning.
+        /// </summary>
+        public const int AttackedFloor = 20;
+
         /// <summary>The world's event log, to find who an event or rumour was about. Set by the World.</summary>
         public EventLog Events { get; set; }
 
@@ -194,7 +201,8 @@ namespace Ashenveil.Core.GameWorld
                 if (!flight.task.IsCompleted) continue;
                 if (flight.task.IsCompletedSuccessfully && flight.task.Result != null)
                 {
-                    ApplyOpinionChanges(flight.npc, flight.task.Result.opinion_changes, flight.caps);
+                    var total = ApplyOpinionChanges(flight.npc, flight.task.Result.opinion_changes, flight.caps);
+                    ApplyAttackedFloor(flight.npc, flight.events, total);
                     flight.npc.ApplyReflection(flight.task.Result, flight.day, flight.events);
                 }
                 _inFlight.RemoveAt(i);
@@ -203,7 +211,8 @@ namespace Ashenveil.Core.GameWorld
 
         // The LLM proposes, the game disposes: a change survives only if it's about a key the
         // request offered, and all the changes about one key together stay within its cap.
-        private void ApplyOpinionChanges(NPC npc, IEnumerable<OpinionChangeDto> changes, Dictionary<string, int> caps)
+        // Returns how far each key moved in all.
+        private Dictionary<string, int> ApplyOpinionChanges(NPC npc, IEnumerable<OpinionChangeDto> changes, Dictionary<string, int> caps)
         {
             var total = new Dictionary<string, int>();
             foreach (var change in changes ?? Enumerable.Empty<OpinionChangeDto>())
@@ -219,13 +228,38 @@ namespace Ashenveil.Core.GameWorld
                 if (change.about.StartsWith("faction:"))
                     npc.Opinions.ChangeFaction(change.about["faction:".Length..], by);
                 else if (int.TryParse(change.about["person:".Length..], out int id) && FindPerson?.Invoke(id) is { } who)
-                {
-                    npc.ChangeOpinionOf(who, by, why);
-                    // Hurt one guard, and the guard thinks a little less of you.
-                    if (who is Player player)
-                        foreach (var faction in npc.Factions) player.ChangeStanding(faction, by / StandingShare);
-                }
+                    ChangePerson(npc, who, by, why);
             }
+            return total;
+        }
+
+        // An attack on this NPC that it saw always leaves a mark: if the LLM's changes didn't
+        // lower its opinion of the attacker by AttackedFloor, the game does the rest. The LLM's
+        // reason is kept if it gave one; otherwise the event itself is the reason.
+        private void ApplyAttackedFloor(NPC npc, IEnumerable<Memory> reflected, Dictionary<string, int> total)
+        {
+            var attacks = reflected
+                .Where(m => m.Kind == MemoryKind.Event && m.SourceId is int)
+                .Select(m => Events?.Find(m.SourceId.Value))
+                .Where(e => e?.Type == EventType.Attacked && e.TargetId == npc.Id && e.ActorId is int);
+
+            foreach (var e in attacks)
+            {
+                string key = PersonKey(e.ActorId.Value);
+                int sofar = total.GetValueOrDefault(key);
+                if (sofar <= -AttackedFloor || FindPerson?.Invoke(e.ActorId.Value) is not { } attacker) continue;
+
+                ChangePerson(npc, attacker, -AttackedFloor - sofar, sofar == 0 ? e.Text : null);
+                total[key] = -AttackedFloor;
+            }
+        }
+
+        private static void ChangePerson(NPC npc, Entity who, int by, string why)
+        {
+            npc.ChangeOpinionOf(who, by, why);
+            // Hurt one guard, and the guard thinks a little less of you.
+            if (who is Player player)
+                foreach (var faction in npc.Factions) player.ChangeStanding(faction, by / StandingShare);
         }
     }
 }

@@ -88,6 +88,8 @@ namespace Ashenveil.Core.Saving
             Tasks = npc.Tasks.Select(ToSave).Where(t => t != null).ToList(),
             DayEntries = npc.Journal.Days.Select(d => new DayEntrySave { Day = d.Day, Summary = d.Summary }).ToList(),
             LastReflectedDay = npc.Journal.LastReflectedDay,
+            KnownEvents = npc.Journal.KnownEvents.OrderBy(k => k.Key)
+                                     .Select(k => new KnownEventSave { EventId = k.Key, Day = k.Value }).ToList(),
             Factions = npc.Factions.ToList(),
             // People, then factions, each in key order, as SaveStore reads them back.
             Opinions = npc.Opinions.People
@@ -217,6 +219,8 @@ namespace Ashenveil.Core.Saving
             foreach (var memory in saved.Memories) journal.Add(FromSave(memory));
             foreach (var day in saved.DayEntries) journal.Add(new DayEntry(day.Day, day.Summary));
             journal.LastReflectedDay = saved.LastReflectedDay;
+            // The memories above already marked theirs as known; these are the ones reflected on since.
+            foreach (var known in saved.KnownEvents) journal.Know(known.EventId, known.Day);
             foreach (var id in saved.TranscriptIds)
             {
                 // A journal pointing at a transcript that isn't in the save is a damaged file:

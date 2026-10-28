@@ -19,10 +19,15 @@ facing → health → the player's attack → NPCs fight back → death → enem
 *reads* opinions to decide who to fight. It owns neither:
 1. The **event log and day-end reflection** ([npc-memory-next-plan.md](npc-memory-next-plan.md)
    Part B, **done**). Fights are stored as events: hot memories that same day, and lasting
-   after-effects at day end. Combat adds `Attacked` / `Killed` to `EventType` and posts them
-   with `EventLog.Post`.
-2. **Factions and opinions** ([factions-plan.md](factions-plan.md)). Who is hostile to whom,
-   for any NPC against any other NPC or the player.
+   after-effects at day end. `EventType.Attacked` already exists (factions added it, and the
+   console's `event attack` posts it); combat posts real ones with `EventLog.Post`, and adds
+   `Killed`.
+2. **Factions and opinions** ([factions-plan.md](factions-plan.md), **done**). Who is hostile
+   to whom, for any NPC against any other NPC or the player. Combat asks
+   `Relations.AttitudeTo(npc, who, log, today)`, which already treats today's attackers as
+   hostile, and reflection always lowers the victim's opinion of an attacker by at least
+   `ReflectionSystem.AttackedFloor`. `Relations.Grudges` scans the whole event log on every
+   call: fine for chat, but cache it per NPC per day before combat asks every frame.
 
 ---
 
@@ -293,8 +298,8 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - Health for players and NPCs; dead / knocked-out state (and knock-out time left).
 - Fights in progress aren't saved, like conversations: you can only save from the pause menu,
   so the World isn't running. Health persists; who you were fighting doesn't.
-- Save schema v1 has shipped, so this is a `user_version` migration (add the `hp` columns),
-  unless the factions work's migration has already gone in first; then they share one.
+- The save is at schema v4 (factions and its gossip fix), so this is the v5 migration (add the
+  `hp` columns).
 
 ### Later (not planned in detail)
 
@@ -352,9 +357,9 @@ Like the rest of the game, everything is tested in cells and seconds with no win
   - pathfinding (done) and world units (done);
   - the save system (done);
   - the event log and reflection (NPC plan, Part B; done), needed by step 4;
-  - [factions-plan.md](factions-plan.md), needed by step 5.
+  - [factions-plan.md](factions-plan.md) (done), needed by step 5.
 
-  Steps 0–3 need neither, so they can start while the others are still being built.
+  Steps 0–3 need neither. Step 3's chase is cleaner once A2's `follow` task exists.
 - **Feeds into:**
   - [npc-memory-next-plan.md](npc-memory-next-plan.md): A2 `follow` (same chase code), and
     Part B (fights are the most important events it gets).

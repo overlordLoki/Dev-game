@@ -174,6 +174,21 @@ public class WorldSaveTests : IDisposable
     }
 
     [Fact]
+    public void Events_an_NPC_has_reflected_on_are_still_known_after_loading()
+    {
+        var world = NewGame();
+        var knight = Knight(world);
+        var seen = new Memory("Grim robbed the miller", MemoryKind.Event) { SourceId = 4, Day = 1 };
+        knight.Journal.Add(seen);
+        knight.Journal.Forget(new[] { seen });   // reflected on: the memory's gone, the event still known
+
+        var back = Knight(Load(SaveMapper.ToSave(world, SavedAt)));
+
+        Assert.DoesNotContain(back.Journal.Memories, m => m.SourceId == 4);
+        Assert.True(back.Journal.Knows(4));
+    }
+
+    [Fact]
     public void A_new_event_after_loading_does_not_reuse_a_saved_id()
     {
         var world = NewGame();

@@ -255,14 +255,15 @@ public class ReflectionSystemTests
     public void Valid_changes_are_applied_and_a_change_about_a_player_moves_their_standing()
     {
         var (knight, bandit, player) = DayWithABanditAndARumour();
+        knight.Opinions.SetFaction("bandit", -20);   // room to move before hitting -100
         int standing = player.StandingWith("guard");
 
-        _asked[0].answer.SetResult(Changes(("person:2", -10), ("faction:bandit", -5), ("person:0", -12)));
+        _asked[0].answer.SetResult(Changes(("person:2", -25), ("faction:bandit", -5), ("person:0", -12)));
         _system.Update();
 
-        Assert.Equal(-90, knight.OpinionOf(bandit));
+        Assert.Equal(-45, knight.OpinionOf(bandit));
         Assert.Equal("because person:2", knight.Opinions.People[2].Why);
-        Assert.Equal(-85, knight.Opinions.OfFaction("bandit"));
+        Assert.Equal(-25, knight.Opinions.OfFaction("bandit"));
         Assert.Equal(-12, knight.OpinionOf(player));
         Assert.Equal(standing - 12 / ReflectionSystem.StandingShare, player.StandingWith("guard"));
     }
@@ -275,9 +276,39 @@ public class ReflectionSystemTests
         _asked[0].answer.SetResult(Changes(("person:1", 50), ("person:77", -30), ("faction:village", -30), ("nonsense", 5)));
         _system.Update();
 
-        Assert.Empty(knight.Opinions.People);
+        Assert.Equal(new[] { 2 }, knight.Opinions.People.Keys);   // only the bandit's attack, by the game's floor
         Assert.Equal(40, knight.Opinions.OfFaction("village"));
         Assert.Single(knight.Journal.Days);   // the rest of the reflection still lands
+    }
+
+    [Fact]
+    public void An_attack_lowers_the_opinion_of_the_attacker_even_if_the_LLM_says_nothing()
+    {
+        var (knight, bandit, _) = DayWithABanditAndARumour();
+        knight.Opinions.SetFaction("bandit", -20);
+
+        _asked[0].answer.SetResult(Changes());
+        _system.Update();
+
+        Assert.Equal(-20 - ReflectionSystem.AttackedFloor, knight.OpinionOf(bandit));
+        Assert.Equal("Grim attacked Sir Lancelot", knight.Opinions.People[2].Why);   // the event is the reason
+    }
+
+    [Fact]
+    public void The_attack_floor_tops_up_a_small_drop_or_a_rise_but_not_a_big_enough_drop()
+    {
+        var (small, smallBandit, _) = DayWithABanditAndARumour();
+        small.Opinions.SetFaction("bandit", -20);
+        _asked[0].answer.SetResult(Changes(("person:2", 10)));   // the LLM even liked him more
+        _system.Update();
+        Assert.Equal(-20 - ReflectionSystem.AttackedFloor, small.OpinionOf(smallBandit));
+        Assert.Equal("because person:2", small.Opinions.People[2].Why);   // its reason is kept
+
+        var (big, bigBandit, _) = DayWithABanditAndARumour();
+        big.Opinions.SetFaction("bandit", -20);
+        _asked[1].answer.SetResult(Changes(("person:2", -30)));
+        _system.Update();
+        Assert.Equal(-50, big.OpinionOf(bigBandit));
     }
 
     [Fact]

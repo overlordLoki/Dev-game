@@ -74,6 +74,7 @@ public class SaveStoreTests : IDisposable
                 TranscriptIds = { 1, 2 },
                 DayEntries = { new DayEntrySave { Day = 10, Summary = "I met Loki." }, new DayEntrySave { Day = 11, Summary = "Quiet." } },
                 LastReflectedDay = 11,
+                KnownEvents = { new KnownEventSave { EventId = 1, Day = 12 }, new KnownEventSave { EventId = 2, Day = 11 } },
                 Factions = { "guard", "village" },
                 Opinions =
                 {
@@ -251,6 +252,7 @@ public class SaveStoreTests : IDisposable
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM day_entries"));
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM opinions"));
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM standings"));
+        Assert.Equal(0, Scalar("SELECT COUNT(*) FROM known_events"));
     }
 
     [Fact]
@@ -348,6 +350,7 @@ public class SaveStoreTests : IDisposable
         Assert.Empty(knight.Opinions);
         Assert.Equal(new[] { "traveller" }, save.Players.Single().Factions);
         Assert.Empty(save.Players.Single().Standings);
+        Assert.Empty(knight.KnownEvents);
         // A fact from a conversation takes its transcript's day; anything else has none.
         Assert.Equal(new[] { (10, (int?)1, (int?)null), (0, null, null) },
                      knight.Memories.Select(m => (m.Day, m.TranscriptId, m.EventId)));

@@ -4,15 +4,20 @@
 > - Personal opinions are keyed by person id (`int`), not a string, and keep the last `why`
 >   (shown in the chat's attitude line, saved in `opinions.why`).
 > - Grudges cover attacks since the NPC's last reflection (today, or yesterday if that isn't
->   reflected yet), so there's no gap between midnight and the reflection landing.
+>   reflected yet), so there's no gap between midnight and the reflection landing. When the
+>   reflection lands, the game makes sure the attack left a mark: if the LLM didn't lower the
+>   opinion of the attacker by at least `AttackedFloor` (20), the game makes up the rest.
 > - Gossip: two NPCs must like each other (≥ +20) both ways; runs every 5 s, within 2 cells;
->   stops at hop 2. Rumours leave the hot list when their day is reflected, like events.
+>   stops at hop 2. Rumours leave the hot list when their day is reflected, like events. Each
+>   journal also keeps `KnownEvents` (event id → day learned) for 2 days after, so an NPC that
+>   already reflected on an event isn't told it again by one that hasn't (it would count twice).
 > - `join_faction` is offered only when the NPC `Admits` people (knights do, by type) to one of
 >   its own factions that's `joinable` in factions.json, and a player there isn't in it yet.
 > - Join/leave shift other standings by a quarter of the table's view of the faction; ±30 for
 >   the faction itself. Reflection moves standing by a quarter of a change about a player.
 > - Save v3: a v2 save's knights become guards and its player a traveller; opinions and
->   standings left empty are seeded from the table on load.
+>   standings left empty are seeded from the table on load. v4 adds a `known_events` table
+>   (`npc_id`, `event_id`, `day`) for the gossip fix above.
 > - The bandit check is a plain Ollama test graded in code (`opinion_changes` are keys), not
 >   a judge test.
 >

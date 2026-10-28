@@ -75,6 +75,13 @@ namespace Ashenveil.Core.Saving
         public int LastReflectedDay { get; set; }                  // Journal.LastReflectedDay; 0 for none
         public List<string> Factions { get; set; } = new();        // NPC.Factions, in order
         public List<OpinionSave> Opinions { get; set; } = new();   // people first, then factions
+        public List<KnownEventSave> KnownEvents { get; set; } = new(); // Journal.KnownEvents, by event id
+    }
+
+    public class KnownEventSave
+    {
+        public int EventId { get; set; }
+        public int Day { get; set; }                     // when the NPC learned of it
     }
 
     /// <summary>

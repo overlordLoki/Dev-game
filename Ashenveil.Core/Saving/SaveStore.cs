@@ -25,7 +25,7 @@ namespace Ashenveil.Core.Saving
     public class SaveStore
     {
         /// <summary>The schema this game writes. Bump it when adding a migration.</summary>
-        public const int SchemaVersion = 3;
+        public const int SchemaVersion = 4;
 
         /// <summary>Where the game keeps its saves: a "saves" folder beside settings.json.</summary>
         public static string DefaultFolder => Path.Combine(SettingsStore.DefaultFolder, "saves");
@@ -170,13 +170,25 @@ namespace Ashenveil.Core.Saving
             ALTER TABLE memories ADD COLUMN teller_id INTEGER;
             ALTER TABLE memories ADD COLUMN hops INTEGER NOT NULL DEFAULT 0;
             """,
+
+            // 3 -> 4: events each NPC knows of, kept after reflection forgets the memory, so
+            // gossip doesn't tell it them again. A version 3 file has none: its NPCs only know
+            // the events still in their memories.
+            """
+            CREATE TABLE known_events (
+                npc_id   INTEGER NOT NULL REFERENCES npcs(npc_id),
+                event_id INTEGER NOT NULL,
+                day      INTEGER NOT NULL,
+                PRIMARY KEY (npc_id, event_id)
+            );
+            """,
         };
 
         // Every table, children before the tables they point at, so clearing them in this
         // order never leaves a row pointing at one that's gone.
         private static readonly string[] Tables =
         {
-            "standings", "opinions", "day_entries", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
+            "known_events", "standings", "opinions", "day_entries", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
             "transcript_participants", "transcripts", "npcs", "populated_levels", "players", "game",
         };
 
@@ -275,6 +287,9 @@ namespace Ashenveil.Core.Saving
                 for (int i = 0; i < npc.DayEntries.Count; i++)
                     Insert(db, "INSERT INTO day_entries (npc_id, seq, day, summary) VALUES ($npc, $seq, $day, $summary)",
                         ("$npc", npc.Id), ("$seq", i), ("$day", npc.DayEntries[i].Day), ("$summary", npc.DayEntries[i].Summary));
+                foreach (var known in npc.KnownEvents)
+                    Insert(db, "INSERT INTO known_events (npc_id, event_id, day) VALUES ($npc, $event, $day)",
+                        ("$npc", npc.Id), ("$event", known.EventId), ("$day", known.Day));
                 foreach (var transcriptId in npc.TranscriptIds)
                     Insert(db, "INSERT INTO journal_transcripts VALUES ($npc, $transcript)",
                         ("$npc", npc.Id), ("$transcript", transcriptId));
@@ -462,6 +477,9 @@ namespace Ashenveil.Core.Saving
             var days = Rows(db, "SELECT npc_id, day, summary FROM day_entries ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), entry: new DayEntrySave { Day = r.GetInt32(1), Summary = r.GetString(2) }))
                 .ToLookup(d => d.npc, d => d.entry);
+            var known = Rows(db, "SELECT npc_id, event_id, day FROM known_events ORDER BY npc_id, event_id",
+                r => (npc: r.GetInt32(0), known: new KnownEventSave { EventId = r.GetInt32(1), Day = r.GetInt32(2) }))
+                .ToLookup(k => k.npc, k => k.known);
             // Transcript ids only count up, so in id order is the order the NPC heard them in.
             var journals = Rows(db, "SELECT npc_id, transcript_id FROM journal_transcripts ORDER BY npc_id, transcript_id",
                 r => (npc: r.GetInt32(0), transcript: r.GetInt32(1)))
@@ -489,6 +507,7 @@ namespace Ashenveil.Core.Saving
                     Tasks = tasks[r.GetInt32(0)].ToList(),
                     DayEntries = days[r.GetInt32(0)].ToList(),
                     LastReflectedDay = r.GetInt32(6),
+                    KnownEvents = known[r.GetInt32(0)].ToList(),
                     Factions = SplitFactions(r.GetString(7)),
                     Opinions = opinions[r.GetInt32(0)].ToList(),
                 });
