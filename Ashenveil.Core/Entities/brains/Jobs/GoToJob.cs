@@ -6,7 +6,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
 {
     /// <summary>
     /// Walks the NPC's feet to a point. With a <see cref="NavGrid"/> it routes round
-    /// obstacles with the <see cref="Pathfinder"/>, one waypoint at a time; without one
+    /// obstacles with a <see cref="Route"/>, one waypoint at a time; without one
     /// (tests, or a level with no grid) it heads straight at the target. Fails if there's
     /// no way through, or if it keeps getting stuck.
     /// </summary>
@@ -14,24 +14,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
     {
         public JobState State { get; set; } = JobState.Inactive;
         private readonly Vector2 _target;            // in cells
-        private const float ArriveRadius = 0.03f;    // "close enough", in cells (~4px at 720p) — stops the jitter
-        // Looser for the waypoints on the way: the NPC turns for the next one a little early
-        // rather than stopping dead on every cell centre.
-        private const float WaypointRadius = 0.1f;
-
-        // Where the feet go, in order, in cells. Null until the first Execute plans the route.
-        private List<Vector2> _waypoints;
-        private int _next;                           // index of the waypoint being walked to
-        private readonly Route _route = new();
-        // Getting stuck: no closer to the waypoint for StuckSeconds means replan; more than
-        // MaxReplans replans means give up. Closer by less than ProgressEpsilon cells
-        // doesn't count, so jittering against something isn't mistaken for progress.
-        private const float StuckSeconds = 1f;
-        private const int MaxReplans = 3;
-        private const float ProgressEpsilon = 0.01f;
-        private float _bestDistance = float.MaxValue;   // closest the feet have got to the waypoint
-        private float _stuckFor;                        // seconds since they last got closer
-        private int _replans;
+        private readonly Route _route = new();       // the waypoints and stuck timers
 
         public GoToJob(Vector2 target) => _target = target;
 
@@ -46,8 +29,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
         /// The waypoints still to walk, in cells, starting with the one being headed for.
         /// Empty until the first Execute plans the route. For debug drawing.
         /// </summary>
-        public IReadOnlyList<Vector2> RemainingWaypoints =>
-            _waypoints == null ? System.Array.Empty<Vector2>() : _waypoints.GetRange(_next, _waypoints.Count - _next);
+        public IReadOnlyList<Vector2> RemainingWaypoints => _route.Remaining;
 
         public void Execute(JobContext context)
         {
@@ -55,69 +37,27 @@ namespace Ashenveil.Core.Entities.brains.Jobs
 
             // Plan on the first tick, not in the constructor: the job may wait in the queue
             // behind others, so where the NPC is now is only known once it starts.
-            if (_waypoints == null && !StartRoute(context.Nav, npc)) return;
-
-            // Walk the feet to each waypoint - the same point Location.PlaceAt stands an entity
-            // on a POI by, so walking to a point ends exactly where spawning on it would.
-            bool last = _next == _waypoints.Count - 1;
-            Vector2 toWaypoint = _waypoints[_next] - npc.Feet;
-
-            if (toWaypoint.Length() <= (last ? ArriveRadius : WaypointRadius))
+            if (!_route.IsPlanned && !_route.Plan(context.Nav, npc.Feet, _target))
             {
-                if (last)
-                {
+                Fail(npc);
+                return;
+            }
+
+            // Walk the feet to the target - the same point Location.PlaceAt stands an entity
+            // on a POI by, so walking to a point ends exactly where spawning on it would.
+            switch (_route.Step(npc.Feet, context.DeltaTime, out Vector2 heading))
+            {
+                case RouteStep.Arrived:
                     npc.Direction = Vector2.Zero;      // stop
                     State = JobState.Completed;        // tell the queue we're done
-                    return;
-                }
-
-                // Reached a waypoint on the way: steer at the next one this same tick.
-                _next++;
-                ResetProgress();
-                toWaypoint = _waypoints[_next] - npc.Feet;
-            }
-
-            // Stuck check. The grid only knows about objects, so the player or another NPC
-            // standing on the path can still block it. If the feet haven't got any closer to
-            // the waypoint for a while, plan again from here; after a few goes, give up.
-            float distance = toWaypoint.Length();
-            if (distance < _bestDistance - ProgressEpsilon)
-            {
-                _bestDistance = distance;
-                _stuckFor = 0f;
-            }
-            else if ((_stuckFor += context.DeltaTime) >= StuckSeconds)
-            {
-                if (++_replans > MaxReplans)
-                {
+                    break;
+                case RouteStep.GaveUp:
                     Fail(npc);
-                    return;
-                }
-                if (!StartRoute(context.Nav, npc)) return;
-                toWaypoint = _waypoints[_next] - npc.Feet;
+                    break;
+                default:
+                    npc.Direction = heading;           // Entity.Move steps
+                    break;
             }
-
-            npc.Direction = Vector2.Normalize(toWaypoint);  // Entity.Move steps
-        }
-
-        // Plans a route from where the feet are now and starts walking it from the first
-        // waypoint. False (and the job Failed) if there's no way through.
-        private bool StartRoute(NavGrid nav, NPC npc)
-        {
-            _waypoints = _route.Plan(nav, npc.Feet, _target);
-            _next = 0;
-            ResetProgress();
-            if (_waypoints != null) return true;
-
-            Fail(npc);
-            return false;
-        }
-
-        // A new waypoint to head for: start measuring progress towards it afresh.
-        private void ResetProgress()
-        {
-            _bestDistance = float.MaxValue;
-            _stuckFor = 0f;
         }
 
         private void Fail(NPC npc)
@@ -125,6 +65,5 @@ namespace Ashenveil.Core.Entities.brains.Jobs
             npc.Direction = Vector2.Zero;
             State = JobState.Failed;
         }
-
     }
 }
