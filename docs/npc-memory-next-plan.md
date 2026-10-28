@@ -44,9 +44,9 @@ points; the engine *validates and disposes*; there's no LLM in the per-frame loo
   - `MemoryKind` already has `Event`, but nothing creates one.
   - **Memories have no day.** Transcripts do; facts don't.
   - `RecentMemories(5)` takes the last five facts of any kind.
-- **Tasks:** `GoToTask` (walks the **feet** to a POI's `StandingSpot()`, pathfinding round
-  objects) and `WaitTask`. `NpcBrain.ApplyDecision` turns `go_to` / `wait` specs into tasks.
-  A task that can't get there **fails** (`TaskState.Failed`) and is dropped; there's a TODO in
+- **Tasks:** `GoToJob` (walks the **feet** to a POI's `StandingSpot()`, pathfinding round
+  objects) and `WaitJob`. `NpcBrain.ApplyDecision` turns `go_to` / `wait` specs into tasks.
+  A task that can't get there **fails** (`JobState.Failed`) and is dropped; there's a TODO in
   `NpcBrain.TickTasks` waiting for the event log.
 - **No fixed greeting:** whoever starts a conversation speaks first. A player-started chat
   opens with only a grey game note.
@@ -81,13 +81,13 @@ comes from whatever sent it over:
 
 ### A2. More task types
 `patrol`, `talk_to`, `follow`. Each is one enum value in the decision schema (`main.py`) plus
-one `switch` arm in `NpcBrain.ApplyDecision`, plus its `ITask` class. Pathfinding is done, so
+one `switch` arm in `NpcBrain.ApplyDecision`, plus its `IJob` class (`FollowJob`, ...). Pathfinding is done, so
 the walking ones can reuse it:
-- **`patrol`:** a loop of `GoToTask`s between POIs.
+- **`patrol`:** a loop of `GoToJob`s between POIs.
 - **`talk_to`:** walk to the target with `Pathfinder` (it ends next to a blocked goal, so it
   works for a person standing somewhere awkward), then start the conversation (A1).
 - **`follow`:** replan towards a moving target every second or so, like the stuck check does.
-- Each should fail cleanly (`TaskState.Failed`) when there's no route, like `GoToTask`.
+- Each should fail cleanly (`JobState.Failed`) when there's no route, like `GoToJob`.
 
 ### A3. Disposition
 **Replaced by [factions-plan.md](factions-plan.md).** Disposition became an opinion score
@@ -112,7 +112,7 @@ summary. Only matters once NPCs chat in groups.
 ### A7. Small things
 - **Hidden thinking** (`think: True`) on the decision step, to compare fact extraction quality.
   Keep it off for live dialogue, where it's just latency.
-- **`TaskContext` as a struct**, if NPC crowds appear (avoids a heap allocation per tick).
+- **`JobContext` as a struct**, if NPC crowds appear (avoids a heap allocation per tick).
 - **Persistence** is done ([Completed/save-system-plan.md](Completed/save-system-plan.md)):
   journals and tasks are saved per NPC, under saved int ids that stay stable across loads.
   Part B's new data is the first schema migration (v2).
@@ -169,7 +169,7 @@ public record GameEvent(int Id, int Day, string Level, Vector2 Where,
 through one list.
 
 The brain can't see the World, so it posts through an `Action<GameEvent>` handed in via
-`TaskContext`, the same way `Nav` is handed in. Tests pass a list.
+`JobContext`, the same way `Nav` is handed in. Tests pass a list.
 
 **3. Perception: who hears about it.** When an event is posted:
 - the actor and the target always know;
@@ -233,7 +233,7 @@ doesn't skip a day.
    - `GameEvent`, `EventType` and `EventLog`, with `Post` and `Posted`;
    - post `EnteredLevel` / `LeftLevel` from `UseExit`, and `Talked` when a transcript is filed;
    - console `events`, and `Posted` shown live in the console.
-2. **Task events:** an `Action<GameEvent>` on `TaskContext`, and `TaskDone` / `TaskFailed` from
+2. **Task events:** an `Action<GameEvent>` on `JobContext`, and `TaskDone` / `TaskFailed` from
    `TickTasks` (closing the TODO).
 3. **Perception and `Memory.Day`:**
    - the range rule;
@@ -279,9 +279,13 @@ Then the [factions plan](factions-plan.md) adds opinions, grudges and gossip on 
 - **LLM task authority:** start **additive-biased** (add tasks, plus `clear`), with no
   surgical delete or update by id. Widen only once the outputs are trusted.
 - **Naming:**
-  - Keep concrete tasks specific (`GoToTask`, never a bare `Task`, which clashes with
-    `System.Threading.Tasks.Task`).
-  - Consider renaming the namespaces `brains.Task` → `brains.Tasks` and `Memorys` → `Memories`.
+  - **Done (2026-10-28):** in C#, queued work is a **job** (`IJob`, `GoToJob`, `WaitJob`,
+    `JobState`, `JobContext`, `NPC.GiveJob`, `NpcBrain.JobQueue`, namespace `brains.Jobs`,
+    `NPCState.Working`), so it never clashes with `System.Threading.Tasks.Task`, which every
+    LLM call uses. The *data* keeps "task": the LLM's `tasks` / `TaskSpecDto`, the save's
+    `TaskSave` / `tasks` table, and the `TaskDone` / `TaskFailed` event types (saved by name).
+    New ones follow suit: `FollowJob`, `PatrolJob`, `TalkToJob`.
+  - Still open: `Memorys` → `Memories`.
 
 ---
 
@@ -299,8 +303,8 @@ Same approach as the completed plan (see its "Testing notes"):
     - an NPC in range in the same level does;
     - one out of range or in another level doesn't;
     - the memory has the day and the event id.
-  - **Task events:** a `GoToTask` with no way through posts `TaskFailed`; a finished one
-    posts `TaskDone`; a `WaitTask` posts nothing.
+  - **Task events:** a `GoToJob` with no way through posts `TaskFailed`; a finished one
+    posts `TaskDone`; a `WaitJob` posts nothing.
   - **`WorldTests`:** using an exit posts `LeftLevel` and `EnteredLevel`; finishing a chat
     where the player spoke posts `Talked`.
   - **The prompt:** today's events are sent separately from facts, and yesterday's aren't

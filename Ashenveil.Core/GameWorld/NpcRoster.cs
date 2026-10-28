@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.GameWorld.Locations;
 using Microsoft.Xna.Framework;
 
@@ -122,9 +122,9 @@ namespace Ashenveil.Core.GameWorld
                     PointOfInterest entry = level.Poi("entry"), home = level.Poi("Knight_spawn");
                     if (entry != null && home != null)
                     {
-                        knight.GiveTask(new GoToTask(entry.StandingSpot()));
-                        knight.GiveTask(new WaitTask(3f));
-                        knight.GiveTask(new GoToTask(home.StandingSpot()));
+                        knight.GiveJob(new GoToJob(entry.StandingSpot()));
+                        knight.GiveJob(new WaitJob(3f));
+                        knight.GiveJob(new GoToJob(home.StandingSpot()));
                     }
                     break;
             }

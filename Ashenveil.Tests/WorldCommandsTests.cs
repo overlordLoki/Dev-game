@@ -2,7 +2,7 @@ using Ashenveil.Core.DevConsole;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Graphics;
 using Ashenveil.Core.Utility;
@@ -243,7 +243,7 @@ public class WorldCommandsTests : IDisposable
         var (npc, brain) = AddNpc();
         npc.StandAt(new Vector2(0.5f, 0.5f));
         var target = new Vector2(4.5f, 4.9f);
-        npc.GiveTask(new GoToTask(target));
+        npc.GiveJob(new GoToJob(target));
 
         brain.Update(new GameTime());   // the first tick plans the route
 

@@ -2,7 +2,7 @@ using Ashenveil.Core;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains;
 using Ashenveil.Core.Entities.brains.Dialogue;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Saving;
@@ -191,8 +191,8 @@ public class SaveMapperTests : IDisposable
     }
 
     // Runs a task for `seconds` outside any brain, as if the NPC had been working on it.
-    private static void Run(ITask task, NPC owner, float seconds) =>
-        task.Execute(new TaskContext { Owner = owner, Blackboard = new Blackboard(), DeltaTime = seconds });
+    private static void Run(IJob task, NPC owner, float seconds) =>
+        task.Execute(new JobContext { Owner = owner, Blackboard = new Blackboard(), DeltaTime = seconds });
 
     [Fact]
     public void A_saved_knight_comes_back_as_a_knight_with_its_id_name_feet_and_memories()
@@ -212,27 +212,27 @@ public class SaveMapperTests : IDisposable
     public void A_task_queue_comes_back_in_order_with_the_waits_time_left()
     {
         var knight = AddKnight(1, 1);
-        var wait = new WaitTask(5f);
+        var wait = new WaitJob(5f);
         Run(wait, knight, 2f);   // 3 seconds still to go
-        knight.GiveTask(new GoToTask(new Vector2(3.5f, 1.9f)));
-        knight.GiveTask(wait);
-        knight.GiveTask(new GoToTask(new Vector2(1.5f, 1.9f)));
+        knight.GiveJob(new GoToJob(new Vector2(3.5f, 1.9f)));
+        knight.GiveJob(wait);
+        knight.GiveJob(new GoToJob(new Vector2(1.5f, 1.9f)));
 
-        var tasks = SaveAndRebuildOnlyNpc().Tasks.ToList();
+        var tasks = SaveAndRebuildOnlyNpc().Jobs.ToList();
 
         Assert.Collection(tasks,
-            t => Near.Equal(new Vector2(3.5f, 1.9f), Assert.IsType<GoToTask>(t).Target),
-            t => Near.Equal(3f, Assert.IsType<WaitTask>(t).SecondsLeft),
-            t => Near.Equal(new Vector2(1.5f, 1.9f), Assert.IsType<GoToTask>(t).Target));
-        Assert.All(tasks, t => Assert.Equal(TaskState.Inactive, t.State));   // starts afresh: a go_to replans
+            t => Near.Equal(new Vector2(3.5f, 1.9f), Assert.IsType<GoToJob>(t).Target),
+            t => Near.Equal(3f, Assert.IsType<WaitJob>(t).SecondsLeft),
+            t => Near.Equal(new Vector2(1.5f, 1.9f), Assert.IsType<GoToJob>(t).Target));
+        Assert.All(tasks, t => Assert.Equal(JobState.Inactive, t.State));   // starts afresh: a go_to replans
     }
 
     [Fact]
-    public void An_NPC_with_tasks_loads_as_Tasked()
+    public void An_NPC_with_jobs_loads_as_Tasked()
     {
-        AddKnight(1, 1).GiveTask(new WaitTask(3f));
+        AddKnight(1, 1).GiveJob(new WaitJob(3f));
 
-        Assert.Equal(NpcBrain.NPCState.Tasked, SaveAndRebuildOnlyNpc().State);
+        Assert.Equal(NpcBrain.NPCState.Working, SaveAndRebuildOnlyNpc().State);
     }
 
     [Fact]
@@ -265,14 +265,14 @@ public class SaveMapperTests : IDisposable
 
         var npc = SaveMapper.FromSave(saved, new Dictionary<int, Transcript>());
 
-        Near.Equal(4f, Assert.IsType<WaitTask>(Assert.Single(npc.Tasks)).SecondsLeft);
+        Near.Equal(4f, Assert.IsType<WaitJob>(Assert.Single(npc.Jobs)).SecondsLeft);
     }
 
     [Fact]
     public void A_wait_counts_down_its_time_left_and_never_goes_below_zero()
     {
         var npc = AddKnight(1, 1);
-        var wait = new WaitTask(2f);
+        var wait = new WaitJob(2f);
 
         Run(wait, npc, 0.5f);
         Near.Equal(1.5f, wait.SecondsLeft);

@@ -1,5 +1,5 @@
 using Ashenveil.Core;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.Navigation;
 using Microsoft.Xna.Framework;
 
@@ -10,30 +10,30 @@ namespace Ashenveil.Tests;
 /// No movement happens here (Entity.Move does that during Update) and no graphics are
 /// touched, so we can test the decision each task makes in isolation.
 /// </summary>
-public class GoToTaskTests
+public class GoToJobTests
 {
-    public GoToTaskTests() => NullContentManager.Install();   // TestNpc construction needs Textures ready
+    public GoToJobTests() => NullContentManager.Install();   // TestNpc construction needs Textures ready
 
-    private static TaskContext Ctx(TestNpc npc, float dt = 0f) =>
+    private static JobContext Ctx(TestNpc npc, float dt = 0f) =>
         new() { Owner = npc, Blackboard = new Blackboard(), DeltaTime = dt };
 
     [Fact]
     public void Heads_straight_at_a_target_to_the_right()
     {
         var npc = new TestNpc(0, 0);
-        var task = new GoToTask(npc.Feet + new Vector2(1, 0));   // a cell right of the npc's feet
+        var task = new GoToJob(npc.Feet + new Vector2(1, 0));   // a cell right of the npc's feet
 
         task.Execute(Ctx(npc));
 
         Assert.Equal(new Vector2(1, 0), npc.Direction);          // unit heading toward target
-        Assert.NotEqual(TaskState.Completed, task.State);  // still travelling
+        Assert.NotEqual(JobState.Completed, task.State);  // still travelling
     }
 
     [Fact]
     public void Heading_is_normalised_on_a_diagonal()
     {
         var npc = new TestNpc(0, 0);
-        var task = new GoToTask(npc.Feet + new Vector2(3, 4));   // length 5 from the feet, outside the radius
+        var task = new GoToJob(npc.Feet + new Vector2(3, 4));   // length 5 from the feet, outside the radius
 
         task.Execute(Ctx(npc));
 
@@ -45,11 +45,11 @@ public class GoToTaskTests
     public void Completes_and_stops_once_within_the_arrive_radius()
     {
         var npc = new TestNpc(0, 0);
-        var task = new GoToTask(npc.Feet + new Vector2(0.02f, 0));   // 0.02 cells from the feet, inside the 0.03 radius
+        var task = new GoToJob(npc.Feet + new Vector2(0.02f, 0));   // 0.02 cells from the feet, inside the 0.03 radius
 
         task.Execute(Ctx(npc));
 
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
         Assert.Equal(Vector2.Zero, npc.Direction);    // stopped, not still steering
     }
 
@@ -57,11 +57,11 @@ public class GoToTaskTests
     public void Keeps_going_just_outside_the_arrive_radius()
     {
         var npc = new TestNpc(0, 0);
-        var task = new GoToTask(npc.Feet + new Vector2(0.05f, 0));   // ~7px at 720p: not there yet
+        var task = new GoToJob(npc.Feet + new Vector2(0.05f, 0));   // ~7px at 720p: not there yet
 
         task.Execute(Ctx(npc));
 
-        Assert.NotEqual(TaskState.Completed, task.State);
+        Assert.NotEqual(JobState.Completed, task.State);
     }
 
     [Fact]
@@ -70,11 +70,11 @@ public class GoToTaskTests
         // A target level with the sprite's centre but half a cell below it is where the feet
         // are already (TestNpc is 1x1 with a full-frame box) - so it has arrived, not "go down".
         var npc = new TestNpc(0, 0);
-        var task = new GoToTask(new Vector2(0.5f, 1));
+        var task = new GoToJob(new Vector2(0.5f, 1));
 
         task.Execute(Ctx(npc));
 
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
     }
 
     // ------------------------------------------------------------ with a nav grid
@@ -93,12 +93,12 @@ public class GoToTaskTests
     // Ticks the task until it completes, stepping the NPC 0.05 cells along Direction each
     // tick. There's no collision here, so only the route keeps the feet out of blocked
     // cells. Returns every cell the feet were in along the way.
-    private static List<Point> Walk(TestNpc npc, GoToTask task, NavGrid nav)
+    private static List<Point> Walk(TestNpc npc, GoToJob task, NavGrid nav)
     {
         var cells = new List<Point> { NavGrid.CellAt(npc.Feet) };
-        for (int tick = 0; tick < 1000 && task.State != TaskState.Completed; tick++)
+        for (int tick = 0; tick < 1000 && task.State != JobState.Completed; tick++)
         {
-            task.Execute(new TaskContext { Owner = npc, Blackboard = new Blackboard(), Nav = nav });
+            task.Execute(new JobContext { Owner = npc, Blackboard = new Blackboard(), Nav = nav });
             npc.Position += npc.Direction * 0.05f;
             cells.Add(NavGrid.CellAt(npc.Feet));
         }
@@ -116,7 +116,7 @@ public class GoToTaskTests
         npc.StandAt(new Vector2(0.5f, 1.9f));        // feet low in cell (0, 1), like a POI's standing spot
         var target = new Vector2(4.5f, 1.9f);        // cell (4, 1): straight through the tree
 
-        var cells = Walk(npc, new GoToTask(target), nav);
+        var cells = Walk(npc, new GoToJob(target), nav);
 
         Assert.DoesNotContain(new Point(2, 1), cells);
         Assert.True(Vector2.Distance(target, npc.Feet) <= 0.03f);   // within the arrive radius
@@ -131,12 +131,12 @@ public class GoToTaskTests
             ".....");
         var npc = new TestNpc(0, 0);
         npc.StandAt(new Vector2(0.5f, 1.9f));
-        var task = new GoToTask(new Vector2(4.5f, 1.9f));
+        var task = new GoToJob(new Vector2(4.5f, 1.9f));
 
         var cells = Walk(npc, task, nav: null);
 
         Assert.Contains(new Point(2, 1), cells);     // the old straight line, tree or not
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
     }
 
     [Fact]
@@ -145,10 +145,10 @@ public class GoToTaskTests
         var nav = Grid("......");
         var npc = new TestNpc(0, 0);
         npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
-        var task = new GoToTask(NavGrid.CentreOf(new Point(2, 0)));
+        var task = new GoToJob(NavGrid.CentreOf(new Point(2, 0)));
 
         npc.StandAt(NavGrid.CentreOf(new Point(5, 0)));   // moved while the task waited its turn
-        task.Execute(new TaskContext { Owner = npc, Blackboard = new Blackboard(), Nav = nav });
+        task.Execute(new JobContext { Owner = npc, Blackboard = new Blackboard(), Nav = nav });
 
         Assert.Equal(new Vector2(-1, 0), npc.Direction);  // heads left, back towards the target
     }
@@ -159,18 +159,18 @@ public class GoToTaskTests
         var nav = Grid("....#");
         var npc = new TestNpc(0, 0);
         npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
-        var task = new GoToTask(NavGrid.CentreOf(new Point(4, 0)));   // a POI on a tree
+        var task = new GoToJob(NavGrid.CentreOf(new Point(4, 0)));   // a POI on a tree
 
         var cells = Walk(npc, task, nav);
 
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
         Assert.DoesNotContain(new Point(4, 0), cells);
         Assert.True(Vector2.Distance(NavGrid.CentreOf(new Point(3, 0)), npc.Feet) <= 0.03f);
     }
 
     // ------------------------------------------------------- getting stuck and failing
 
-    private static TaskContext NavCtx(TestNpc npc, NavGrid nav, float dt) =>
+    private static JobContext NavCtx(TestNpc npc, NavGrid nav, float dt) =>
         new() { Owner = npc, Blackboard = new Blackboard(), Nav = nav, DeltaTime = dt };
 
     [Fact]
@@ -179,11 +179,11 @@ public class GoToTaskTests
         var nav = Grid(".#.");
         var npc = new TestNpc(0, 0);
         npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
-        var task = new GoToTask(NavGrid.CentreOf(new Point(2, 0)));
+        var task = new GoToJob(NavGrid.CentreOf(new Point(2, 0)));
 
         task.Execute(NavCtx(npc, nav, 0.25f));
 
-        Assert.Equal(TaskState.Failed, task.State);
+        Assert.Equal(JobState.Failed, task.State);
         Assert.Equal(Vector2.Zero, npc.Direction);
     }
 
@@ -195,15 +195,15 @@ public class GoToTaskTests
         var nav = Grid(".....");
         var npc = new TestNpc(0, 0);
         npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
-        var task = new GoToTask(NavGrid.CentreOf(new Point(4, 0)));
+        var task = new GoToJob(NavGrid.CentreOf(new Point(4, 0)));
 
         // 1s stuck per try, and 3 replans: still trying after 3s...
         for (int tick = 0; tick < 12; tick++) task.Execute(NavCtx(npc, nav, 0.25f));
-        Assert.NotEqual(TaskState.Failed, task.State);
+        Assert.NotEqual(JobState.Failed, task.State);
 
         // ...given up well before 8s.
-        for (int tick = 0; tick < 20 && task.State != TaskState.Failed; tick++) task.Execute(NavCtx(npc, nav, 0.25f));
-        Assert.Equal(TaskState.Failed, task.State);
+        for (int tick = 0; tick < 20 && task.State != JobState.Failed; tick++) task.Execute(NavCtx(npc, nav, 0.25f));
+        Assert.Equal(JobState.Failed, task.State);
         Assert.Equal(Vector2.Zero, npc.Direction);
     }
 
@@ -213,16 +213,16 @@ public class GoToTaskTests
         var nav = Grid("......");
         var npc = new TestNpc(0, 0);
         npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
-        var task = new GoToTask(NavGrid.CentreOf(new Point(5, 0)));
+        var task = new GoToJob(NavGrid.CentreOf(new Point(5, 0)));
 
         // 0.02 cells every quarter second: about a minute for the walk, never stalled.
-        for (int tick = 0; tick < 1000 && task.State != TaskState.Completed; tick++)
+        for (int tick = 0; tick < 1000 && task.State != JobState.Completed; tick++)
         {
             task.Execute(NavCtx(npc, nav, 0.25f));
             npc.Position += npc.Direction * 0.02f;
         }
 
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class GoToTaskTests
         var npc = new TestNpc(0, 0);
         npc.StandAt(NavGrid.CentreOf(new Point(0, 0)));
         var target = NavGrid.CentreOf(new Point(5, 0));
-        var task = new GoToTask(target);
+        var task = new GoToJob(target);
         task.Execute(NavCtx(npc, nav, 0.25f));        // an open row: straight at the target
         Assert.Equal(new[] { target }, task.RemainingWaypoints);
 
@@ -248,52 +248,52 @@ public class GoToTaskTests
     }
 }
 
-public class WaitTaskTests
+public class WaitJobTests
 {
-    public WaitTaskTests() => NullContentManager.Install();
+    public WaitJobTests() => NullContentManager.Install();
 
-    private static TaskContext Ctx(TestNpc npc, float dt) =>
+    private static JobContext Ctx(TestNpc npc, float dt) =>
         new() { Owner = npc, Blackboard = new Blackboard(), DeltaTime = dt };
 
     [Fact]
     public void Does_not_complete_before_its_duration()
     {
         var npc = new TestNpc(0, 0);
-        var task = new WaitTask(1f);
+        var task = new WaitJob(1f);
 
         task.Execute(Ctx(npc, 0.5f));
 
-        Assert.NotEqual(TaskState.Completed, task.State);
+        Assert.NotEqual(JobState.Completed, task.State);
     }
 
     [Fact]
     public void Completes_once_the_elapsed_time_reaches_the_duration()
     {
         var npc = new TestNpc(0, 0);
-        var task = new WaitTask(1f);
+        var task = new WaitJob(1f);
 
         task.Execute(Ctx(npc, 0.5f));   // 0.5s
         task.Execute(Ctx(npc, 0.5f));   // 1.0s total
 
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
     }
 
     [Fact]
     public void Completes_when_a_single_long_tick_exceeds_the_duration()
     {
         var npc = new TestNpc(0, 0);
-        var task = new WaitTask(1f);
+        var task = new WaitJob(1f);
 
         task.Execute(Ctx(npc, 2f));
 
-        Assert.Equal(TaskState.Completed, task.State);
+        Assert.Equal(JobState.Completed, task.State);
     }
 
     [Fact]
     public void Stands_still_while_waiting()
     {
         var npc = new TestNpc(0, 0) { Direction = new Vector2(1, 0) };
-        var task = new WaitTask(1f);
+        var task = new WaitJob(1f);
 
         task.Execute(Ctx(npc, 0.1f));
 

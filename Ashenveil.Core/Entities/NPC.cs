@@ -20,7 +20,7 @@ namespace Ashenveil.Core.Entities
         // (see ConversationSystem.Start).
         public string Persona { get; set;} = "A generic NPC.";
         // The level this NPC is in, set by NpcRoster.Add. Null until it's been added to one
-        // (tests often skip that). Tasks get the level's NavGrid through it.
+        // (tests often skip that). Jobs get the level's NavGrid through it.
         public GameWorld.Locations.Location Location { get; internal set; }
         protected NPC(Vector2 position, int id, string name, NpcBrain brain) : base(position, id)
         {
@@ -42,12 +42,12 @@ namespace Ashenveil.Core.Entities
         public NpcBrain.NPCState State => Brain.State;
         public brains.Memorys.Journal Journal => Brain.Journal;
         public brains.Opinions Opinions => Brain.Opinions;
-        // The task queue, front first. For saving; new tasks still go in through GiveTask.
-        public IReadOnlyCollection<brains.Task.ITask> Tasks => Brain.TaskQueue;
-        // Where the current go-to task is still heading, in cells; empty when the NPC isn't
+        // The job queue, front first. For saving; new jobs still go in through GiveJob.
+        public IReadOnlyCollection<brains.Jobs.IJob> Jobs => Brain.JobQueue;
+        // Where the current go-to job is still heading, in cells; empty when the NPC isn't
         // walking to anything. For the `nav` debug drawing.
         public IReadOnlyList<Vector2> CurrentPath =>
-            State == NpcBrain.NPCState.Tasked && Brain.TaskQueue.TryPeek(out var task) && task is brains.Task.GoToTask go
+            State == NpcBrain.NPCState.Working && Brain.JobQueue.TryPeek(out var job) && job is brains.Jobs.GoToJob go
                 ? go.RemainingWaypoints
                 : Array.Empty<Vector2>();
 
@@ -119,9 +119,9 @@ namespace Ashenveil.Core.Entities
 
         /// <summary>Stopped by an entity or the map's edge: the brain decides how to react.</summary>
         public override void OnBlocked(bool horizontal) => Brain.OnBlocked(horizontal);
-        public void GiveTask(brains.Task.ITask task)
+        public void GiveJob(brains.Jobs.IJob job)
         {
-            Brain.Enqueue(task);
+            Brain.Enqueue(job);
         }
 
         // Files a finished conversation in this NPC's cold-tier memory. The same transcript

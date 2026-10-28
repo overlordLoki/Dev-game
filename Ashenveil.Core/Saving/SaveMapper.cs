@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Memorys;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.GameWorld;
 using Microsoft.Xna.Framework;
 
@@ -85,7 +85,7 @@ namespace Ashenveil.Core.Saving
             Memories = npc.Journal.Memories.Select(ToSave).ToList(),
             TranscriptIds = npc.Journal.Transcripts.Select(t => t.Id).ToList(),
             // A task type saving doesn't know is left out, so the rest of the queue still loads.
-            Tasks = npc.Tasks.Select(ToSave).Where(t => t != null).ToList(),
+            Tasks = npc.Jobs.Select(ToSave).Where(t => t != null).ToList(),
             DayEntries = npc.Journal.Days.Select(d => new DayEntrySave { Day = d.Day, Summary = d.Summary }).ToList(),
             LastReflectedDay = npc.Journal.LastReflectedDay,
             KnownEvents = npc.Journal.KnownEvents.OrderBy(k => k.Key)
@@ -101,12 +101,12 @@ namespace Ashenveil.Core.Saving
                 .ToList(),
         };
 
-        // Only what the task needs to carry on. Completed and failed tasks never get here:
+        // Only what the job needs to carry on. Completed and failed jobs never get here:
         // they leave the queue the tick they finish.
-        public static TaskSave ToSave(ITask task) => task switch
+        public static TaskSave ToSave(IJob job) => job switch
         {
-            GoToTask go => new TaskSave { Type = "go_to", X = go.Target.X, Y = go.Target.Y },
-            WaitTask wait => new TaskSave { Type = "wait", Seconds = wait.SecondsLeft },
+            GoToJob go => new TaskSave { Type = "go_to", X = go.Target.X, Y = go.Target.Y },
+            WaitJob wait => new TaskSave { Type = "wait", Seconds = wait.SecondsLeft },
             _ => null,
         };
 
@@ -180,9 +180,9 @@ namespace Ashenveil.Core.Saving
             npc.StandAt(new Vector2(saved.X, saved.Y));
             FillJournal(npc.Journal, saved, transcripts);
             FillFactions(npc, saved, table ?? FactionTable.Default);
-            // GiveTask puts the NPC in the Tasked state, as it was when it was saved with work queued.
-            foreach (var task in saved.Tasks.Select(FromSave).Where(t => t != null))
-                npc.GiveTask(task);
+            // GiveJob puts the NPC in the Working state, as it was when it was saved with work queued.
+            foreach (var job in saved.Tasks.Select(FromSave).Where(t => t != null))
+                npc.GiveJob(job);
             return npc;
         }
 
@@ -203,10 +203,10 @@ namespace Ashenveil.Core.Saving
         }
 
         /// <summary>The task a save describes, or null if its type is unknown or it's missing what that type needs.</summary>
-        public static ITask FromSave(TaskSave saved) => saved.Type switch
+        public static IJob FromSave(TaskSave saved) => saved.Type switch
         {
-            "go_to" when saved.X is float x && saved.Y is float y => new GoToTask(new Vector2(x, y)),
-            "wait" when saved.Seconds is float seconds => new WaitTask(seconds),
+            "go_to" when saved.X is float x && saved.Y is float y => new GoToJob(new Vector2(x, y)),
+            "wait" when saved.Seconds is float seconds => new WaitJob(seconds),
             _ => null,
         };
 

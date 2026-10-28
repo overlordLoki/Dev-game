@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.Screens;
 using Microsoft.Xna.Framework;
 using Ashenveil.Core.GameWorld;
@@ -28,7 +28,7 @@ namespace Ashenveil.Core.Entities
             Idle,
             Walking,
             Talking,
-            Tasked, //for future AI, like following the player or going to a specific location
+            Working, // running its job queue (go_to, wait, ...); Idle/Walking again once it empties
         }
         /// <summary>
         /// Binds this brain to its NPC and runs <see cref="Start"/>. Called from the NPC
@@ -43,20 +43,20 @@ namespace Ashenveil.Core.Entities
         public Journal Journal { get; } = new Journal();
         /// <summary>What this NPC thinks of people and factions.</summary>
         public brains.Opinions Opinions { get; } = new brains.Opinions();
-        public Queue<ITask> TaskQueue { get; } = new Queue<ITask>();
+        public Queue<IJob> JobQueue { get; } = new Queue<IJob>();
         public NPCState State { get; protected set; } = NPCState.Idle;
-        // One blackboard per NPC, reused across every tick and every task, so tasks can
+        // One blackboard per NPC, reused across every tick and every job, so jobs can
         // share scratch state (a GoTo's target cell, "have I started") between frames.
         private readonly Blackboard _blackboard = new();
 
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         protected virtual void Start() {}
 
-        /// <summary>Hand the NPC a task to run; switches it into the Tasked state.</summary>
-        public void Enqueue(ITask task)
+        /// <summary>Hand the NPC a job to run; switches it into the Working state.</summary>
+        public void Enqueue(IJob job)
         {
-            TaskQueue.Enqueue(task);
-            State = NPCState.Tasked;
+            JobQueue.Enqueue(job);
+            State = NPCState.Working;
         }
 
         public virtual void StartTalking()
@@ -68,7 +68,7 @@ namespace Ashenveil.Core.Entities
         public virtual void StopTalking()
         {
             // Resume an interrupted errand if one is waiting; otherwise go back to wandering.
-            State = TaskQueue.Count > 0 ? NPCState.Tasked : NPCState.Walking;
+            State = JobQueue.Count > 0 ? NPCState.Working : NPCState.Walking;
             if (State == NPCState.Walking)
             {
                 float angle = (float)(Random.Shared.NextDouble() * Math.PI * 2);
@@ -77,9 +77,9 @@ namespace Ashenveil.Core.Entities
         }
 
         /// <summary>
-        /// The fixed per-frame flow, shared by every brain: talking stands still, a tasked
+        /// The fixed per-frame flow, shared by every brain: talking stands still, a working
         /// NPC ticks its queue, and anything else defers to the subclass's default behaviour.
-        /// Subclasses override <see cref="UpdateDefault"/>, not this, so the task machinery
+        /// Subclasses override <see cref="UpdateDefault"/>, not this, so the job machinery
         /// can never be accidentally shadowed.
         /// </summary>
         public void Update(GameTime gameTime)
@@ -90,8 +90,8 @@ namespace Ashenveil.Core.Entities
                 case NPCState.Talking:
                     // Stand still while talking.
                     break;
-                case NPCState.Tasked:
-                    TickTasks(dt);
+                case NPCState.Working:
+                    TickJobs(dt);
                     break;
                 default: // Idle / Walking
                     UpdateDefault(gameTime);
@@ -102,20 +102,20 @@ namespace Ashenveil.Core.Entities
         /// <summary>A brain's own idle/wander behaviour. Base does nothing; WanderBrain walks.</summary>
         protected virtual void UpdateDefault(GameTime gameTime) { }
 
-        // Runs the task at the front of the queue until it reports Completed or Failed, then moves on.
-        // A task may take many ticks; Peek (not Dequeue) keeps it at the front until it's done.
-        private void TickTasks(float dt)
+        // Runs the job at the front of the queue until it reports Completed or Failed, then moves on.
+        // A job may take many ticks; Peek (not Dequeue) keeps it at the front until it's done.
+        private void TickJobs(float dt)
         {
-            if (TaskQueue.Count == 0)
+            if (JobQueue.Count == 0)
             {
                 State = NPCState.Walking;   // nothing left to do -> back to the default loop
                 return;
             }
 
-            ITask task = TaskQueue.Peek();
-            if (task.State == TaskState.Inactive) task.State = TaskState.Active;
+            IJob job = JobQueue.Peek();
+            if (job.State == JobState.Inactive) job.State = JobState.Active;
 
-            task.Execute(new TaskContext
+            job.Execute(new JobContext
             {
                 Owner = Npc,
                 Blackboard = _blackboard,
@@ -124,23 +124,23 @@ namespace Ashenveil.Core.Entities
                 Post = Npc.PostEvent,
             });
 
-            // A failed task is dropped the same way, so the NPC moves on to the next one. Either
+            // A failed job is dropped the same way, so the NPC moves on to the next one. Either
             // way the world hears about it - but only for trips: a wait is never news.
-            if (task.State is TaskState.Completed or TaskState.Failed)
+            if (job.State is JobState.Completed or JobState.Failed)
             {
-                TaskQueue.Dequeue();
-                if (task is GoToTask go) Npc.PostEvent?.Invoke(TripEvent(go));
+                JobQueue.Dequeue();
+                if (job is GoToJob go) Npc.PostEvent?.Invoke(TripEvent(go));
             }
         }
 
-        // "Sir Lancelot reached the entry" / "Sir Lancelot couldn't reach the well". The task only
+        // "Sir Lancelot reached the entry" / "Sir Lancelot couldn't reach the well". The job only
         // knows a point, so the place is the POI standing there, if any.
-        private GameEvent TripEvent(GoToTask go)
+        private GameEvent TripEvent(GoToJob go)
         {
             var poi = Npc.Location?.pointsOfInterest.Values
                 .FirstOrDefault(p => Vector2.Distance(p.StandingSpot(), go.Target) < 0.01f);
             string place = poi != null ? $"the {poi.Name.Replace('_', ' ')}" : $"({go.Target.X:0.0}, {go.Target.Y:0.0})";
-            bool done = go.State == TaskState.Completed;
+            bool done = go.State == JobState.Completed;
             return GameEvent.Of(done ? EventType.TaskDone : EventType.TaskFailed, Npc.Location?.Name, Npc.Feet,
                                 Npc.Id, null, done ? $"{Npc.Name} reached {place}" : $"{Npc.Name} couldn't reach {place}");
         }
@@ -170,22 +170,22 @@ namespace Ashenveil.Core.Entities
             Remember(decision.memories, 5, MemoryKind.Conversation, transcript?.Id, transcript?.Day ?? 0);
 
             // 2. Optionally drop whatever the NPC was doing.
-            if (decision.clear_current_tasks) TaskQueue.Clear();
+            if (decision.clear_current_tasks) JobQueue.Clear();
 
-            // 3. Turn each spec into a real task, dropping anything we can't honour.
+            // 3. Turn each spec into a real job, dropping anything we can't honour.
             foreach (var spec in decision.tasks ?? Array.Empty<TaskSpecDto>())
             {
-                ITask task = spec.type switch
+                IJob job = spec.type switch
                 {
                     "go_to" => MakeGoTo(spec, location),
-                    "wait"  => new WaitTask(Math.Clamp(spec.seconds, 0f, 600f)),
+                    "wait"  => new WaitJob(Math.Clamp(spec.seconds, 0f, 600f)),
                     _       => null,                    // unknown type -> ignore
                 };
-                if (task != null) Enqueue(task);
+                if (job != null) Enqueue(job);
             }
 
             // 4. Resulting state: queued work always wins; otherwise honour the mood.
-            State = TaskQueue.Count > 0 ? NPCState.Tasked
+            State = JobQueue.Count > 0 ? NPCState.Working
                 : decision.behaviour == "idle" ? NPCState.Idle
                 : NPCState.Walking;
         }
@@ -224,10 +224,10 @@ namespace Ashenveil.Core.Entities
         }
 
         // A go_to survives only if its target names a real POI in this level.
-        private ITask MakeGoTo(TaskSpecDto spec, Location location)
+        private IJob MakeGoTo(TaskSpecDto spec, Location location)
         {
             var poi = location?.Poi(spec.target);
-            return poi == null ? null : new GoToTask(poi.StandingSpot());
+            return poi == null ? null : new GoToJob(poi.StandingSpot());
         }
 
 

@@ -4,7 +4,7 @@ using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Saving;
@@ -246,15 +246,15 @@ public class WorldSaveTests : IDisposable
         var world = NewGame();
         Step(world, 1.0);   // a second into his walk to the entry
         var save = SaveMapper.ToSave(world, SavedAt);
-        var heading = Assert.IsType<GoToTask>(Knight(world).Tasks.First()).Target;
+        var heading = Assert.IsType<GoToJob>(Knight(world).Jobs.First()).Target;
 
         var loaded = Load(save);
         var knight = Knight(loaded);
         Vector2 before = knight.Feet;
         Step(loaded, 0.5);
 
-        Assert.Equal(NpcBrain.NPCState.Tasked, knight.State);
-        Near.Equal(heading, Assert.IsType<GoToTask>(knight.Tasks.First()).Target);
+        Assert.Equal(NpcBrain.NPCState.Working, knight.State);
+        Near.Equal(heading, Assert.IsType<GoToJob>(knight.Jobs.First()).Target);
         Assert.True(Vector2.Distance(knight.Feet, heading) < Vector2.Distance(before, heading), "he should be closer to where he was going");
     }
 
@@ -268,7 +268,7 @@ public class WorldSaveTests : IDisposable
         Step(loaded);
         Step(loaded);
 
-        Assert.Empty(Knight(loaded).Tasks);   // dropped as Failed, not stuck or crashed
+        Assert.Empty(Knight(loaded).Jobs);   // dropped as Failed, not stuck or crashed
     }
 
     [Fact]

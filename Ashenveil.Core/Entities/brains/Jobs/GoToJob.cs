@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Ashenveil.Core.Navigation;
 using Microsoft.Xna.Framework;
 
-namespace Ashenveil.Core.Entities.brains.Task
+namespace Ashenveil.Core.Entities.brains.Jobs
 {
     /// <summary>
     /// Walks the NPC's feet to a point. With a <see cref="NavGrid"/> it routes round
@@ -10,9 +10,9 @@ namespace Ashenveil.Core.Entities.brains.Task
     /// (tests, or a level with no grid) it heads straight at the target. Fails if there's
     /// no way through, or if it keeps getting stuck.
     /// </summary>
-    public class GoToTask : ITask
+    public class GoToJob : IJob
     {
-        public TaskState State { get; set; } = TaskState.Inactive;
+        public JobState State { get; set; } = JobState.Inactive;
         private readonly Vector2 _target;            // in cells
         private const float ArriveRadius = 0.03f;    // "close enough", in cells (~4px at 720p) — stops the jitter
         // Looser for the waypoints on the way: the NPC turns for the next one a little early
@@ -33,12 +33,12 @@ namespace Ashenveil.Core.Entities.brains.Task
         private float _stuckFor;                        // seconds since they last got closer
         private int _replans;
 
-        public GoToTask(Vector2 target) => _target = target;
+        public GoToJob(Vector2 target) => _target = target;
 
         /// <summary>
         /// Where the feet are headed, in cells. All saving keeps: the route and stuck timers
         /// aren't saved, because the first Execute after loading plans again from wherever the
-        /// NPC is, as it does for any task that's just starting.
+        /// NPC is, as it does for any job that's just starting.
         /// </summary>
         public Vector2 Target => _target;
 
@@ -49,11 +49,11 @@ namespace Ashenveil.Core.Entities.brains.Task
         public IReadOnlyList<Vector2> RemainingWaypoints =>
             _waypoints == null ? System.Array.Empty<Vector2>() : _waypoints.GetRange(_next, _waypoints.Count - _next);
 
-        public void Execute(TaskContext context)
+        public void Execute(JobContext context)
         {
             var npc = (NPC)context.Owner;
 
-            // Plan on the first tick, not in the constructor: the task may wait in the queue
+            // Plan on the first tick, not in the constructor: the job may wait in the queue
             // behind others, so where the NPC is now is only known once it starts.
             if (_waypoints == null && !StartRoute(context.Nav, npc)) return;
 
@@ -67,7 +67,7 @@ namespace Ashenveil.Core.Entities.brains.Task
                 if (last)
                 {
                     npc.Direction = Vector2.Zero;      // stop
-                    State = TaskState.Completed;        // tell the queue we're done
+                    State = JobState.Completed;        // tell the queue we're done
                     return;
                 }
 
@@ -101,7 +101,7 @@ namespace Ashenveil.Core.Entities.brains.Task
         }
 
         // Plans a route from where the feet are now and starts walking it from the first
-        // waypoint. False (and the task Failed) if there's no way through.
+        // waypoint. False (and the job Failed) if there's no way through.
         private bool StartRoute(NavGrid nav, NPC npc)
         {
             _waypoints = Plan(nav, npc.Feet);
@@ -123,7 +123,7 @@ namespace Ashenveil.Core.Entities.brains.Task
         private void Fail(NPC npc)
         {
             npc.Direction = Vector2.Zero;
-            State = TaskState.Failed;
+            State = JobState.Failed;
         }
 
         // The cell centres along the route, then the exact target, smoothed into straight

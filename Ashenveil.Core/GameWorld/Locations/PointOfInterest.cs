@@ -37,7 +37,7 @@ namespace Ashenveil.Core.GameWorld.Locations
 
         /// <summary>
         /// Where an entity's feet go to stand on this cell, in cells: centred across it, near
-        /// the bottom. What spawning (Location.PlaceAt) and walking to a point (GoToTask) aim at.
+        /// the bottom. What spawning (Location.PlaceAt) and walking to a point (GoToJob) aim at.
         /// </summary>
         public Vector2 StandingSpot() => new Vector2(X + 0.5f, Y + FeetDown);
     }

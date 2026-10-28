@@ -18,7 +18,7 @@ namespace Ashenveil.Core.Entities
             Npc.Direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
         }
 
-        // The base runs this for Idle/Walking; Talking and Tasked are handled by the base.
+        // The base runs this for Idle/Walking; Talking and Working are handled by the base.
         protected override void UpdateDefault(GameTime gameTime)
         {
             //chance to change direction every second

@@ -1,6 +1,6 @@
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.GameWorld;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.GameWorld.Locations;
 using Ashenveil.Core.Graphics;
 using Microsoft.Xna.Framework;
@@ -120,18 +120,18 @@ public class NpcRosterTests
     // -------------------------------------------------------------- navigation
 
     // Keeps the context it was run with, so a test can see what the brain handed it.
-    private sealed class ProbeTask : ITask
+    private sealed class ProbeJob : IJob
     {
-        public TaskState State { get; set; }
-        public TaskContext Seen { get; private set; }
-        public void Execute(TaskContext context) => Seen = context;
+        public JobState State { get; set; }
+        public JobContext Seen { get; private set; }
+        public void Execute(JobContext context) => Seen = context;
     }
 
     // Gives up the first time it's run.
-    private sealed class FailingTask : ITask
+    private sealed class FailingJob : IJob
     {
-        public TaskState State { get; set; }
-        public void Execute(TaskContext context) => State = TaskState.Failed;
+        public JobState State { get; set; }
+        public void Execute(JobContext context) => State = JobState.Failed;
     }
 
     [Fact]
@@ -139,9 +139,9 @@ public class NpcRosterTests
     {
         var brain = new WanderBrain();
         var npc = new TestNpc(0, 0, brain);
-        var next = new ProbeTask();
-        npc.GiveTask(new FailingTask());
-        npc.GiveTask(next);
+        var next = new ProbeJob();
+        npc.GiveJob(new FailingJob());
+        npc.GiveJob(next);
 
         brain.Update(new GameTime());   // the failing task runs, fails and is dropped
         brain.Update(new GameTime());   // so this tick runs the next one
@@ -159,14 +159,14 @@ public class NpcRosterTests
     }
 
     [Fact]
-    public void Tasks_get_the_nav_grid_of_the_NPCs_level()
+    public void Jobs_get_the_nav_grid_of_the_NPCs_level()
     {
         var brain = new WanderBrain();
         var npc = new TestNpc(0, 0, brain);
         var medows = new Location("Medows");
         _roster.Add(medows, npc);
-        var probe = new ProbeTask();
-        npc.GiveTask(probe);
+        var probe = new ProbeJob();
+        npc.GiveJob(probe);
 
         brain.Update(new GameTime());
 
@@ -174,12 +174,12 @@ public class NpcRosterTests
     }
 
     [Fact]
-    public void Tasks_get_no_nav_grid_when_the_NPC_isnt_in_a_level()
+    public void Jobs_get_no_nav_grid_when_the_NPC_isnt_in_a_level()
     {
         var brain = new WanderBrain();
         var npc = new TestNpc(0, 0, brain);
-        var probe = new ProbeTask();
-        npc.GiveTask(probe);
+        var probe = new ProbeJob();
+        npc.GiveJob(probe);
 
         brain.Update(new GameTime());
 

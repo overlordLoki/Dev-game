@@ -1,19 +1,19 @@
 
 using System.Collections.Generic;
 
-namespace Ashenveil.Core.Entities.brains.Task
+namespace Ashenveil.Core.Entities.brains.Jobs
 {
-    public enum TaskState
+    public enum JobState
     {
         Inactive,
         Active,
         Completed,
         Failed,      // gave up (no way through, or stuck too long); dropped like Completed
     }
-    public interface ITask
+    public interface IJob
     {
-        TaskState State { get; set; }
-        void Execute(TaskContext context);
+        JobState State { get; set; }
+        void Execute(JobContext context);
         
     }
     public sealed class Blackboard
@@ -33,13 +33,13 @@ namespace Ashenveil.Core.Entities.brains.Task
             TryGet<T>(key, out var v) ? v : fallback;
     }
 
-    public sealed class TaskContext
+    public sealed class JobContext
     {
         public required Entity Owner { get; init; }
         public required Blackboard Blackboard { get; init; }
         public float DeltaTime { get; init; }
-        // The owner's level's walkable cells, for tasks that route round obstacles. Null when
-        // the owner isn't in a level (tests): tasks fall back to walking straight.
+        // The owner's level's walkable cells, for jobs that route round obstacles. Null when
+        // the owner isn't in a level (tests): jobs fall back to walking straight.
         public Navigation.NavGrid Nav { get; init; }
         // How the owner tells the world something happened (EventLog.Post). Null when it isn't
         // wired to a world (tests that don't care): nothing is posted.

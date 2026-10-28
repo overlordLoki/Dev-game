@@ -157,7 +157,7 @@ public class WorldBoundsTests
     public void An_NPC_whose_brain_ignores_walls_keeps_its_heading()
     {
         // Before, WorldBounds flipped every NPC's heading. Now a brain that doesn't react
-        // (like the knight's) isn't turned around - e.g. mid-GoToTask.
+        // (like the knight's) isn't turned around - e.g. mid-GoToJob.
         var npc = new TestNpc(4.5f, 2, new RecordingBrain()) { Direction = new Vector2(1, 0) };
 
         _bounds.Clamp(npc);

@@ -54,12 +54,12 @@ facing → health → the player's attack → NPCs fight back → death → enem
 - **The knight has combat art already loaded:** `attack1/2/3`, `defend`, `hurt` and `death`
   are registered in `Knight`'s constructor, and `Animation` already supports one-shot clips
   (`Loop = false`, `IsFinished`). He's side-view only (left/right).
-- **The NPC brain** has a state machine: `Idle / Walking / Talking / Tasked`. Talking pauses
+- **The NPC brain** has a state machine: `Idle / Walking / Talking / Working`. Talking pauses
   the task queue and `StopTalking` resumes it. That pattern is the model for fighting.
   - It already has an unused `target` field ("for later AI, like following the player or
     attacking them").
   - It has a parked `// TODO (separate feature): combat` comment, which this plan replaces.
-- **Pathfinding is done** (`NavGrid`, `Pathfinder`, `GoToTask` replanning), so chasing is
+- **Pathfinding is done** (`NavGrid`, `Pathfinder`, `GoToJob` replanning), so chasing is
   mostly solved.
 - **`World.Update`** steps the clock, conversations, then movement and collision for everyone.
   `ConversationSystem` is a good model for a `CombatSystem`: the needed pieces are handed in,

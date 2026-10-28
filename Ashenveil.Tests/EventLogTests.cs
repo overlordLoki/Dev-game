@@ -3,7 +3,7 @@ using Ashenveil.Core.DevConsole;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Utility.Input;
 using Microsoft.Xna.Framework;
@@ -178,7 +178,7 @@ public class EventLogTests : IDisposable
         var world = NewWorld();
         var well = world.location.Poi("well")!.StandingSpot();
         var (npc, brain) = NpcAt(world, well, 10);
-        npc.GiveTask(new GoToTask(well));   // already there: done on the first tick
+        npc.GiveJob(new GoToJob(well));   // already there: done on the first tick
 
         Tick(brain);
 
@@ -194,7 +194,7 @@ public class EventLogTests : IDisposable
     {
         var world = NewWorld();
         var (npc, brain) = NpcAt(world, new Vector2(0.5f, 0.9f), 10);
-        npc.GiveTask(new GoToTask(world.location.Poi("well")!.StandingSpot()));
+        npc.GiveJob(new GoToJob(world.location.Poi("well")!.StandingSpot()));
 
         // Ticking the brain alone never moves the body, so the trip gets stuck and gives up.
         Tick(brain, 20);
@@ -209,7 +209,7 @@ public class EventLogTests : IDisposable
     {
         var world = NewWorld();
         var (npc, brain) = NpcAt(world, new Vector2(0.5f, 0.9f), 10);
-        npc.GiveTask(new WaitTask(1f));
+        npc.GiveJob(new WaitJob(1f));
 
         Tick(brain, 3);
 

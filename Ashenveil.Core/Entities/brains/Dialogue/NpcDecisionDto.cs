@@ -7,7 +7,7 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
         public string[] memories { get; set; }          // facts as text, not Memory objects
         public string behaviour { get; set; }           // "resume" | "idle" | "do_tasks"
         public bool clear_current_tasks { get; set; }
-        public TaskSpecDto[] tasks { get; set; }         // specs, not ITask instances
+        public TaskSpecDto[] tasks { get; set; }         // specs, not IJob instances
         public string join_faction { get; set; }         // let the others in this faction; null for no
         public NpcDecisionDto(string summary, string[] memories, string behaviour, bool clear_current_tasks, TaskSpecDto[] tasks)
         {

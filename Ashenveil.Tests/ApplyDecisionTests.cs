@@ -2,7 +2,7 @@ using System.Linq;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
 using Ashenveil.Core.Entities.brains.Memorys;
-using Ashenveil.Core.Entities.brains.Task;
+using Ashenveil.Core.Entities.brains.Jobs;
 
 namespace Ashenveil.Tests;
 
@@ -53,8 +53,8 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Equal(3, brain.TaskQueue.Count);
-        Assert.Equal(NpcBrain.NPCState.Tasked, brain.State);
+        Assert.Equal(3, brain.JobQueue.Count);
+        Assert.Equal(NpcBrain.NPCState.Working, brain.State);
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Empty(brain.TaskQueue);
-        Assert.NotEqual(NpcBrain.NPCState.Tasked, brain.State);
+        Assert.Empty(brain.JobQueue);
+        Assert.NotEqual(NpcBrain.NPCState.Working, brain.State);
         var memory = Assert.Single(brain.Journal.Memories);
         Assert.Equal("the traveller asked about the roads", memory.Text);
         Assert.Equal(MemoryKind.Conversation, memory.Kind);
@@ -234,7 +234,7 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Single(brain.TaskQueue);   // only the wait survived
+        Assert.Single(brain.JobQueue);   // only the wait survived
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Single(brain.TaskQueue);   // "nowhere" dropped, the wait remains
+        Assert.Single(brain.JobQueue);   // "nowhere" dropped, the wait remains
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public class ApplyDecisionTests
 
         brain.ApplyDecision(null, TestLevels.Location(Level));   // must not throw
 
-        Assert.Empty(brain.TaskQueue);
+        Assert.Empty(brain.JobQueue);
         Assert.Empty(brain.Journal.Memories);
     }
 
@@ -267,28 +267,28 @@ public class ApplyDecisionTests
     public void Clear_current_tasks_empties_the_queue_before_adding_new_ones()
     {
         var brain = NewBrain();
-        brain.Enqueue(new WaitTask(1f));
-        brain.Enqueue(new WaitTask(1f));          // two tasks already queued
+        brain.Enqueue(new WaitJob(1f));
+        brain.Enqueue(new WaitJob(1f));          // two tasks already queued
 
         var decision = new NpcDecisionDto(
             "x", null, "do_tasks", clear_current_tasks: true, new[] { Wait(1f) });
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Single(brain.TaskQueue);           // old two cleared, one new added
+        Assert.Single(brain.JobQueue);           // old two cleared, one new added
     }
 
     [Fact]
     public void Without_clear_new_tasks_are_appended_to_the_existing_queue()
     {
         var brain = NewBrain();
-        brain.Enqueue(new WaitTask(1f));
+        brain.Enqueue(new WaitJob(1f));
 
         var decision = new NpcDecisionDto(
             "x", null, "do_tasks", clear_current_tasks: false, new[] { Wait(1f) });
 
         brain.ApplyDecision(decision, TestLevels.Location(Level));
 
-        Assert.Equal(2, brain.TaskQueue.Count);   // original plus the new one
+        Assert.Equal(2, brain.JobQueue.Count);   // original plus the new one
     }
 }
