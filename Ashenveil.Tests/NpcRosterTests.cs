@@ -185,4 +185,73 @@ public class NpcRosterTests
 
         Assert.Null(probe.Seen.Nav);
     }
+
+    // -------------------------------------------------------------- finding people
+
+    [Fact]
+    public void Adding_an_NPC_lets_it_find_people_through_the_roster()
+    {
+        var npc = new TestNpc(0, 0);
+        var target = new TestNpc(1, 0, 42);
+        (NPC asker, int id) asked = default;
+        _roster.FindPersonNear = (a, id) => { asked = (a, id); return target; };
+        _roster.Add(new Location("Medows"), npc);
+
+        var found = npc.FindPerson(42);
+
+        Assert.Same(target, found);
+        Assert.Same(npc, asked.asker);   // the roster says who's asking, so the World can check their level
+        Assert.Equal(42, asked.id);
+    }
+
+    [Fact]
+    public void An_NPC_added_before_the_lookup_is_set_still_gets_it()
+    {
+        var npc = new TestNpc(0, 0);
+        var target = new TestNpc(1, 0, 42);
+        _roster.Add(new Location("Medows"), npc);
+
+        _roster.FindPersonNear = (_, _) => target;   // set after the Add
+
+        Assert.Same(target, npc.FindPerson(42));
+    }
+
+    [Fact]
+    public void With_no_lookup_set_an_NPC_finds_nobody()
+    {
+        var npc = new TestNpc(0, 0);
+        _roster.Add(new Location("Medows"), npc);
+
+        Assert.Null(npc.FindPerson(42));
+    }
+
+    [Fact]
+    public void Jobs_get_the_NPCs_way_of_finding_people()
+    {
+        var brain = new WanderBrain();
+        var npc = new TestNpc(0, 0, brain);
+        var target = new TestNpc(1, 0, 42);
+        _roster.FindPersonNear = (_, id) => id == 42 ? target : null;
+        _roster.Add(new Location("Medows"), npc);
+        var probe = new ProbeJob();
+        npc.GiveJob(probe);
+
+        brain.Update(new GameTime());
+
+        Assert.Same(target, probe.Seen.FindPerson(42));
+        Assert.Null(probe.Seen.FindPerson(7));
+    }
+
+    [Fact]
+    public void Jobs_get_no_way_of_finding_people_when_the_NPC_isnt_in_a_level()
+    {
+        var brain = new WanderBrain();
+        var npc = new TestNpc(0, 0, brain);
+        var probe = new ProbeJob();
+        npc.GiveJob(probe);
+
+        brain.Update(new GameTime());
+
+        Assert.Null(probe.Seen.FindPerson);   // never added to a roster: jobs must cope with null
+    }
 }

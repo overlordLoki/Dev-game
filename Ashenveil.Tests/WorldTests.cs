@@ -251,6 +251,70 @@ public class WorldTests : IDisposable
         Assert.Equal("Medows", world.location.Name);
     }
 
+    // ------------------------------------------------------------------ finding people nearby
+
+    // An NPC with a known id, put in some other level than the player's.
+    private static TestNpc NpcElsewhere(World world, int id)
+    {
+        var npc = new TestNpc(1, 1, id);
+        world.Roster.Add(TestLevels.Location(Level), npc);   // a fresh throwaway level, its own name
+        return npc;
+    }
+
+    [Fact]
+    public void An_NPC_can_find_another_NPC_in_its_own_level()
+    {
+        var world = NewWorld();
+        var asker = new TestNpc(1, 1, 900);
+        var other = new TestNpc(3, 3, 901);
+        world.AddNpc(asker);
+        world.AddNpc(other);
+
+        Assert.Same(other, world.FindPersonNear(asker, 901));
+        Assert.Same(other, asker.FindPerson(901));   // the same lookup, through the roster's wiring
+    }
+
+    [Fact]
+    public void An_NPC_cant_find_an_NPC_in_another_level()
+    {
+        var world = NewWorld();
+        var asker = new TestNpc(1, 1, 900);
+        world.AddNpc(asker);
+        NpcElsewhere(world, 901);
+
+        Assert.NotNull(world.FindPerson(901));       // they exist...
+        Assert.Null(world.FindPersonNear(asker, 901));  // ...just not here
+    }
+
+    [Fact]
+    public void An_NPC_in_the_players_level_can_find_the_player()
+    {
+        var world = NewWorld();
+        var asker = new TestNpc(1, 1, 900);
+        world.AddNpc(asker);
+
+        Assert.Same(world.player, world.FindPersonNear(asker, world.player.Id));
+    }
+
+    [Fact]
+    public void An_NPC_in_another_level_cant_find_the_player()
+    {
+        var world = NewWorld();
+        var asker = NpcElsewhere(world, 900);
+
+        Assert.Null(world.FindPersonNear(asker, world.player.Id));
+    }
+
+    [Fact]
+    public void Nobody_is_found_for_an_unknown_id()
+    {
+        var world = NewWorld();
+        var asker = new TestNpc(1, 1, 900);
+        world.AddNpc(asker);
+
+        Assert.Null(world.FindPersonNear(asker, 12345));
+    }
+
     // ------------------------------------------------------------------ remembering
 
     [Fact]
