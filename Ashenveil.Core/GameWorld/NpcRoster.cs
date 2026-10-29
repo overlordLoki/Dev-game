@@ -59,6 +59,11 @@ namespace Ashenveil.Core.GameWorld
 
         /// <summary>Seeds the opinions of NPCs spawned here. Set by the World; the game's own table if not.</summary>
         public FactionTable Factions { get; set; }
+        /// <summary>
+        /// Finds a person by id for an NPC, but only if they're in that NPC's level. Set by the
+        /// World; null: nobody can be found.
+        /// </summary>
+        public Func<NPC, int, Entity> FindPersonNear { get; set; }
 
         /// <summary>Puts an NPC in a level, tells the NPC which level it's in, and where to post events.</summary>
         public void Add(Location level, NPC npc)
@@ -66,6 +71,9 @@ namespace Ashenveil.Core.GameWorld
             ListFor(level.Name).Add(npc);
             npc.Location = level;
             npc.PostEvent = PostEvent;
+            // Read FindPersonNear when it's called, not now, so an NPC added before the World
+            // sets it still gets it.
+            npc.FindPerson = id => FindPersonNear?.Invoke(npc, id);
         }
 
         /// <summary>Each level's NPCs, one list per level.</summary>

@@ -76,6 +76,7 @@ namespace Ashenveil.Core.GameWorld
             // the roster, conversations directly. The World posts level changes itself.
             Events = new EventLog(() => Clock.TotalDays, Perceive);
             Roster.PostEvent = e => Events.Post(e);
+            Roster.FindPersonNear = FindPersonNear;
             Conversations.Events = Events;
             Conversations.FindPerson = FindPerson;
             Conversations.Factions = Factions;
@@ -274,6 +275,17 @@ namespace Ashenveil.Core.GameWorld
                 foreach (var npc in NPCs)
                     npc.ResolveCollision(obj.Boxes);
             }
+        }
+        public Entity FindPersonNear(NPC asker, int id)
+        {
+            Entity who = FindPerson(id);
+            string level = who switch
+            {
+                NPC other => other.Location?.Name,
+                Player    => location.Name,      // the player is always in the current level
+                _         => null,
+            };
+            return level != null && level == asker.Location?.Name ? who : null;
         }
     }
 }

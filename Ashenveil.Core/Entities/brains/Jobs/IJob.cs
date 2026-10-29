@@ -44,5 +44,8 @@ namespace Ashenveil.Core.Entities.brains.Jobs
         // How the owner tells the world something happened (EventLog.Post). Null when it isn't
         // wired to a world (tests that don't care): nothing is posted.
         public System.Action<GameWorld.GameEvent> Post { get; init; }
+        // Finds a person (player or NPC) by id, but only if they're in the owner's level; null if
+        // they're gone, elsewhere, or unknown. Null when not wired (tests): nobody can be found.
+        public System.Func<int, Entity> FindPerson { get; init; }
     }
 }

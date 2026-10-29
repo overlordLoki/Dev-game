@@ -14,6 +14,8 @@ namespace Ashenveil.Core.Entities
     {
         protected NpcBrain Brain { get; }
         public string Name { get; }
+        // Finds a person by id, but only in this NPC's level. Set by the roster; null: nobody.
+        public Func<int, Entity> FindPerson { get; set; }
         public string Portrait { get; set; }
         // The persona seeds who the NPC is and how they talk. There's no fixed opening line:
         // whoever starts a conversation speaks first, and the LLM writes every NPC line

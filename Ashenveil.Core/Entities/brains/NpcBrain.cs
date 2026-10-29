@@ -122,6 +122,7 @@ namespace Ashenveil.Core.Entities
                 DeltaTime = dt,
                 Nav = Npc.Location?.Nav,
                 Post = Npc.PostEvent,
+                FindPerson = Npc.FindPerson,
             });
 
             // A failed job is dropped the same way, so the NPC moves on to the next one. Either
