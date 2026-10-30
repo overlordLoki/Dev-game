@@ -1,4 +1,5 @@
 using Ashenveil.Core;
+using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Jobs;
 using Ashenveil.Core.Navigation;
 using Microsoft.Xna.Framework;
@@ -493,5 +494,148 @@ public class FollowJobTests
 
         Assert.Equal(JobState.Failed, job.State);
         Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+}
+
+/// <summary>
+/// Walking up to someone and starting a conversation. The target is found through a fake
+/// FindPerson and the conversation "starts" through a fake StartConversation that records
+/// what it was asked, so no World is needed.
+/// </summary>
+public class TalkToJobTests
+{
+    public TalkToJobTests() => NullContentManager.Install();
+
+    private const int TargetId = 42;
+
+    // Who StartConversation was asked to talk to, and about what; null until it's asked.
+    private (Entity who, string reason)? _asked;
+
+    // A context whose lookup finds `target` by TargetId, and whose StartConversation answers `agree`.
+    private JobContext Ctx(TestNpc npc, TestNpc? target, NavGrid? nav = null, bool agree = true) =>
+        new()
+        {
+            Owner = npc, Blackboard = new Blackboard(), Nav = nav!, DeltaTime = 0.25f,
+            FindPerson = id => id == TargetId ? target! : null!,
+            StartConversation = (who, reason) => { _asked = (who, reason); return agree; },
+        };
+
+    private static TestNpc At(Point cell, int id = 0)
+    {
+        var npc = new TestNpc(0, 0, id);
+        npc.StandAt(NavGrid.CentreOf(cell));
+        return npc;
+    }
+
+    [Fact]
+    public void Fails_when_the_target_cant_be_found()
+    {
+        var npc = At(new Point(0, 0));
+        var job = new TalkToJob(TargetId, "warn them");
+
+        job.Execute(Ctx(npc, target: null));
+
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Null(_asked);
+    }
+
+    [Fact]
+    public void Walks_towards_the_target_without_talking_yet()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new TalkToJob(TargetId, "warn them");
+
+        job.Execute(Ctx(npc, target, GoToJobTests.Grid(".....")));
+
+        Assert.Equal(new Vector2(1, 0), npc.Direction);
+        Assert.Equal(JobState.Inactive, job.State);
+        Assert.Null(_asked);
+    }
+
+    [Fact]
+    public void A_target_with_no_way_through_fails_at_once()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(2, 0), TargetId);
+        var job = new TalkToJob(TargetId, "warn them");
+
+        job.Execute(Ctx(npc, target, GoToJobTests.Grid(".#.")));
+
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Null(_asked);
+    }
+
+    [Fact]
+    public void On_reaching_them_it_starts_the_conversation_with_its_reason_and_completes()
+    {
+        var nav = GoToJobTests.Grid("......");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(5, 0), TargetId);
+        var job = new TalkToJob(TargetId, "warn them about the wolves");
+
+        for (int tick = 0; tick < 400 && job.State is JobState.Inactive or JobState.Active; tick++)
+        {
+            job.Execute(Ctx(npc, target, nav));
+            npc.Position += npc.Direction * 0.05f;
+        }
+
+        Assert.Equal(JobState.Completed, job.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+        Assert.Same(target, _asked?.who);
+        Assert.Equal("warn them about the wolves", _asked?.reason);
+    }
+
+    [Fact]
+    public void Already_beside_them_it_talks_straight_away()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(0, 0), TargetId);
+        target.Position += new Vector2(0.5f, 0);
+        var job = new TalkToJob(TargetId, "hello");
+
+        job.Execute(Ctx(npc, target));
+
+        Assert.Equal(JobState.Completed, job.State);
+        Assert.Same(target, _asked?.who);
+    }
+
+    [Fact]
+    public void Fails_when_the_conversation_cant_start()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(0, 0), TargetId);
+        var job = new TalkToJob(TargetId, "hello");
+
+        job.Execute(Ctx(npc, target, agree: false));   // busy, say
+
+        Assert.Equal(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Fails_when_there_is_no_way_to_start_a_conversation()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(0, 0), TargetId);
+        var job = new TalkToJob(TargetId, "hello");
+
+        job.Execute(new JobContext { Owner = npc, Blackboard = new Blackboard(), FindPerson = _ => target });
+
+        Assert.Equal(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Keeps_after_a_target_who_moves()
+    {
+        var nav = GoToJobTests.Grid(".....", ".....");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new TalkToJob(TargetId, "hello");
+        job.Execute(Ctx(npc, target, nav));
+
+        target.StandAt(NavGrid.CentreOf(new Point(4, 1)));
+        job.Execute(Ctx(npc, target, nav));
+
+        Assert.Equal(target.Feet, job.RemainingWaypoints[^1]);
     }
 }

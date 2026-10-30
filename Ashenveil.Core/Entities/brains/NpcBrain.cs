@@ -134,6 +134,7 @@ namespace Ashenveil.Core.Entities
                 Nav = Npc.Location?.Nav,
                 Post = Npc.PostEvent,
                 FindPerson = Npc.FindPerson,
+                StartConversation = Npc.StartConversation,
             });
 
             // A failed job is dropped the same way, so the NPC moves on to the next one. Either
@@ -191,7 +192,10 @@ namespace Ashenveil.Core.Entities
                 {
                     "go_to" => MakeGoTo(spec, location),
                     "wait"  => new WaitJob(Math.Clamp(spec.seconds, 0f, 600f)),
-                    "follow" => MakeFollow(spec, transcript),
+                    "follow" => OtherPerson(spec, transcript) is Participant who ? new FollowJob(who.Id) : null,
+                    "talk_to" => OtherPerson(spec, transcript) is Participant who
+                        ? new TalkToJob(who.Id, string.IsNullOrWhiteSpace(spec.reason) ? null : spec.reason.Trim())
+                        : null,
                     _       => null,                    // unknown type -> ignore
                 };
                 if (job != null) Enqueue(job);
@@ -243,14 +247,13 @@ namespace Ashenveil.Core.Entities
             return poi == null ? null : new GoToJob(poi.StandingSpot());
         }
 
-        // Someone else from the conversation, by name: the transcript says who was there and
-        // their ids. No transcript, a stranger, or the NPC itself: no job.
-        private IJob MakeFollow(TaskSpecDto spec, Transcript transcript)
+        // The task's target, if it's someone else from the conversation, by name: the transcript
+        // says who was there and their ids. No transcript, a stranger, or the NPC itself: null.
+        private Participant OtherPerson(TaskSpecDto spec, Transcript transcript)
         {
             string name = spec.target?.Trim();
-            var who = transcript?.Participants.FirstOrDefault(p =>
+            return transcript?.Participants.FirstOrDefault(p =>
                 p.Id != Npc.Id && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            return who == null ? null : new FollowJob(who.Id);
         }
 
 

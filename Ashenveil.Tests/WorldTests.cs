@@ -315,6 +315,67 @@ public class WorldTests : IDisposable
         Assert.Null(world.FindPersonNear(asker, 12345));
     }
 
+    // ------------------------------------------------------------------ NPCs walking up to talk
+
+    [Fact]
+    public void An_NPC_walking_up_to_the_player_opens_the_chat_box()
+    {
+        var world = NewWorld();
+        var (npc, _) = NpcBeside(world);
+        Conversation shown = null;
+        world.PlayerConversationStarted += c => shown = c;
+
+        bool started = npc.StartConversation(world.player, "warn them about the wolves");
+
+        Assert.True(started);
+        Assert.NotNull(shown);
+        Assert.Contains(npc, shown.Participants);
+        Assert.Contains(world.player, shown.Participants);
+    }
+
+    [Fact]
+    public void An_NPC_cant_start_a_conversation_with_another_NPC_yet()
+    {
+        var world = NewWorld();
+        var (a, _) = NpcBeside(world);
+        var (b, _) = NpcBeside(world);
+
+        Assert.False(a.StartConversation(b, "hello"));
+        Assert.Empty(world.Conversations.Active);
+    }
+
+    [Fact]
+    public void An_NPC_cant_talk_to_the_player_while_theyre_already_talking()
+    {
+        var world = NewWorld();
+        var (a, _) = NpcBeside(world);
+        var (b, _) = NpcBeside(world);
+        world.StartConversation(world.player, a);
+
+        Assert.False(b.StartConversation(world.player, "hello"));
+        Assert.Single(world.Conversations.Active);
+    }
+
+    [Fact]
+    public void Once_the_players_chat_has_ended_an_NPC_can_talk_to_them()
+    {
+        var world = NewWorld();
+        var (a, _) = NpcBeside(world);
+        var (b, _) = NpcBeside(world);
+        world.StartConversation(world.player, a).End();
+
+        Assert.True(b.StartConversation(world.player, "hello"));
+    }
+
+    [Fact]
+    public void An_NPC_in_another_level_cant_talk_to_the_player()
+    {
+        var world = NewWorld();
+        var npc = NpcElsewhere(world, 900);
+
+        Assert.False(world.NpcStartsConversation(npc, world.player, "hello"));
+    }
+
     // ------------------------------------------------------------------ remembering
 
     [Fact]

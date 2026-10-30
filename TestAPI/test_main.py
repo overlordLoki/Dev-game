@@ -64,6 +64,11 @@ def test_schema_target_takes_places_and_people_to_follow():
     assert target["enum"] == ["well", "Traveller"]
 
 
+def test_schema_tasks_can_carry_a_reason():
+    task_props = decision_schema([])["properties"]["tasks"]["items"]["properties"]
+    assert task_props["reason"] == {"type": "string"}
+
+
 def test_schema_target_takes_people_even_with_no_pois():
     target = decision_schema([], people=["Traveller"])["properties"]["tasks"]["items"]["properties"]["target"]
     assert target["enum"] == ["Traveller"]
@@ -92,7 +97,7 @@ def test_prompt_mentions_npc_persona_transcript_and_places():
 def test_prompt_lists_the_people_who_can_be_followed():
     req = DecisionRequest(npc_name="Sir Lancelot", people=["Traveller"])
 
-    assert "People you can follow: Traveller" in build_decision_prompt(req)
+    assert "People you can follow or talk to: Traveller" in build_decision_prompt(req)
 
 
 def test_prompt_leaves_out_following_when_nobody_was_there():

@@ -243,6 +243,8 @@ TASK_TYPES = {
     "wait": "stand still for a while (needs seconds)",
     "follow": "walk with someone from the conversation (needs a target person); lasts until "
               "you give yourself something else to do",
+    "talk_to": "walk up to someone from the conversation and talk to them (needs a target person "
+               "and a reason: what you want to say to them)",
 }
 BEHAVIOURS = ["resume", "idle", "do_tasks"]
 
@@ -267,6 +269,7 @@ class TaskSpec(BaseModel):
     type: str
     target: str | None = None
     seconds: float = 0.0
+    reason: str | None = None
 
 
 class DecisionResponse(BaseModel):
@@ -311,6 +314,7 @@ def decision_schema(poi_names: list[str], can_admit: list[str] | None = None,
                         "type": {"type": "string", "enum": list(TASK_TYPES)},
                         "target": target,
                         "seconds": {"type": "number"},
+                        "reason": {"type": "string"},
                     },
                     "required": ["type"],
                 },
@@ -343,7 +347,7 @@ def build_decision_prompt(req: DecisionRequest) -> str:
     if req.poi_names:
         parts.append("Places you can go: " + ", ".join(req.poi_names))
     if req.people:
-        parts.append("People you can follow: " + ", ".join(req.people))
+        parts.append("People you can follow or talk to: " + ", ".join(req.people))
 
     parts.append(
         f"\nSummarise the conversation in one sentence. Then extract the concrete facts worth "

@@ -25,7 +25,7 @@ namespace Ashenveil.Core.Saving
     public class SaveStore
     {
         /// <summary>The schema this game writes. Bump it when adding a migration.</summary>
-        public const int SchemaVersion = 5;
+        public const int SchemaVersion = 6;
 
         /// <summary>Where the game keeps its saves: a "saves" folder beside settings.json.</summary>
         public static string DefaultFolder => Path.Combine(SettingsStore.DefaultFolder, "saves");
@@ -187,6 +187,11 @@ namespace Ashenveil.Core.Saving
             """
             ALTER TABLE tasks ADD COLUMN target_id INTEGER;
             """,
+
+            // 5 -> 6: what a talk_to task wants to say. A version 5 file has no talk_to tasks.
+            """
+            ALTER TABLE tasks ADD COLUMN reason TEXT;
+            """,
         };
 
         // Every table, children before the tables they point at, so clearing them in this
@@ -301,9 +306,9 @@ namespace Ashenveil.Core.Saving
                 for (int i = 0; i < npc.Tasks.Count; i++)
                 {
                     var task = npc.Tasks[i];
-                    Insert(db, "INSERT INTO tasks VALUES ($npc, $seq, $type, $x, $y, $seconds, $target)",
+                    Insert(db, "INSERT INTO tasks VALUES ($npc, $seq, $type, $x, $y, $seconds, $target, $reason)",
                         ("$npc", npc.Id), ("$seq", i), ("$type", task.Type), ("$x", task.X), ("$y", task.Y), ("$seconds", task.Seconds),
-                        ("$target", task.TargetId));
+                        ("$target", task.TargetId), ("$reason", task.Reason));
                 }
             }
         }
@@ -490,7 +495,7 @@ namespace Ashenveil.Core.Saving
             var journals = Rows(db, "SELECT npc_id, transcript_id FROM journal_transcripts ORDER BY npc_id, transcript_id",
                 r => (npc: r.GetInt32(0), transcript: r.GetInt32(1)))
                 .ToLookup(j => j.npc, j => j.transcript);
-            var tasks = Rows(db, "SELECT npc_id, type, x, y, seconds, target_id FROM tasks ORDER BY npc_id, seq",
+            var tasks = Rows(db, "SELECT npc_id, type, x, y, seconds, target_id, reason FROM tasks ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), task: new TaskSave
                 {
                     Type = r.GetString(1),
@@ -498,6 +503,7 @@ namespace Ashenveil.Core.Saving
                     Y = r.IsDBNull(3) ? null : r.GetFloat(3),
                     Seconds = r.IsDBNull(4) ? null : r.GetFloat(4),
                     TargetId = r.IsDBNull(5) ? null : r.GetInt32(5),
+                    Reason = r.IsDBNull(6) ? null : r.GetString(6),
                 }))
                 .ToLookup(t => t.npc, t => t.task);
             save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y, last_reflected_day, factions FROM npcs ORDER BY npc_id",

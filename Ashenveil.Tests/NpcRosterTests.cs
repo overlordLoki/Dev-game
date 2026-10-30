@@ -254,4 +254,33 @@ public class NpcRosterTests
 
         Assert.Null(probe.Seen.FindPerson);   // never added to a roster: jobs must cope with null
     }
+
+    // -------------------------------------------------------------- starting conversations
+
+    [Fact]
+    public void Jobs_can_start_conversations_through_the_roster()
+    {
+        var brain = new WanderBrain();
+        var npc = new TestNpc(0, 0, brain);
+        var target = new TestNpc(1, 0, 42);
+        (NPC npc, Entity who, string reason) asked = default;
+        _roster.StartConversationFor = (n, who, reason) => { asked = (n, who, reason); return true; };
+        _roster.Add(new Location("Medows"), npc);
+        var probe = new ProbeJob();
+        npc.GiveJob(probe);
+
+        brain.Update(new GameTime());
+
+        Assert.True(probe.Seen.StartConversation(target, "hello"));
+        Assert.Equal((npc, (Entity)target, "hello"), asked);   // the roster says who's asking
+    }
+
+    [Fact]
+    public void With_nothing_set_an_NPC_can_never_start_a_conversation()
+    {
+        var npc = new TestNpc(0, 0);
+        _roster.Add(new Location("Medows"), npc);
+
+        Assert.False(npc.StartConversation(new TestNpc(1, 0, 42), "hello"));
+    }
 }

@@ -64,6 +64,11 @@ namespace Ashenveil.Core.GameWorld
         /// World; null: nobody can be found.
         /// </summary>
         public Func<NPC, int, Entity> FindPersonNear { get; set; }
+        /// <summary>
+        /// Starts a conversation an NPC walked up to have, with someone, about a reason; false
+        /// if it can't now. Set by the World; null: it never can.
+        /// </summary>
+        public Func<NPC, Entity, string, bool> StartConversationFor { get; set; }
 
         /// <summary>Puts an NPC in a level, tells the NPC which level it's in, and where to post events.</summary>
         public void Add(Location level, NPC npc)
@@ -74,6 +79,7 @@ namespace Ashenveil.Core.GameWorld
             // Read FindPersonNear when it's called, not now, so an NPC added before the World
             // sets it still gets it.
             npc.FindPerson = id => FindPersonNear?.Invoke(npc, id);
+            npc.StartConversation = (who, reason) => StartConversationFor?.Invoke(npc, who, reason) == true;
         }
 
         /// <summary>Each level's NPCs, one list per level.</summary>

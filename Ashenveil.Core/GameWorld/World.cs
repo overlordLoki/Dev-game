@@ -77,6 +77,7 @@ namespace Ashenveil.Core.GameWorld
             Events = new EventLog(() => Clock.TotalDays, Perceive);
             Roster.PostEvent = e => Events.Post(e);
             Roster.FindPersonNear = FindPersonNear;
+            Roster.StartConversationFor = NpcStartsConversation;
             Conversations.Events = Events;
             Conversations.FindPerson = FindPerson;
             Conversations.Factions = Factions;
@@ -228,6 +229,22 @@ namespace Ashenveil.Core.GameWorld
             var convo = Conversations.Start(from, others, location, Clock.TotalDays);
             if (from == player) PlayerConversationStarted?.Invoke(convo);
             return convo;
+        }
+
+        /// <summary>
+        /// An NPC walked up to someone to talk (a talk_to job). For now only the player can be
+        /// talked to: the chat box opens as if they'd walked up themselves, and the NPC answers
+        /// whatever they say first. Opening with the NPC's <paramref name="reason"/>, and NPCs
+        /// talking among themselves, come with A1 (docs/npc-memory-next-plan.md) - an NPC-only
+        /// conversation has nobody to end it yet. False if it can't happen: another NPC, the
+        /// player in another level, or the player already in a conversation.
+        /// </summary>
+        public bool NpcStartsConversation(NPC npc, Entity target, string reason)
+        {
+            if (target != player || npc.Location?.Name != location.Name) return false;
+            if (Conversations.Active.Any(c => !c.IsFinished && c.Participants.Contains(player))) return false;
+            StartConversation(player, npc);
+            return true;
         }
 
         /// <summary>

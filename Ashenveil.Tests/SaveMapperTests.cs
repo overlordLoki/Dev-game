@@ -241,6 +241,33 @@ public class SaveMapperTests : IDisposable
     }
 
     [Fact]
+    public void A_talk_to_comes_back_with_who_and_why()
+    {
+        var knight = AddKnight(1, 1);
+        knight.GiveJob(new TalkToJob(targetId: 7, "warn them about the wolves"));
+        knight.GiveJob(new TalkToJob(targetId: 8, reason: null!));
+
+        var tasks = SaveAndRebuildOnlyNpc().Jobs.Cast<TalkToJob>().ToList();
+
+        Assert.Equal(new[] { (7, (string?)"warn them about the wolves"), (8, null) },
+                     tasks.Select(t => (t.TargetId, (string?)t.Reason)));
+    }
+
+    [Fact]
+    public void A_talk_to_saved_with_nobody_to_talk_to_is_left_out()
+    {
+        var saved = new NpcSave
+        {
+            Type = nameof(Knight), Name = "Sir Lancelot",
+            Tasks = { new TaskSave { Type = "talk_to", Reason = "hi" }, new TaskSave { Type = "wait", Seconds = 4 } },
+        };
+
+        var npc = SaveMapper.FromSave(saved, new Dictionary<int, Transcript>());
+
+        Assert.IsType<WaitJob>(Assert.Single(npc.Jobs));
+    }
+
+    [Fact]
     public void A_follow_saved_with_nobody_to_follow_is_left_out()
     {
         var saved = new NpcSave

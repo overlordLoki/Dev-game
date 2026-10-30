@@ -88,6 +88,8 @@ public class SaveStoreTests : IDisposable
                     new TaskSave { Type = "go_to", X = 3.5f, Y = 1.9f },
                     new TaskSave { Type = "wait", Seconds = 2.75f },
                     new TaskSave { Type = "go_to", X = 1.5f, Y = 3.9f },
+                    new TaskSave { Type = "talk_to", TargetId = 0, Reason = "warn them about the wolves" },
+                    new TaskSave { Type = "talk_to", TargetId = 2 },   // no reason
                     new TaskSave { Type = "follow", TargetId = 0 },
                 },
             },
@@ -356,6 +358,7 @@ public class SaveStoreTests : IDisposable
         var task = Assert.Single(knight.Tasks);
         Assert.Equal("wait", task.Type);
         Assert.Null(task.TargetId);
+        Assert.Null(task.Reason);
         // A fact from a conversation takes its transcript's day; anything else has none.
         Assert.Equal(new[] { (10, (int?)1, (int?)null), (0, null, null) },
                      knight.Memories.Select(m => (m.Day, m.TranscriptId, m.EventId)));

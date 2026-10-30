@@ -47,5 +47,8 @@ namespace Ashenveil.Core.Entities.brains.Jobs
         // Finds a person (player or NPC) by id, but only if they're in the owner's level; null if
         // they're gone, elsewhere, or unknown. Null when not wired (tests): nobody can be found.
         public System.Func<int, Entity> FindPerson { get; init; }
+        // Starts a conversation between the owner and someone, with what the owner wants to say
+        // to them; false if it can't happen now. Null when not wired (tests): it never can.
+        public System.Func<Entity, string, bool> StartConversation { get; init; }
     }
 }

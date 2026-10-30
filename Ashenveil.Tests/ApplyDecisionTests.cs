@@ -396,4 +396,70 @@ public class ApplyDecisionTests
 
         Assert.IsType<FollowJob>(Assert.Single(brain.JobQueue));
     }
+
+    // --------------------------------------------------------------- talking to someone
+
+    private static TaskSpecDto TalkTo(string who, string reason) => new("talk_to", who, 0f, reason);
+
+    [Fact]
+    public void Talk_to_someone_from_the_conversation_walks_up_to_them_with_the_reason()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(TalkTo("Traveller", "  warn them about the wolves ")), TestLevels.Location(Level), KayMetTraveller());
+
+        var job = Assert.IsType<TalkToJob>(Assert.Single(brain.JobQueue));
+        Assert.Equal(0, job.TargetId);
+        Assert.Equal("warn them about the wolves", job.Reason);
+        Assert.Equal(NpcBrain.NPCState.Working, brain.State);
+    }
+
+    [Fact]
+    public void Talk_to_with_a_blank_reason_still_goes_but_has_none()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(TalkTo("Traveller", "   ")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.Null(Assert.IsType<TalkToJob>(Assert.Single(brain.JobQueue)).Reason);
+    }
+
+    [Fact]
+    public void Talk_to_a_stranger_or_itself_is_dropped()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(TalkTo("Sir Lancelot", "hi"), TalkTo("Sir Kay", "hi")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.Empty(brain.JobQueue);
+    }
+
+    [Fact]
+    public void Talk_to_after_a_follow_replaces_it()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Traveller"), TalkTo("Traveller", "hi")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.IsType<TalkToJob>(Assert.Single(brain.JobQueue));
+    }
+
+    [Fact]
+    public void A_talk_to_from_the_server_arrives_with_its_reason()
+    {
+        // What /decision sends back, read the way DialogueAPI reads it (ReadFromJsonAsync: Web defaults).
+        const string json = """
+            {"summary": "x", "memories": [], "behaviour": "do_tasks", "clear_current_tasks": false,
+             "tasks": [{"type": "talk_to", "target": "Traveller", "seconds": 0.0, "reason": "warn them"}],
+             "join_faction": null, "model": "test"}
+            """;
+
+        var decision = System.Text.Json.JsonSerializer.Deserialize<NpcDecisionDto>(
+            json, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+        var task = Assert.Single(decision.tasks);
+        Assert.Equal("talk_to", task.type);
+        Assert.Equal("Traveller", task.target);
+        Assert.Equal("warn them", task.reason);
+    }
 }

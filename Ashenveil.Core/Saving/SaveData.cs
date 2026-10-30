@@ -87,17 +87,18 @@ namespace Ashenveil.Core.Saving
     /// <summary>
     /// One task in an NPC's queue. Each type fills only what it needs to carry on:
     ///   go_to: X, Y (the target, in cells)      wait: Seconds (time left)
-    ///   follow: TargetId (who, a player or NPC id)
+    ///   follow: TargetId (who, a player or NPC id)    talk_to: TargetId, Reason (may be null)
     /// The type names are the decision schema's, so a new task type adds one branch there
     /// and one in SaveMapper.
     /// </summary>
     public class TaskSave
     {
-        public string Type { get; set; }                 // "go_to", "wait", "follow"
+        public string Type { get; set; }                 // "go_to", "wait", "follow", "talk_to"
         public float? X { get; set; }
         public float? Y { get; set; }
         public float? Seconds { get; set; }
         public int? TargetId { get; set; }
+        public string Reason { get; set; }
     }
 
     public class MemorySave
