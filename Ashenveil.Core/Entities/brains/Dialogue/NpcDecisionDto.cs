@@ -21,8 +21,8 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
 
     public class TaskSpecDto
     {
-        public string type { get; set; }    // "go_to" | "wait"
-        public string target { get; set; }  // POI name (for go_to)
+        public string type { get; set; }    // "go_to" | "wait" | "follow"
+        public string target { get; set; }  // POI name (for go_to), or a person's name (for follow)
         public float seconds { get; set; }  // (for wait)
         public TaskSpecDto(string type, string target, float seconds)
         {

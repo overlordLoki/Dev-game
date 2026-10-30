@@ -88,6 +88,7 @@ public class SaveStoreTests : IDisposable
                     new TaskSave { Type = "go_to", X = 3.5f, Y = 1.9f },
                     new TaskSave { Type = "wait", Seconds = 2.75f },
                     new TaskSave { Type = "go_to", X = 1.5f, Y = 3.9f },
+                    new TaskSave { Type = "follow", TargetId = 0 },
                 },
             },
             new NpcSave { Id = 2, Type = "Knight", Name = "Sir Kay", Level = "Castle", X = 4.5f, Y = 4.9f, TranscriptIds = { 1 } },
@@ -351,6 +352,10 @@ public class SaveStoreTests : IDisposable
         Assert.Equal(new[] { "traveller" }, save.Players.Single().Factions);
         Assert.Empty(save.Players.Single().Standings);
         Assert.Empty(knight.KnownEvents);
+        // Tasks from before follows existed still load, with nobody to follow.
+        var task = Assert.Single(knight.Tasks);
+        Assert.Equal("wait", task.Type);
+        Assert.Null(task.TargetId);
         // A fact from a conversation takes its transcript's day; anything else has none.
         Assert.Equal(new[] { (10, (int?)1, (int?)null), (0, null, null) },
                      knight.Memories.Select(m => (m.Day, m.TranscriptId, m.EventId)));

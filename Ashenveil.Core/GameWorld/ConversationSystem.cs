@@ -209,6 +209,7 @@ namespace Ashenveil.Core.GameWorld
                 location = transcript.Location,
                 transcript = transcript.Lines.ToArray(),   // already only what was actually said
                 poi_names = convo.Location?.pointsOfInterest.Keys.ToArray() ?? Array.Empty<string>(),
+                people = transcript.Participants.Where(p => p.Id != npc.Id).Select(p => p.Name).ToArray(),
                 // Only factions a player there isn't already in: there's nobody else to let in.
                 can_admit = Factions == null ? Array.Empty<string>()
                     : npc.Factions.Where(f => npc.CanAdmit(f, Factions)

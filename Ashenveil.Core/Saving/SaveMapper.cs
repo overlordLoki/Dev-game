@@ -107,6 +107,7 @@ namespace Ashenveil.Core.Saving
         {
             GoToJob go => new TaskSave { Type = "go_to", X = go.Target.X, Y = go.Target.Y },
             WaitJob wait => new TaskSave { Type = "wait", Seconds = wait.SecondsLeft },
+            FollowJob follow => new TaskSave { Type = "follow", TargetId = follow.TargetId },
             _ => null,
         };
 
@@ -207,6 +208,7 @@ namespace Ashenveil.Core.Saving
         {
             "go_to" when saved.X is float x && saved.Y is float y => new GoToJob(new Vector2(x, y)),
             "wait" when saved.Seconds is float seconds => new WaitJob(seconds),
+            "follow" when saved.TargetId is int target => new FollowJob(target),
             _ => null,
         };
 

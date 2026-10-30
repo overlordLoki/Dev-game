@@ -59,6 +59,16 @@ def test_schema_target_is_free_text_when_no_pois_given():
     assert "enum" not in target
 
 
+def test_schema_target_takes_places_and_people_to_follow():
+    target = decision_schema(["well"], people=["Traveller"])["properties"]["tasks"]["items"]["properties"]["target"]
+    assert target["enum"] == ["well", "Traveller"]
+
+
+def test_schema_target_takes_people_even_with_no_pois():
+    target = decision_schema([], people=["Traveller"])["properties"]["tasks"]["items"]["properties"]["target"]
+    assert target["enum"] == ["Traveller"]
+
+
 # ----------------------------------------------------------------- unit: prompt
 
 def test_prompt_mentions_npc_persona_transcript_and_places():
@@ -77,6 +87,16 @@ def test_prompt_mentions_npc_persona_transcript_and_places():
     assert "well" in prompt and "gate" in prompt
     for task_name in TASK_TYPES:
         assert task_name in prompt
+
+
+def test_prompt_lists_the_people_who_can_be_followed():
+    req = DecisionRequest(npc_name="Sir Lancelot", people=["Traveller"])
+
+    assert "People you can follow: Traveller" in build_decision_prompt(req)
+
+
+def test_prompt_leaves_out_following_when_nobody_was_there():
+    assert "People you can follow" not in build_decision_prompt(DecisionRequest(npc_name="Sir Lancelot"))
 
 
 # ------------------------------------------------------- integration: endpoints

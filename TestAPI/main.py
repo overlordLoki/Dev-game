@@ -241,6 +241,8 @@ async def conversation(req: ConversationRequest):
 TASK_TYPES = {
     "go_to": "walk to a named place (needs a target place)",
     "wait": "stand still for a while (needs seconds)",
+    "follow": "walk with someone from the conversation (needs a target person); lasts until "
+              "you give yourself something else to do",
 }
 BEHAVIOURS = ["resume", "idle", "do_tasks"]
 
@@ -253,6 +255,8 @@ class DecisionRequest(BaseModel):
     transcript: list[str] = []
     # The places a go_to may target - the current level's points of interest.
     poi_names: list[str] = []
+    # Who a follow may target - the others in the conversation, by name.
+    people: list[str] = []
     max_tasks: int = Field(default=4, ge=0, le=8)
     max_memories: int = Field(default=5, ge=0, le=10)
     # Factions this NPC could let the people it talked to into. Empty: it can't let anyone in.
@@ -285,10 +289,13 @@ DECISION_SYSTEM_PROMPT = (
 )
 
 
-def decision_schema(poi_names: list[str], can_admit: list[str] | None = None) -> dict:
+def decision_schema(poi_names: list[str], can_admit: list[str] | None = None,
+                    people: list[str] | None = None) -> dict:
     """JSON schema Ollama is held to. The enums stop the model inventing tasks, places or factions."""
-    # A go_to target is constrained to real POIs when the game sends them.
-    target = {"type": "string", "enum": poi_names} if poi_names else {"type": "string"}
+    # A target is a place (go_to) or a person (follow): constrained to the real ones when the
+    # game sends them. The game still checks each task's target is the right kind.
+    targets = [*poi_names, *(people or [])]
+    target = {"type": "string", "enum": targets} if targets else {"type": "string"}
     schema = {
         "type": "object",
         "properties": {
@@ -335,6 +342,8 @@ def build_decision_prompt(req: DecisionRequest) -> str:
         parts.append(f"  {name}: {desc}")
     if req.poi_names:
         parts.append("Places you can go: " + ", ".join(req.poi_names))
+    if req.people:
+        parts.append("People you can follow: " + ", ".join(req.people))
 
     parts.append(
         f"\nSummarise the conversation in one sentence. Then extract the concrete facts worth "
@@ -359,7 +368,7 @@ def build_decision_prompt(req: DecisionRequest) -> str:
 
 @app.post("/decision", response_model=DecisionResponse)
 async def decision(req: DecisionRequest):
-    raw = await ask_ollama(DECISION_SYSTEM_PROMPT, build_decision_prompt(req), decision_schema(req.poi_names, req.can_admit))
+    raw = await ask_ollama(DECISION_SYSTEM_PROMPT, build_decision_prompt(req), decision_schema(req.poi_names, req.can_admit, req.people))
 
     # The schema guarantees the shape; we still trim to the caps the game asked for and
     # drop blank memories (the game does this too, but cheap to do here as well).

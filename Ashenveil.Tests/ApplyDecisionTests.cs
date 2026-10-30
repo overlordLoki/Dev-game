@@ -291,4 +291,109 @@ public class ApplyDecisionTests
 
         Assert.Equal(2, brain.JobQueue.Count);   // original plus the new one
     }
+
+    // --------------------------------------------------------------- following
+
+    private static TaskSpecDto Follow(string who) => new("follow", who, 0f);
+
+    // A brain whose NPC is Sir Kay (id 5), just back from talking with the Traveller (id 0).
+    private static WanderBrain KayBrain()
+    {
+        var brain = new WanderBrain();
+        _ = new TestNpc(0, 0, 5, "Sir Kay", brain);
+        return brain;
+    }
+
+    private static Transcript KayMetTraveller() =>
+        new(4, day: 1, "Medows", new[] { new Participant(0, "Traveller"), new Participant(5, "Sir Kay") }, new[] { "Traveller: walk with me" });
+
+    private static NpcDecisionDto Doing(params TaskSpecDto[] tasks) =>
+        new("x", null, "do_tasks", clear_current_tasks: false, tasks);
+
+    [Fact]
+    public void Follow_someone_from_the_conversation_follows_them_by_id()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Traveller")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.Equal(0, Assert.IsType<FollowJob>(Assert.Single(brain.JobQueue)).TargetId);
+        Assert.Equal(NpcBrain.NPCState.Working, brain.State);
+    }
+
+    [Fact]
+    public void Follow_matches_the_name_whatever_its_case_and_spacing()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("  traveller ")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.IsType<FollowJob>(Assert.Single(brain.JobQueue));
+    }
+
+    [Fact]
+    public void Follow_someone_who_wasnt_in_the_conversation_is_dropped()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Sir Lancelot"), Wait(2f)), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.IsType<WaitJob>(Assert.Single(brain.JobQueue));
+    }
+
+    [Fact]
+    public void An_NPC_cant_follow_itself()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Sir Kay")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.Empty(brain.JobQueue);
+    }
+
+    [Fact]
+    public void Follow_with_no_transcript_or_no_target_is_dropped()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Traveller")), TestLevels.Location(Level));            // no transcript
+        brain.ApplyDecision(Doing(Follow(null!)), TestLevels.Location(Level), KayMetTraveller());  // no target
+
+        Assert.Empty(brain.JobQueue);
+    }
+
+    [Fact]
+    public void Tasks_after_a_follow_in_the_same_decision_replace_it()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Traveller"), GoTo("shop")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.IsType<GoToJob>(Assert.Single(brain.JobQueue));   // the follow would never have let it run
+    }
+
+    [Fact]
+    public void A_later_decisions_tasks_replace_a_follow_without_clearing()
+    {
+        var brain = KayBrain();
+        var level = TestLevels.Location(Level);
+        brain.ApplyDecision(Doing(Wait(1f), Follow("Traveller")), level, KayMetTraveller());
+
+        brain.ApplyDecision(Doing(GoTo("shop")), level, KayMetTraveller());
+
+        // The wait was before the follow, so it still runs; the follow made way for the go_to.
+        Assert.Collection(brain.JobQueue,
+            j => Assert.IsType<WaitJob>(j),
+            j => Assert.IsType<GoToJob>(j));
+    }
+
+    [Fact]
+    public void A_new_follow_replaces_the_old_one()
+    {
+        var brain = KayBrain();
+
+        brain.ApplyDecision(Doing(Follow("Traveller"), Follow("Traveller")), TestLevels.Location(Level), KayMetTraveller());
+
+        Assert.IsType<FollowJob>(Assert.Single(brain.JobQueue));
+    }
 }

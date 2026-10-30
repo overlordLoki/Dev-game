@@ -25,7 +25,7 @@ namespace Ashenveil.Core.Saving
     public class SaveStore
     {
         /// <summary>The schema this game writes. Bump it when adding a migration.</summary>
-        public const int SchemaVersion = 4;
+        public const int SchemaVersion = 5;
 
         /// <summary>Where the game keeps its saves: a "saves" folder beside settings.json.</summary>
         public static string DefaultFolder => Path.Combine(SettingsStore.DefaultFolder, "saves");
@@ -182,6 +182,11 @@ namespace Ashenveil.Core.Saving
                 PRIMARY KEY (npc_id, event_id)
             );
             """,
+
+            // 4 -> 5: who a follow task is following. A version 4 file has no follows.
+            """
+            ALTER TABLE tasks ADD COLUMN target_id INTEGER;
+            """,
         };
 
         // Every table, children before the tables they point at, so clearing them in this
@@ -296,8 +301,9 @@ namespace Ashenveil.Core.Saving
                 for (int i = 0; i < npc.Tasks.Count; i++)
                 {
                     var task = npc.Tasks[i];
-                    Insert(db, "INSERT INTO tasks VALUES ($npc, $seq, $type, $x, $y, $seconds)",
-                        ("$npc", npc.Id), ("$seq", i), ("$type", task.Type), ("$x", task.X), ("$y", task.Y), ("$seconds", task.Seconds));
+                    Insert(db, "INSERT INTO tasks VALUES ($npc, $seq, $type, $x, $y, $seconds, $target)",
+                        ("$npc", npc.Id), ("$seq", i), ("$type", task.Type), ("$x", task.X), ("$y", task.Y), ("$seconds", task.Seconds),
+                        ("$target", task.TargetId));
                 }
             }
         }
@@ -484,13 +490,14 @@ namespace Ashenveil.Core.Saving
             var journals = Rows(db, "SELECT npc_id, transcript_id FROM journal_transcripts ORDER BY npc_id, transcript_id",
                 r => (npc: r.GetInt32(0), transcript: r.GetInt32(1)))
                 .ToLookup(j => j.npc, j => j.transcript);
-            var tasks = Rows(db, "SELECT npc_id, type, x, y, seconds FROM tasks ORDER BY npc_id, seq",
+            var tasks = Rows(db, "SELECT npc_id, type, x, y, seconds, target_id FROM tasks ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), task: new TaskSave
                 {
                     Type = r.GetString(1),
                     X = r.IsDBNull(2) ? null : r.GetFloat(2),
                     Y = r.IsDBNull(3) ? null : r.GetFloat(3),
                     Seconds = r.IsDBNull(4) ? null : r.GetFloat(4),
+                    TargetId = r.IsDBNull(5) ? null : r.GetInt32(5),
                 }))
                 .ToLookup(t => t.npc, t => t.task);
             save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y, last_reflected_day, factions FROM npcs ORDER BY npc_id",

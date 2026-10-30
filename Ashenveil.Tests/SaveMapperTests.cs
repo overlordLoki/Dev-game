@@ -228,6 +228,33 @@ public class SaveMapperTests : IDisposable
     }
 
     [Fact]
+    public void A_follow_comes_back_following_the_same_person()
+    {
+        var knight = AddKnight(1, 1);
+        knight.GiveJob(new WaitJob(2f));
+        knight.GiveJob(new FollowJob(targetId: 7));
+
+        var tasks = SaveAndRebuildOnlyNpc().Jobs.ToList();
+
+        Assert.IsType<WaitJob>(tasks[0]);
+        Assert.Equal(7, Assert.IsType<FollowJob>(tasks[1]).TargetId);
+    }
+
+    [Fact]
+    public void A_follow_saved_with_nobody_to_follow_is_left_out()
+    {
+        var saved = new NpcSave
+        {
+            Type = nameof(Knight), Name = "Sir Lancelot",
+            Tasks = { new TaskSave { Type = "follow" }, new TaskSave { Type = "wait", Seconds = 4 } },
+        };
+
+        var npc = SaveMapper.FromSave(saved, new Dictionary<int, Transcript>());
+
+        Assert.IsType<WaitJob>(Assert.Single(npc.Jobs));
+    }
+
+    [Fact]
     public void An_NPC_with_jobs_loads_as_Tasked()
     {
         AddKnight(1, 1).GiveJob(new WaitJob(3f));

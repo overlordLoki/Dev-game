@@ -52,9 +52,20 @@ namespace Ashenveil.Core.Entities
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         protected virtual void Start() {}
 
-        /// <summary>Hand the NPC a job to run; switches it into the Working state.</summary>
+        /// <summary>
+        /// Hand the NPC a job to run; switches it into the Working state. A follow never ends
+        /// on its own, so anything queued after one would never run: the new job replaces it
+        /// instead. That keeps a follow always last in the queue.
+        /// </summary>
         public void Enqueue(IJob job)
         {
+            if (JobQueue.Count > 0 && JobQueue.Last() is FollowJob)
+            {
+                // A Queue can't drop its back item, so rebuild it without the follow.
+                var keep = JobQueue.Take(JobQueue.Count - 1).ToList();
+                JobQueue.Clear();
+                foreach (var kept in keep) JobQueue.Enqueue(kept);
+            }
             JobQueue.Enqueue(job);
             State = NPCState.Working;
         }
@@ -180,6 +191,7 @@ namespace Ashenveil.Core.Entities
                 {
                     "go_to" => MakeGoTo(spec, location),
                     "wait"  => new WaitJob(Math.Clamp(spec.seconds, 0f, 600f)),
+                    "follow" => MakeFollow(spec, transcript),
                     _       => null,                    // unknown type -> ignore
                 };
                 if (job != null) Enqueue(job);
@@ -229,6 +241,16 @@ namespace Ashenveil.Core.Entities
         {
             var poi = location?.Poi(spec.target);
             return poi == null ? null : new GoToJob(poi.StandingSpot());
+        }
+
+        // Someone else from the conversation, by name: the transcript says who was there and
+        // their ids. No transcript, a stranger, or the NPC itself: no job.
+        private IJob MakeFollow(TaskSpecDto spec, Transcript transcript)
+        {
+            string name = spec.target?.Trim();
+            var who = transcript?.Participants.FirstOrDefault(p =>
+                p.Id != Npc.Id && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+            return who == null ? null : new FollowJob(who.Id);
         }
 
 

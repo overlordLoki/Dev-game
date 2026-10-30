@@ -80,7 +80,7 @@ public class GoToJobTests
     // ------------------------------------------------------------ with a nav grid
 
     // A grid drawn as text: '#' is blocked, anything else is walkable.
-    private static NavGrid Grid(params string[] rows)
+    internal static NavGrid Grid(params string[] rows)
     {
         var grid = new NavGrid(rows[0].Length, rows.Length);
         for (int row = 0; row < rows.Length; row++)
@@ -297,6 +297,201 @@ public class WaitJobTests
 
         task.Execute(Ctx(npc, 0.1f));
 
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+}
+
+/// <summary>
+/// Following a person who can move. The target is a TestNpc looked up through a fake
+/// FindPerson, so no World is needed; a test moves it by hand between ticks.
+/// </summary>
+public class FollowJobTests
+{
+    public FollowJobTests() => NullContentManager.Install();
+
+    private const int TargetId = 42;
+
+    // A context whose lookup finds `target` by TargetId (and nobody else), or nobody if it's null.
+    private static JobContext Ctx(TestNpc npc, TestNpc? target, NavGrid? nav = null, float dt = 0.25f) =>
+        new()
+        {
+            Owner = npc, Blackboard = new Blackboard(), Nav = nav!, DeltaTime = dt,
+            FindPerson = id => id == TargetId ? target! : null!,
+        };
+
+    private static TestNpc At(Point cell, int id = 0)
+    {
+        var npc = new TestNpc(0, 0, id);
+        npc.StandAt(NavGrid.CentreOf(cell));
+        return npc;
+    }
+
+    // ------------------------------------------------------------------ the target
+
+    [Fact]
+    public void Fails_when_the_target_cant_be_found()
+    {
+        var npc = At(new Point(0, 0));
+        var job = new FollowJob(TargetId);
+
+        job.Execute(Ctx(npc, target: null));   // gone, in another level, or never existed
+
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+
+    [Fact]
+    public void Fails_when_there_is_no_way_to_look_people_up()
+    {
+        var npc = At(new Point(0, 0));
+        var job = new FollowJob(TargetId);
+
+        job.Execute(new JobContext { Owner = npc, Blackboard = new Blackboard() });   // FindPerson null
+
+        Assert.Equal(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Fails_when_the_target_leaves_partway()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new FollowJob(TargetId);
+        job.Execute(Ctx(npc, target));
+        Assert.NotEqual(JobState.Failed, job.State);
+
+        job.Execute(Ctx(npc, target: null));   // walked out of the level
+
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+
+    // ------------------------------------------------------------------ walking
+
+    [Fact]
+    public void Heads_towards_a_target_to_the_right()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new FollowJob(TargetId);
+
+        job.Execute(Ctx(npc, target, GoToJobTests.Grid(".....")));
+
+        Assert.Equal(new Vector2(1, 0), npc.Direction);
+        Assert.NotEqual(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void A_target_with_no_way_through_fails_at_once()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(2, 0), TargetId);
+        var job = new FollowJob(TargetId);
+
+        job.Execute(Ctx(npc, target, GoToJobTests.Grid(".#.")));
+
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+
+    [Fact]
+    public void Stands_still_when_already_close_and_keeps_following()
+    {
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(0, 0), TargetId);
+        target.Position += new Vector2(0.5f, 0);   // half a cell away
+        var job = new FollowJob(TargetId);
+
+        job.Execute(Ctx(npc, target, GoToJobTests.Grid("...")));
+
+        Assert.Equal(Vector2.Zero, npc.Direction);
+        Assert.NotEqual(JobState.Completed, job.State);
+        Assert.NotEqual(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Never_completes_on_its_own()
+    {
+        // Walk all the way up to a target who stands still, then wait beside them a while.
+        var nav = GoToJobTests.Grid("......");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(5, 0), TargetId);
+        var job = new FollowJob(TargetId);
+
+        for (int tick = 0; tick < 400; tick++)
+        {
+            job.Execute(Ctx(npc, target, nav));
+            npc.Position += npc.Direction * 0.05f;
+        }
+
+        Assert.True(Vector2.Distance(npc.Feet, target.Feet) <= 1f);   // caught up...
+        Assert.Equal(Vector2.Zero, npc.Direction);                    // ...stopped...
+        Assert.Equal(JobState.Inactive, job.State);                   // ...and still at it (the queue sets Active)
+    }
+
+    // ------------------------------------------------------------------ a moving target
+
+    [Fact]
+    public void Plans_again_when_the_target_moves_away()
+    {
+        var nav = GoToJobTests.Grid(".....", ".....");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new FollowJob(TargetId);
+        job.Execute(Ctx(npc, target, nav));
+        Assert.Equal(target.Feet, job.RemainingWaypoints[^1]);
+
+        target.StandAt(NavGrid.CentreOf(new Point(4, 1)));   // a whole cell down
+        job.Execute(Ctx(npc, target, nav));
+
+        Assert.Equal(target.Feet, job.RemainingWaypoints[^1]);   // the route now ends where they are
+    }
+
+    [Fact]
+    public void A_small_move_doesnt_replan()
+    {
+        var nav = GoToJobTests.Grid(".....");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new FollowJob(TargetId);
+        job.Execute(Ctx(npc, target, nav));
+        var planned = job.RemainingWaypoints[^1];
+
+        target.Position += new Vector2(0.25f, 0);   // a shuffle, not a move
+        job.Execute(Ctx(npc, target, nav));
+
+        Assert.Equal(planned, job.RemainingWaypoints[^1]);
+    }
+
+    [Fact]
+    public void Getting_stuck_now_and_then_on_a_long_follow_doesnt_add_up_to_giving_up()
+    {
+        // The NPC is never moved, as if something not in the grid blocks it every tick.
+        // Stuck for 1s means a replan, and more than 3 replans on one route means giving up.
+        var nav = GoToJobTests.Grid(".....", ".....");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new FollowJob(TargetId);
+
+        for (int tick = 0; tick < 10; tick++) job.Execute(Ctx(npc, target, nav));   // 2.5s: 2 replans
+        target.StandAt(NavGrid.CentreOf(new Point(4, 1)));                          // they move on
+        for (int tick = 0; tick < 10; tick++) job.Execute(Ctx(npc, target, nav));   // 2.5s more
+
+        // 4 stuck replans in all, but only 2 on each route.
+        Assert.NotEqual(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Stuck_for_good_behind_something_still_gives_up()
+    {
+        var nav = GoToJobTests.Grid(".....");
+        var npc = At(new Point(0, 0));
+        var target = At(new Point(4, 0), TargetId);
+        var job = new FollowJob(TargetId);
+
+        for (int tick = 0; tick < 40 && job.State != JobState.Failed; tick++) job.Execute(Ctx(npc, target, nav));
+
+        Assert.Equal(JobState.Failed, job.State);
         Assert.Equal(Vector2.Zero, npc.Direction);
     }
 }
