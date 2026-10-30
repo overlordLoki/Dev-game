@@ -109,6 +109,11 @@ namespace Ashenveil.Core.Saving
             WaitJob wait => new TaskSave { Type = "wait", Seconds = wait.SecondsLeft },
             FollowJob follow => new TaskSave { Type = "follow", TargetId = follow.TargetId },
             TalkToJob talk => new TaskSave { Type = "talk_to", TargetId = talk.TargetId, Reason = talk.Reason },
+            PatrolJob patrol => new TaskSave
+            {
+                Type = "patrol", Seconds = patrol.Pause,
+                Stops = patrol.StopsFromNext.Select(s => new StopSave { X = s.X, Y = s.Y }).ToList(),
+            },
             _ => null,
         };
 
@@ -211,6 +216,8 @@ namespace Ashenveil.Core.Saving
             "wait" when saved.Seconds is float seconds => new WaitJob(seconds),
             "follow" when saved.TargetId is int target => new FollowJob(target),
             "talk_to" when saved.TargetId is int target => new TalkToJob(target, saved.Reason),
+            "patrol" when saved.Stops.Count >= 2 =>
+                new PatrolJob(saved.Stops.Select(s => new Vector2(s.X, s.Y)), saved.Seconds ?? 0f),
             _ => null,
         };
 

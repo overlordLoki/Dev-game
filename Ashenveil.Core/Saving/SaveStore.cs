@@ -25,7 +25,7 @@ namespace Ashenveil.Core.Saving
     public class SaveStore
     {
         /// <summary>The schema this game writes. Bump it when adding a migration.</summary>
-        public const int SchemaVersion = 6;
+        public const int SchemaVersion = 7;
 
         /// <summary>Where the game keeps its saves: a "saves" folder beside settings.json.</summary>
         public static string DefaultFolder => Path.Combine(SettingsStore.DefaultFolder, "saves");
@@ -192,13 +192,25 @@ namespace Ashenveil.Core.Saving
             """
             ALTER TABLE tasks ADD COLUMN reason TEXT;
             """,
+
+            // 6 -> 7: a patrol task's stops, in walking order. A version 6 file has no patrols.
+            """
+            CREATE TABLE task_stops (
+                npc_id   INTEGER NOT NULL REFERENCES npcs(npc_id),
+                task_seq INTEGER NOT NULL,           -- the tasks row's seq
+                seq      INTEGER NOT NULL,
+                x        REAL    NOT NULL,
+                y        REAL    NOT NULL,
+                PRIMARY KEY (npc_id, task_seq, seq)
+            );
+            """,
         };
 
         // Every table, children before the tables they point at, so clearing them in this
         // order never leaves a row pointing at one that's gone.
         private static readonly string[] Tables =
         {
-            "known_events", "standings", "opinions", "day_entries", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
+            "known_events", "standings", "opinions", "day_entries", "task_stops", "tasks", "journal_transcripts", "memories", "events", "transcript_lines",
             "transcript_participants", "transcripts", "npcs", "populated_levels", "players", "game",
         };
 
@@ -309,6 +321,9 @@ namespace Ashenveil.Core.Saving
                     Insert(db, "INSERT INTO tasks VALUES ($npc, $seq, $type, $x, $y, $seconds, $target, $reason)",
                         ("$npc", npc.Id), ("$seq", i), ("$type", task.Type), ("$x", task.X), ("$y", task.Y), ("$seconds", task.Seconds),
                         ("$target", task.TargetId), ("$reason", task.Reason));
+                    for (int s = 0; s < task.Stops.Count; s++)
+                        Insert(db, "INSERT INTO task_stops VALUES ($npc, $task, $seq, $x, $y)",
+                            ("$npc", npc.Id), ("$task", i), ("$seq", s), ("$x", task.Stops[s].X), ("$y", task.Stops[s].Y));
                 }
             }
         }
@@ -495,7 +510,10 @@ namespace Ashenveil.Core.Saving
             var journals = Rows(db, "SELECT npc_id, transcript_id FROM journal_transcripts ORDER BY npc_id, transcript_id",
                 r => (npc: r.GetInt32(0), transcript: r.GetInt32(1)))
                 .ToLookup(j => j.npc, j => j.transcript);
-            var tasks = Rows(db, "SELECT npc_id, type, x, y, seconds, target_id, reason FROM tasks ORDER BY npc_id, seq",
+            var stops = Rows(db, "SELECT npc_id, task_seq, x, y FROM task_stops ORDER BY npc_id, task_seq, seq",
+                r => (task: (r.GetInt32(0), r.GetInt32(1)), stop: new StopSave { X = r.GetFloat(2), Y = r.GetFloat(3) }))
+                .ToLookup(s => s.task, s => s.stop);
+            var tasks = Rows(db, "SELECT npc_id, type, x, y, seconds, target_id, reason, seq FROM tasks ORDER BY npc_id, seq",
                 r => (npc: r.GetInt32(0), task: new TaskSave
                 {
                     Type = r.GetString(1),
@@ -504,6 +522,7 @@ namespace Ashenveil.Core.Saving
                     Seconds = r.IsDBNull(4) ? null : r.GetFloat(4),
                     TargetId = r.IsDBNull(5) ? null : r.GetInt32(5),
                     Reason = r.IsDBNull(6) ? null : r.GetString(6),
+                    Stops = stops[(r.GetInt32(0), r.GetInt32(7))].ToList(),
                 }))
                 .ToLookup(t => t.npc, t => t.task);
             save.Npcs = Rows(db, "SELECT npc_id, type, name, level, x, y, last_reflected_day, factions FROM npcs ORDER BY npc_id",

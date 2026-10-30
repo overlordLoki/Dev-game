@@ -16,6 +16,11 @@ namespace Ashenveil.Core.Entities.brains.Jobs
         void Execute(JobContext context);
         
     }
+    /// <summary>
+    /// A job that never completes on its own (following, patrolling): it runs until it fails
+    /// or something replaces it. NpcBrain.Enqueue keeps one always last in the queue.
+    /// </summary>
+    public interface IEndlessJob : IJob { }
     public sealed class Blackboard
     {
         private readonly Dictionary<string, object?> _data = new();

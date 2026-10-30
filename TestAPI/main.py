@@ -245,6 +245,8 @@ TASK_TYPES = {
               "you give yourself something else to do",
     "talk_to": "walk up to someone from the conversation and talk to them (needs a target person "
                "and a reason: what you want to say to them)",
+    "patrol": "walk round two or more places in order, again and again (needs targets: the places; "
+              "seconds: how long to stand at each); lasts until you give yourself something else to do",
 }
 BEHAVIOURS = ["resume", "idle", "do_tasks"]
 
@@ -270,6 +272,7 @@ class TaskSpec(BaseModel):
     target: str | None = None
     seconds: float = 0.0
     reason: str | None = None
+    targets: list[str] = []
 
 
 class DecisionResponse(BaseModel):
@@ -299,6 +302,8 @@ def decision_schema(poi_names: list[str], can_admit: list[str] | None = None,
     # game sends them. The game still checks each task's target is the right kind.
     targets = [*poi_names, *(people or [])]
     target = {"type": "string", "enum": targets} if targets else {"type": "string"}
+    # A patrol's stops are places only.
+    place = {"type": "string", "enum": poi_names} if poi_names else {"type": "string"}
     schema = {
         "type": "object",
         "properties": {
@@ -315,6 +320,7 @@ def decision_schema(poi_names: list[str], can_admit: list[str] | None = None,
                         "target": target,
                         "seconds": {"type": "number"},
                         "reason": {"type": "string"},
+                        "targets": {"type": "array", "items": place},
                     },
                     "required": ["type"],
                 },

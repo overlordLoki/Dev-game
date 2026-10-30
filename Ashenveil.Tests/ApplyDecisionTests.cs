@@ -462,4 +462,77 @@ public class ApplyDecisionTests
         Assert.Equal("Traveller", task.target);
         Assert.Equal("warn them", task.reason);
     }
+
+    // --------------------------------------------------------------- patrolling
+
+    private static TaskSpecDto Patrol(float pause, params string[] stops) => new("patrol", null, pause, targets: stops);
+
+    [Fact]
+    public void Patrol_walks_the_named_places_in_order()
+    {
+        var brain = NewBrain();
+        var level = TestLevels.Location(Level);
+
+        brain.ApplyDecision(Doing(Patrol(3f, "shop", "spawn")), level);
+
+        var job = Assert.IsType<PatrolJob>(Assert.Single(brain.JobQueue));
+        Assert.Equal(new[] { level.Poi("shop")!.StandingSpot(), level.Poi("spawn")!.StandingSpot() }, job.StopsFromNext);
+        Assert.Equal(3f, job.Pause);
+    }
+
+    [Fact]
+    public void Patrol_drops_places_that_dont_exist()
+    {
+        var brain = NewBrain();
+        var level = TestLevels.Location(Level);
+
+        brain.ApplyDecision(Doing(Patrol(0f, "shop", "nowhere", "spawn")), level);
+
+        Assert.Equal(2, Assert.IsType<PatrolJob>(Assert.Single(brain.JobQueue)).StopsFromNext.Count);
+    }
+
+    [Fact]
+    public void A_patrol_of_fewer_than_two_places_is_dropped()
+    {
+        var brain = NewBrain();
+
+        brain.ApplyDecision(Doing(Patrol(0f, "shop", "nowhere"), Patrol(0f, "shop", "shop"), Patrol(0f)), TestLevels.Location(Level));
+
+        Assert.Empty(brain.JobQueue);
+    }
+
+    [Fact]
+    public void A_patrols_pause_is_kept_within_a_minute()
+    {
+        var brain = NewBrain();
+
+        brain.ApplyDecision(Doing(Patrol(9999f, "shop", "spawn")), TestLevels.Location(Level));
+
+        Assert.Equal(60f, Assert.IsType<PatrolJob>(Assert.Single(brain.JobQueue)).Pause);
+    }
+
+    [Fact]
+    public void Tasks_after_a_patrol_replace_it()
+    {
+        var brain = NewBrain();
+
+        brain.ApplyDecision(Doing(Patrol(0f, "shop", "spawn"), Wait(2f)), TestLevels.Location(Level));
+
+        Assert.IsType<WaitJob>(Assert.Single(brain.JobQueue));
+    }
+
+    [Fact]
+    public void A_patrol_from_the_server_arrives_with_its_stops()
+    {
+        const string json = """
+            {"summary": "x", "memories": [], "behaviour": "do_tasks", "clear_current_tasks": false,
+             "tasks": [{"type": "patrol", "target": null, "seconds": 2.0, "reason": null, "targets": ["shop", "spawn"]}],
+             "join_faction": null, "model": "test"}
+            """;
+
+        var decision = System.Text.Json.JsonSerializer.Deserialize<NpcDecisionDto>(
+            json, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+        Assert.Equal(new[] { "shop", "spawn" }, Assert.Single(decision.tasks).targets);
+    }
 }

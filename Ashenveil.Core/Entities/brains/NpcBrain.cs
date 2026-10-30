@@ -48,20 +48,22 @@ namespace Ashenveil.Core.Entities
         // One blackboard per NPC, reused across every tick and every job, so jobs can
         // share scratch state (a GoTo's target cell, "have I started") between frames.
         private readonly Blackboard _blackboard = new();
+        // The most stops a patrol from a decision can have; any after that are dropped.
+        private const int MaxPatrolStops = 8;
 
         /// <summary>Called once when the NPC is created, to set its starting heading.</summary>
         protected virtual void Start() {}
 
         /// <summary>
-        /// Hand the NPC a job to run; switches it into the Working state. A follow never ends
-        /// on its own, so anything queued after one would never run: the new job replaces it
-        /// instead. That keeps a follow always last in the queue.
+        /// Hand the NPC a job to run; switches it into the Working state. A follow or patrol
+        /// never ends on its own, so anything queued after one would never run: the new job
+        /// replaces it instead. That keeps an endless job always last in the queue.
         /// </summary>
         public void Enqueue(IJob job)
         {
-            if (JobQueue.Count > 0 && JobQueue.Last() is FollowJob)
+            if (JobQueue.Count > 0 && JobQueue.Last() is IEndlessJob)
             {
-                // A Queue can't drop its back item, so rebuild it without the follow.
+                // A Queue can't drop its back item, so rebuild it without the endless job.
                 var keep = JobQueue.Take(JobQueue.Count - 1).ToList();
                 JobQueue.Clear();
                 foreach (var kept in keep) JobQueue.Enqueue(kept);
@@ -196,6 +198,7 @@ namespace Ashenveil.Core.Entities
                     "talk_to" => OtherPerson(spec, transcript) is Participant who
                         ? new TalkToJob(who.Id, string.IsNullOrWhiteSpace(spec.reason) ? null : spec.reason.Trim())
                         : null,
+                    "patrol" => MakePatrol(spec, location),
                     _       => null,                    // unknown type -> ignore
                 };
                 if (job != null) Enqueue(job);
@@ -245,6 +248,19 @@ namespace Ashenveil.Core.Entities
         {
             var poi = location?.Poi(spec.target);
             return poi == null ? null : new GoToJob(poi.StandingSpot());
+        }
+
+        // The places that exist, in order, up to MaxPatrolStops. Fewer than two isn't a patrol
+        // (one is a go_to): no job.
+        private IJob MakePatrol(TaskSpecDto spec, Location location)
+        {
+            var stops = (spec.targets ?? Array.Empty<string>())
+                .Select(name => location?.Poi(name))
+                .Where(poi => poi != null)
+                .Take(MaxPatrolStops)
+                .Select(poi => poi.StandingSpot())
+                .ToList();
+            return stops.Distinct().Count() < 2 ? null : new PatrolJob(stops, Math.Clamp(spec.seconds, 0f, 60f));
         }
 
         // The task's target, if it's someone else from the conversation, by name: the transcript

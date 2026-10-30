@@ -21,16 +21,18 @@ namespace Ashenveil.Core.Entities.brains.Dialogue
 
     public class TaskSpecDto
     {
-        public string type { get; set; }    // "go_to" | "wait" | "follow" | "talk_to"
+        public string type { get; set; }    // "go_to" | "wait" | "follow" | "talk_to" | "patrol"
         public string target { get; set; }  // POI name (for go_to), or a person's name (for follow, talk_to)
-        public float seconds { get; set; }  // (for wait)
+        public float seconds { get; set; }  // (for wait), or the pause at each stop (for patrol)
         public string reason { get; set; }  // what to say to them (for talk_to)
-        public TaskSpecDto(string type, string target, float seconds, string reason = null)
+        public string[] targets { get; set; }   // POI names, in order (for patrol)
+        public TaskSpecDto(string type, string target, float seconds, string reason = null, string[] targets = null)
         {
             this.type = type;
             this.target = target;
             this.seconds = seconds;
             this.reason = reason;
+            this.targets = targets;
         }
     }
 }

@@ -69,6 +69,11 @@ def test_schema_tasks_can_carry_a_reason():
     assert task_props["reason"] == {"type": "string"}
 
 
+def test_schema_patrol_stops_are_places_only():
+    task_props = decision_schema(["well", "gate"], people=["Traveller"])["properties"]["tasks"]["items"]["properties"]
+    assert task_props["targets"] == {"type": "array", "items": {"type": "string", "enum": ["well", "gate"]}}
+
+
 def test_schema_target_takes_people_even_with_no_pois():
     target = decision_schema([], people=["Traveller"])["properties"]["tasks"]["items"]["properties"]["target"]
     assert target["enum"] == ["Traveller"]

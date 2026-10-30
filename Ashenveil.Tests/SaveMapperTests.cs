@@ -268,6 +268,39 @@ public class SaveMapperTests : IDisposable
     }
 
     [Fact]
+    public void A_patrol_comes_back_heading_for_the_same_stop_with_its_pause()
+    {
+        var knight = AddKnight(1, 1);
+        var patrol = new PatrolJob(new[] { knight.Feet, new Vector2(3.5f, 1.9f), new Vector2(3.5f, 3.9f) }, pause: 2f);
+        Run(patrol, knight, 0f);   // already on the first stop: reached it, now heading for the second
+        knight.GiveJob(patrol);
+
+        var back = Assert.IsType<PatrolJob>(Assert.Single(SaveAndRebuildOnlyNpc().Jobs));
+
+        Assert.Equal(patrol.StopsFromNext, back.StopsFromNext);
+        Assert.Equal(new Vector2(3.5f, 1.9f), back.StopsFromNext[0]);
+        Assert.Equal(2f, back.Pause);
+    }
+
+    [Fact]
+    public void A_patrol_saved_with_fewer_than_two_stops_is_left_out()
+    {
+        var saved = new NpcSave
+        {
+            Type = nameof(Knight), Name = "Sir Lancelot",
+            Tasks =
+            {
+                new TaskSave { Type = "patrol", Stops = { new StopSave { X = 1, Y = 1 } } },
+                new TaskSave { Type = "wait", Seconds = 4 },
+            },
+        };
+
+        var npc = SaveMapper.FromSave(saved, new Dictionary<int, Transcript>());
+
+        Assert.IsType<WaitJob>(Assert.Single(npc.Jobs));
+    }
+
+    [Fact]
     public void A_follow_saved_with_nobody_to_follow_is_left_out()
     {
         var saved = new NpcSave

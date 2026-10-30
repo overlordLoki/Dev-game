@@ -639,3 +639,134 @@ public class TalkToJobTests
         Assert.Equal(target.Feet, job.RemainingWaypoints[^1]);
     }
 }
+
+/// <summary>
+/// Walking a loop of stops. The NPC is moved by hand along its Direction each tick (there's
+/// no collision here), and the test watches which stop it heads for next.
+/// </summary>
+public class PatrolJobTests
+{
+    public PatrolJobTests() => NullContentManager.Install();
+
+    private static JobContext Ctx(TestNpc npc, NavGrid nav, float dt = 0.25f) =>
+        new() { Owner = npc, Blackboard = new Blackboard(), Nav = nav, DeltaTime = dt };
+
+    private static Vector2 Stop(int col, int row = 0) => NavGrid.CentreOf(new Point(col, row));
+
+    private static TestNpc At(Point cell)
+    {
+        var npc = new TestNpc(0, 0);
+        npc.StandAt(NavGrid.CentreOf(cell));
+        return npc;
+    }
+
+    // Ticks until the job's next stop changes (a stop was reached or skipped), moving the NPC
+    // 0.05 cells along its Direction each tick. Returns the new next stop.
+    private static Vector2 UntilNextStop(PatrolJob job, TestNpc npc, NavGrid nav)
+    {
+        var before = job.StopsFromNext[0];
+        for (int tick = 0; tick < 1000 && job.StopsFromNext[0] == before && job.State != JobState.Failed; tick++)
+        {
+            job.Execute(Ctx(npc, nav));
+            npc.Position += npc.Direction * 0.05f;
+        }
+        return job.StopsFromNext[0];
+    }
+
+    [Fact]
+    public void Walks_the_stops_in_order_and_loops_back_round()
+    {
+        var nav = GoToJobTests.Grid(".....");
+        var npc = At(new Point(0, 0));
+        var job = new PatrolJob(new[] { Stop(4), Stop(0), Stop(2) });
+
+        Assert.Equal(Stop(0), UntilNextStop(job, npc, nav));   // reached 4, now for 0
+        Near.Equal(Stop(4), npc.Feet);
+        Assert.Equal(Stop(2), UntilNextStop(job, npc, nav));
+        Assert.Equal(Stop(4), UntilNextStop(job, npc, nav));   // and round again
+        Assert.Equal(Stop(0), UntilNextStop(job, npc, nav));
+
+        Assert.NotEqual(JobState.Completed, job.State);       // never ends on its own
+        Assert.NotEqual(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Pauses_at_each_stop_before_moving_on()
+    {
+        var nav = GoToJobTests.Grid(".....");
+        var npc = At(new Point(0, 0));
+        var job = new PatrolJob(new[] { Stop(2), Stop(0) }, pause: 1f);
+
+        UntilNextStop(job, npc, nav);                      // at stop 2
+        for (int tick = 0; tick < 3; tick++)               // 0.75s: still standing there
+        {
+            job.Execute(Ctx(npc, nav));
+            Assert.Equal(Vector2.Zero, npc.Direction);
+        }
+        job.Execute(Ctx(npc, nav));                        // 1s: pause over...
+        job.Execute(Ctx(npc, nav));                        // ...so it sets off
+
+        Assert.Equal(new Vector2(-1, 0), npc.Direction);
+    }
+
+    [Fact]
+    public void Sets_off_for_the_first_stop_without_pausing()
+    {
+        var npc = At(new Point(0, 0));
+        var job = new PatrolJob(new[] { Stop(4), Stop(0) }, pause: 5f);
+
+        job.Execute(Ctx(npc, GoToJobTests.Grid(".....")));
+
+        Assert.Equal(new Vector2(1, 0), npc.Direction);
+    }
+
+    [Fact]
+    public void A_stop_it_cant_reach_is_skipped()
+    {
+        // Stop (4,0) is walled off by (3,0); (0,0) and (2,0) aren't.
+        var nav = GoToJobTests.Grid("...#.");
+        var npc = At(new Point(0, 0));
+        var job = new PatrolJob(new[] { Stop(2), Stop(4), Stop(0) });
+
+        Assert.Equal(Stop(4), UntilNextStop(job, npc, nav));   // reached 2
+        Assert.Equal(Stop(0), UntilNextStop(job, npc, nav));   // 4 skipped
+
+        Assert.NotEqual(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Fails_when_no_stop_can_be_reached()
+    {
+        var nav = GoToJobTests.Grid(".#.#.");
+        var npc = At(new Point(2, 0));                       // boxed in
+        var job = new PatrolJob(new[] { Stop(0), Stop(4) });
+
+        for (int tick = 0; tick < 5 && job.State != JobState.Failed; tick++) job.Execute(Ctx(npc, nav));
+
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal(Vector2.Zero, npc.Direction);
+    }
+
+    [Fact]
+    public void A_patrol_with_no_stops_fails()
+    {
+        var npc = At(new Point(0, 0));
+        var job = new PatrolJob(System.Array.Empty<Vector2>());
+
+        job.Execute(Ctx(npc, GoToJobTests.Grid("...")));
+
+        Assert.Equal(JobState.Failed, job.State);
+    }
+
+    [Fact]
+    public void Its_stops_are_listed_from_the_one_its_heading_for()
+    {
+        var nav = GoToJobTests.Grid(".....");
+        var npc = At(new Point(0, 0));
+        var job = new PatrolJob(new[] { Stop(1), Stop(3), Stop(4) });
+
+        UntilNextStop(job, npc, nav);                        // reached (1,0)
+
+        Assert.Equal(new[] { Stop(3), Stop(4), Stop(1) }, job.StopsFromNext);
+    }
+}

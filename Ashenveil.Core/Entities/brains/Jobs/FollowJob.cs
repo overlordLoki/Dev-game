@@ -10,7 +10,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
     /// replaces it (see <see cref="NpcBrain.Enqueue"/>). Fails if the target can't be found
     /// in the NPC's level, or can't be reached.
     /// </summary>
-    public class FollowJob : IJob
+    public class FollowJob : IEndlessJob
     {
         // Stop this close to the target, in cells, feet to feet: near them, not on top of them.
         private const float FollowDistance = 1f;
