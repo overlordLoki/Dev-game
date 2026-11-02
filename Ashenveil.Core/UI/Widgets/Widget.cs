@@ -18,6 +18,9 @@ namespace Ashenveil.Core.UI.Widgets
 
         protected Widget(Rectangle bounds) => Bounds = bounds;
 
+        /// <summary>Moves and resizes it: for a widget a screen keeps across window resizes (the HUD).</summary>
+        public void Place(Rectangle bounds) => Bounds = bounds;
+
         // Shared input plumbing: track hover (only when shown). A subclass calls base.Update
         // then adds its own reaction (a button fires its click).
         public virtual void Update(MouseState mouse, MouseState prev)

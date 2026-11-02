@@ -44,6 +44,7 @@ namespace Ashenveil.Core.DevConsole
             commands.Register("reflect", "<npc>", "Has an NPC reflect on today now, without waiting for midnight.",
                 args => Reflect(world(), args[0]), minArgs: 1, maxArgs: 1);
             FactionCommands.Register(commands, world);
+            CombatCommands.Register(commands, world);
         }
 
         private const int DefaultEventCount = 10;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Ashenveil.Core.Combat;
 using Ashenveil.Core.GameWorld;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -12,6 +13,8 @@ namespace Ashenveil.Core.Entities
             Idle,
             Walking,
             Talking,
+            Attacking,  // a swing in progress: rooted to the spot until it's done
+            Dead,   // health reached 0: can't move or talk; healing brings them back
         }
         public PlayerState State { get; set; } = PlayerState.Idle;
 
@@ -81,13 +84,17 @@ namespace Ashenveil.Core.Entities
             return true;
         }
 
+        /// <summary>Full health. A tuning number (docs/combat-plan.md).</summary>
+        public const int MaxHealth = 100;
+
         public Player(Vector2 position, int id, string name = DefaultName) : base(position, id)
         {
             Name = name;
             Speed = 1.4f;   // cells per second (was 200px/s at 720p's 144px cells)
+            SetHealth(MaxHealth);
 
             // One clip per action and facing, named "<action>_<down|up|side>" (see Clip).
-            // Attack, hurt and death are one-shots, loaded now for combat's later steps.
+            // Attack, hurt and death are one-shots: they stop on their last frame.
             AddAnimation("idle_down",   Assets.PlayerIdleDown,   0.15);
             AddAnimation("idle_up",     Assets.PlayerIdleUp,     0.15);
             AddAnimation("idle_side",   Assets.PlayerIdleSide,   0.15);
@@ -118,15 +125,47 @@ namespace Ashenveil.Core.Entities
         // for right; the up and down sheets are never flipped.
         protected override bool FlipSprite => Facing == Facing.Right;
 
+        /// <summary>The player's one attack, on Space. Tuning numbers (docs/combat-plan.md, step 2).</summary>
+        public static readonly AttackData Sword = new(Damage: 10, Reach: 0.6f, Width: 0.7f,
+            Windup: 0.08f, Active: 0.12f, Recovery: 0.2f, Knockback: 0.4f, Animation: "attack");
+
+        // Space is edge-triggered: one press is one swing, holding it down doesn't keep swinging.
+        private bool _attackWasDown;
+        // Whether Move walked this frame. Not "the position changed": a knockback moves you too.
+        private bool _walked;
+
         public override void Update(GameTime gameTime)
         {
-            Vector2 before = Position;
+            bool attackDown = AshenveilGame.Input.Keyboard.IsKeyDown(Keys.Space);
+            if (attackDown && !_attackWasDown && State != PlayerState.Talking) StartSwing(Sword);
+            _attackWasDown = attackDown;
+
+            _walked = false;
             base.Update(gameTime);
 
-            // Walking is moving this frame. Talking is set from outside and left alone.
+            // Talking is set from outside and left alone, and Dead only changes when health does
+            // (OnDied / OnRevived). Otherwise it's whatever happened this frame.
+            if (State == PlayerState.Dead) return;
             if (State != PlayerState.Talking)
-                State = Position != before ? PlayerState.Walking : PlayerState.Idle;
-            Play(Clip(State == PlayerState.Walking ? "walk" : "idle", Facing));
+                State = Swing != null ? PlayerState.Attacking : _walked ? PlayerState.Walking : PlayerState.Idle;
+
+            // A flinch shows over everything; the attack clip is the swing's facing, which is fixed.
+            if (IsFlinching) Play(Clip("hurt", Facing));
+            else if (Swing != null) Play(Clip(Swing.Data.Animation, Swing.Facing));
+            else Play(Clip(State == PlayerState.Walking ? "walk" : "idle", Facing));
+        }
+
+        protected override void OnDied()
+        {
+            base.OnDied();
+            State = PlayerState.Dead;
+            Play(Clip("death", Facing));   // one-shot: stops on the last frame
+        }
+
+        protected override void OnRevived()
+        {
+            State = PlayerState.Idle;
+            Play(Clip("idle", Facing));
         }
 
         // Keyboard-driven instead of following Direction. The held arrows make a direction
@@ -141,10 +180,11 @@ namespace Ashenveil.Core.Entities
             if (kb.IsKeyDown(Keys.Left))  dir.X -= 1;
             if (kb.IsKeyDown(Keys.Up))    dir.Y -= 1;
             if (kb.IsKeyDown(Keys.Down))  dir.Y += 1;
-            if (dir == Vector2.Zero) return;
+            if (dir == Vector2.Zero || delta <= 0) return;
 
             dir.Normalize();
             Position += dir * Speed * delta;
+            _walked = true;
         }
     }
 }

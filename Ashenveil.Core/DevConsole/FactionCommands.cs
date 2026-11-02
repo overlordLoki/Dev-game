@@ -153,8 +153,8 @@ namespace Ashenveil.Core.DevConsole
             yield return WorldCommands.Describe(posted);
         }
 
-        // "player" (or "me"), or an NPC by id or name.
-        private static Entity FindPerson(World world, string who) =>
+        // "player" (or "me"), or an NPC by id or name. CombatCommands uses it too.
+        internal static Entity FindPerson(World world, string who) =>
             who.Equals("player", StringComparison.OrdinalIgnoreCase) || who.Equals("me", StringComparison.OrdinalIgnoreCase)
                 ? world.player
                 : WorldCommands.FindNpc(world, who);

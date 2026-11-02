@@ -16,6 +16,19 @@ namespace Ashenveil.Core.Entities
         Left,
         Right,
     }
+
+    public static class FacingExtensions
+    {
+        /// <summary>One cell's step that way: Down is +Y, as on screen.</summary>
+        public static Vector2 ToVector(this Facing facing) => facing switch
+        {
+            Facing.Up    => new Vector2(0, -1),
+            Facing.Down  => new Vector2(0, 1),
+            Facing.Left  => new Vector2(-1, 0),
+            _            => new Vector2(1, 0),
+        };
+    }
+
     /// <summary>
     /// What the world needs from anything that moves around in it. Contract only - the
     /// shared behaviour (movement, collision, animated drawing) lives in the Entity base

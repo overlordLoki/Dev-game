@@ -33,8 +33,13 @@ facing → health → the player's attack → NPCs fight back → death → enem
 
 ## Where things are now
 
-- **No health anywhere.** `Entity` has position, speed, `Direction`, collision boxes, `Feet`
-  and animations; nothing can be hurt.
+- **Health is built** (step 1, done): `Combat/Health` (`Max`, `Current`, `Invulnerable`, `God`,
+  `Died` / `Revived` events) is a component on `Entity.Health`, given with `SetHealth(max)`.
+  Player 100, knight 80; null for anything that can't be hurt.
+  - Reaching 0 sets `PlayerState.Dead` / `NPCState.Dead` and plays the death clip. The dead
+    don't move, run jobs, collide, talk or gossip. An NPC keeps its job queue while dead.
+  - Healing from 0 revives (for the console now, knock-outs later): the NPC resumes its queue
+    or wanders, like after a conversation. There's no respawn yet (step 4).
 - **Facing is four-way** (step 0, done): `Entity.Facing` (`Down / Up / Left / Right`), set in
   `Entity.Face` from whichever axis moved further. An exact diagonal keeps a facing it's already
   walking. Side-only art (the knight) flips by `FacedLeft`, the last left/right.
@@ -56,11 +61,9 @@ facing → health → the player's attack → NPCs fight back → death → enem
 - **The knight has combat art already loaded:** `attack1/2/3`, `defend`, `hurt` and `death`
   are registered in `Knight`'s constructor, and `Animation` already supports one-shot clips
   (`Loop = false`, `IsFinished`). He's side-view only (left/right).
-- **The NPC brain** has a state machine: `Idle / Walking / Talking / Working`. Talking pauses
-  the task queue and `StopTalking` resumes it. That pattern is the model for fighting.
-  - It already has an unused `target` field ("for later AI, like following the player or
-    attacking them").
-  - It has a parked `// TODO (separate feature): combat` comment, which this plan replaces.
+- **The NPC brain** has a state machine: `Idle / Walking / Talking / Working / Dead / Fighting`.
+  Talking and Fighting pause the task queue, and ending them resumes it.
+  - `target` is who it's fighting (step 3); null outside a fight.
 - **Pathfinding is done** (`NavGrid`, `Pathfinder`, `Navigation.Route`), and so is
   chasing: `Navigation.Chase` replans towards a moving target, and `FollowJob` and
   `TalkToJob` already use it. `JobContext.FindPerson` finds someone only in the NPC's own
@@ -68,10 +71,12 @@ facing → health → the player's attack → NPCs fight back → death → enem
 - **`World.Update`** steps the clock, conversations, then movement and collision for everyone.
   `ConversationSystem` is a good model for a `CombatSystem`: the needed pieces are handed in,
   and it's testable on its own.
-- **UI:** `ProgressBar` exists ("health, loading, XP"); `GameplayScreen.Widgets` is marked
-  "HUD goes here" but is empty.
+- **UI:** `GameplayScreen.Widgets` is the HUD, drawn in screen space after the world (the
+  screen swaps the camera batch for a plain one). It holds the player's health `ProgressBar`,
+  top left. Hurt, living NPCs get a small red bar above their feet (`DrawNpcHealth`).
 - **Debug:** `Debug.SHOWBOUNDS` outlines collision boxes; the console has `where`, `tp`,
-  `npcs` and `journal`, built from `CommandRegistry`.
+  `npcs` and `journal`, built from `CommandRegistry`, and `hp`, `damage`, `heal`, `kill` and
+  `god` (`CombatCommands`).
 - **Input keys used:** E interact, P pause, \` / Oem8 console.
 - **Saving is built** ([Completed/save-system-plan.md](Completed/save-system-plan.md), with
   slots in [Completed/save-slots-plan.md](Completed/save-slots-plan.md)). It's at schema v7,
@@ -222,7 +227,7 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - Normalise the player's diagonal movement while you're in there.
 - *Visible result:* the player looks the way they walk, and stops looking down all the time.
 
-### Step 1 — Health, and hurting things by console
+### Step 1 — Health, and hurting things by console (**done**)
 
 - `Health` class and `Entity.Health`. Player 100, knight 80 (tuning).
 - Death without combat: hitting 0 sets `NPCState.Dead` / `PlayerState.Dead` and plays `death`
@@ -235,7 +240,7 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - HUD: a `ProgressBar` for the player's health in `GameplayScreen.Widgets`. NPCs get a small bar
   over their head, only after they've been hurt.
 
-### Step 2 — The player's attack
+### Step 2 — The player's attack (**done**)
 
 - `AttackData`, `Swing`, and `CombatSystem` (hit resolution and events), wired into
   `World.Update`.
@@ -255,7 +260,25 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - *Visible result:* walk up to the knight and hit him. He flinches and his bar drops; he
   doesn't fight back yet.
 
-### Step 3 — NPCs fight back
+As built, with these differences from the design above:
+- **The hitbox starts from the centre of the collision box**, not `Feet` (its bottom edge):
+  from `Feet`, an upward swing would start below the body. See `Swing.HitboxFrom`.
+- **A swing roots its attacker for the whole swing**, active phase included, not just windup
+  and recovery.
+- **Swings and health are ticked in `Entity.Update`**, with the flinch and knockback timers.
+  `CombatSystem` (in `Combat/`, not `GameWorld/`) only resolves hits. `World.Combat` raises
+  `Hit` and `Died`, which nothing listens to yet (step 4 posts them as events).
+- **Knockback goes along the swing's facing**, eased over `Entity.KnockbackSeconds` (0.15 s).
+  It's applied after facing, so being shoved doesn't turn you round.
+- A long frame that jumps right over the active phase still gets its one chance to hit
+  (`Swing.IsLive`).
+- One chance per target per swing, landed or not: a target that's invulnerable or in god mode
+  when the hitbox reaches it isn't hit later in the same swing.
+- Flinching (`Entity.FlinchSeconds`, 0.25 s) shows a red tint and the hurt clip. The knight's
+  hurt clip was sped up to 0.06 s a frame to fit inside it.
+- `PlayerState.Attacking` while a swing runs.
+
+### Step 3 — NPCs fight back (**done**)
 
 - `NPCState.Fighting` with `target` (the field that's already there). Entered when hit (aggro),
   or by a console command `aggro <npc>`. It pauses the task queue like Talking.
@@ -269,6 +292,28 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
     `StopFighting()` (back to the task queue, or wandering).
   - **Knight extra:** sometimes `defend` (blocks damage from the front while the clip plays).
 - *Visible result:* hit the knight and he chases you round the well and hits back.
+
+As built:
+- `NpcBrain.StartFighting(who)` / `StopFighting()` and `UpdateFighting(dt)` (virtual). `target`
+  now has a private setter and is null outside a fight. `NPC.Provoke(attacker)` starts a fight
+  unless one's already going (the World calls it on `Combat.Hit` and `Combat.Blocked`).
+- **Reach** is the real hitbox: the brain asks whether its next attack, thrown towards the
+  target now, would overlap them (`Swing.HitboxFrom`). Out of reach it chases at
+  `ChaseSpeedFactor` (1.6x) times walking speed, playing `run` if the NPC has it.
+- **Attacks** come from `NPC.Attacks`, thrown in turn. The knight's are a combo:
+  `attack1` (8), `attack2` (8), `attack3` (12, longer reach and windup). The next swing waits
+  `AttackCooldown` (0.6 s) after the last one ends. An NPC with no attacks chases but never swings.
+- **Giving up:** the target dead, not found in the NPC's level, or more than `GiveUpDistance`
+  (8 cells) away, or unreachable, for `GiveUpSeconds` (4 s).
+- **Defending:** an enemy swing that's winding up and would reach is considered once.
+  `ShouldDefend` (base: never; `KnightBrain`: 35%, random injectable) turns the NPC to face
+  it and starts a guard (`Entity.StartGuard`, 0.5 s, rooted, `defend` clip). A guarded swing
+  from the front (`Entity.Blocks`) does no damage, pushes a quarter of its knockback, and
+  raises `Combat.Blocked`.
+- Jobs given and decisions applied mid-fight wait in the queue; the fight isn't interrupted.
+  Fighting NPCs can't be talked to.
+- Console: `aggro <npc> [who]` (default the player) and `calm <npc>`.
+- The `nav` drawing shows a fighter's chase path.
 
 ### Step 4 — Death and consequences
 

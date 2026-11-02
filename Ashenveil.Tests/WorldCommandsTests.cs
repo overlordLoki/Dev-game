@@ -284,4 +284,150 @@ public class WorldCommandsTests : IDisposable
 
         Assert.Empty(npc.CurrentPath);
     }
+
+    // ------------------------------------------------------------------ health
+
+    // An NPC with health, for the health commands.
+    private TestNpc HurtableNpc(int id = 7, int max = 80)
+    {
+        var npc = new TestNpc(0, 0, id);
+        npc.SetHealth(max);
+        _world.AddNpc(npc);
+        return npc;
+    }
+
+    [Fact]
+    public void Hp_with_no_argument_shows_the_players_health()
+    {
+        Assert.Equal($"{_world.player.Name} (you): 100/100", RunOne("hp").Text);
+    }
+
+    [Fact]
+    public void Damage_hurts_an_NPC_and_hp_shows_it()
+    {
+        var npc = HurtableNpc();
+
+        Assert.Equal("Test (#7): 55/80", RunOne("damage 7 25").Text);
+        Assert.Equal(55, npc.Health.Current);
+        Assert.Equal("Test (#7): 55/80", RunOne("hp test").Text);
+    }
+
+    [Fact]
+    public void Damage_lands_every_time_it_is_typed()
+    {
+        // No invulnerability from the console: each command is its own hit.
+        HurtableNpc();
+
+        RunOne("damage 7 10");
+
+        Assert.Equal("Test (#7): 60/80", RunOne("damage 7 10").Text);
+    }
+
+    [Fact]
+    public void Kill_kills_and_heal_brings_back_to_full()
+    {
+        var npc = HurtableNpc();
+
+        Assert.Equal("Test (#7): 0/80, dead", RunOne("kill 7").Text);
+        Assert.Equal(NpcBrain.NPCState.Dead, npc.State);
+
+        Assert.Equal("Test (#7): 80/80", RunOne("heal 7").Text);
+        Assert.NotEqual(NpcBrain.NPCState.Dead, npc.State);
+    }
+
+    [Fact]
+    public void Heal_by_an_amount()
+    {
+        HurtableNpc();
+        RunOne("damage 7 50");
+
+        Assert.Equal("Test (#7): 50/80", RunOne("heal 7 20").Text);
+    }
+
+    [Fact]
+    public void God_mode_blocks_damage_to_the_player_and_toggles_off()
+    {
+        Assert.Equal("God mode on: nothing hurts you.", RunOne("god").Text);
+        Assert.Equal(LineKind.Error, RunOne("damage player 10").Kind);
+        Assert.Equal(100, _world.player.Health.Current);
+
+        RunOne("god");
+        RunOne("damage me 10");
+        Assert.Equal(90, _world.player.Health.Current);
+    }
+
+    [Theory]
+    [InlineData("damage 7 0")]
+    [InlineData("damage 7 lots")]
+    [InlineData("heal 7 -3")]
+    [InlineData("damage Bob 5")]
+    public void Bad_health_commands_are_errors(string input)
+    {
+        HurtableNpc();
+
+        Assert.Equal(LineKind.Error, RunOne(input).Kind);
+    }
+
+    [Fact]
+    public void Someone_with_no_health_cant_be_hurt()
+    {
+        _world.AddNpc(new TestNpc(0, 0, 9));   // TestNpc has no health unless given one
+
+        Assert.Equal(LineKind.Error, RunOne("damage 9 5").Kind);
+    }
+
+    [Fact]
+    public void Killing_the_dead_is_an_error()
+    {
+        HurtableNpc();
+        RunOne("kill 7");
+
+        Assert.Equal(LineKind.Error, RunOne("kill 7").Kind);
+    }
+
+    // ------------------------------------------------------------------ fighting
+
+    [Fact]
+    public void Aggro_makes_an_NPC_fight_the_player_and_calm_ends_it()
+    {
+        var npc = HurtableNpc();
+
+        Assert.Equal($"Test (#7) is fighting {_world.player.Name}.", RunOne("aggro 7").Text);
+        Assert.Equal(NpcBrain.NPCState.Fighting, npc.State);
+        Assert.Same(_world.player, npc.FightingWith);
+
+        Assert.Equal(LineKind.Output, RunOne("calm 7").Kind);
+        Assert.Null(npc.FightingWith);
+    }
+
+    [Fact]
+    public void Aggro_can_set_an_NPC_on_another_NPC()
+    {
+        var npc = HurtableNpc();
+        var other = HurtableNpc(id: 8);
+
+        RunOne("aggro 7 8");
+
+        Assert.Same(other, npc.FightingWith);
+    }
+
+    [Theory]
+    [InlineData("aggro 7 7")]        // itself
+    [InlineData("aggro Bob")]        // nobody
+    [InlineData("calm 7")]           // isn't fighting
+    public void Bad_fight_commands_are_errors(string input)
+    {
+        HurtableNpc();
+
+        Assert.Equal(LineKind.Error, RunOne(input).Kind);
+    }
+
+    [Fact]
+    public void A_dead_NPC_cant_be_set_fighting()
+    {
+        HurtableNpc();
+        RunOne("kill 7");
+
+        Assert.Equal(LineKind.Error, RunOne("aggro 7").Kind);
+    }
 }

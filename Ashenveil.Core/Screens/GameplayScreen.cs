@@ -20,7 +20,14 @@ namespace Ashenveil.Core.Screens
     public class GameplayScreen : IScreen
     {
         public World World { get; }
-        public List<Widget> Widgets { get; set; } = new List<Widget>();   // HUD goes here
+        public List<Widget> Widgets { get; set; } = new List<Widget>();   // the HUD, in screen pixels
+
+        // The player's health, top left. Placed by UpdateLayout, filled every frame.
+        private readonly ProgressBar _healthBar = new(Rectangle.Empty, "red");
+
+        // The small bar over a hurt NPC: how wide and tall, and how far above the feet it sits,
+        // in cells. Both characters stand about half a cell tall on screen, whatever their frame.
+        private const float NpcBarWidth = 0.6f, NpcBarHeight = 0.07f, NpcBarAboveFeet = 0.7f;
 
         private readonly Camera _camera = new Camera();
         private readonly Action _onPause;
@@ -37,6 +44,7 @@ namespace Ashenveil.Core.Screens
             World = world;
             _onPause = onPause;
             World.PlayerConversationStarted += convo => onTalk(convo);
+            Widgets.Add(_healthBar);
         }
 
         // Recompute cell size from the window, and remember the window size so the camera
@@ -46,6 +54,10 @@ namespace Ashenveil.Core.Screens
             _viewWidth = viewportWidth;
             _viewHeight = viewportHeight;
             Layout.Update(viewportHeight);
+
+            // Sized from the window, like the chat box, so it stays in proportion after a resize.
+            int margin = viewportHeight / 40;
+            _healthBar.Place(new Rectangle(margin, margin, viewportHeight / 3, Math.Max(28, viewportHeight / 24)));
         }
 
         public void Update(GameTime gameTime)
@@ -90,8 +102,36 @@ namespace Ashenveil.Core.Screens
             foreach (var d in drawables)
                 d.Draw(spriteBatch);
 
-            // 5. debug overlay on top of everything
+            // 5. health bars over hurt NPCs, above everything in the world
+            DrawNpcHealth(spriteBatch, pixel);
+
+            // 6. debug overlay on top of everything
             if (Debug.SHOWNAV) DrawNav(spriteBatch, pixel);
+
+            // 7. the HUD. It's in screen pixels, not through the camera, so the batch the
+            // ScreenManager began with our Transform is swapped for a plain one (it ends that).
+            var health = World.player.Health;
+            _healthBar.Visible = health != null;
+            if (health != null) _healthBar.Value = health.Fraction;
+            spriteBatch.End();
+            spriteBatch.Begin();
+            foreach (var widget in Widgets) widget.Draw(spriteBatch, null);
+        }
+
+        // Only once they've been hurt, and not once they're dead: a full bar over everyone is noise.
+        private void DrawNpcHealth(SpriteBatch spriteBatch, Texture2D pixel)
+        {
+            foreach (var npc in World.NPCs)
+            {
+                var health = npc.Health;
+                if (health == null || health.IsDead || health.Current == health.Max) continue;
+
+                var feet = npc.Feet;
+                var back = new RectF(feet.X - NpcBarWidth / 2, feet.Y - NpcBarAboveFeet, NpcBarWidth, NpcBarHeight);
+                var fill = new RectF(back.X, back.Y, back.Width * health.Fraction, back.Height);
+                spriteBatch.Draw(pixel, Layout.ToScreen(back), Color.Black * 0.6f);
+                spriteBatch.Draw(pixel, Layout.ToScreen(fill), Color.Red);
+            }
         }
 
         // Blocked cells as red squares, and each NPC's route as a yellow line from its feet

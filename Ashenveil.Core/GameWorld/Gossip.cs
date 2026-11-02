@@ -36,7 +36,8 @@ namespace Ashenveil.Core.GameWorld
             foreach (var level in levels)
                 foreach (var teller in level)
                     foreach (var hearer in level)
-                        if (teller != hearer && Vector2.Distance(teller.Feet, hearer.Feet) <= Range)
+                        if (teller != hearer && !teller.IsDead && !hearer.IsDead
+                            && Vector2.Distance(teller.Feet, hearer.Feet) <= Range)
                             shared += Share(teller, hearer, today);
             return shared;
         }

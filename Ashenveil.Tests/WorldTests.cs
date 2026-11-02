@@ -403,4 +403,179 @@ public class WorldTests : IDisposable
         Assert.Equal(transcript.Id, fact.SourceId);
         Assert.Equal(transcript.Day, fact.Day);
     }
+
+    // ------------------------------------------------------------------ the dead
+
+    [Fact]
+    public void A_dead_NPC_cant_be_talked_to()
+    {
+        var world = NewWorld();
+        var (npc, _) = NpcBeside(world);
+        npc.SetHealth(10);
+        npc.Health.Kill();
+
+        Assert.Null(world.Interact());
+    }
+
+    [Fact]
+    public void A_dead_NPC_cant_walk_up_and_talk()
+    {
+        var world = NewWorld();
+        var (npc, _) = NpcBeside(world);
+        npc.SetHealth(10);
+        npc.Health.Kill();
+
+        Assert.False(npc.StartConversation(world.player, "hello"));
+    }
+
+    [Fact]
+    public void A_dead_player_cant_talk_or_be_talked_to()
+    {
+        var world = NewWorld();
+        var (npc, _) = NpcBeside(world);
+        world.player.Health.Kill();
+
+        Assert.Null(world.Interact());
+        Assert.False(npc.StartConversation(world.player, "hello"));
+    }
+
+    [Fact]
+    public void The_player_walks_over_a_dead_NPC_instead_of_being_pushed()
+    {
+        var world = NewWorld();
+        var npc = new TestNpc(world.player.Position.X, world.player.Position.Y);   // right on top
+        world.AddNpc(npc);
+        npc.SetHealth(10);
+        npc.Health.Kill();
+        var where = world.player.Position;
+
+        Step(world, 0.1);
+
+        Assert.Equal(where, world.player.Position);
+    }
+
+    // ------------------------------------------------------------------ attacking
+
+    [Fact]
+    public void Pressing_Space_beside_an_NPC_hurts_it_and_says_so()
+    {
+        var input = new FakeInput();
+        AshenveilGame.Input = input;
+        var world = NewWorld();
+        // Just below the player, who faces down to start with.
+        var feet = world.player.Feet;
+        var npc = new TestNpc(feet.X - 0.5f, feet.Y + 0.05f);
+        world.AddNpc(npc);
+        npc.SetHealth(80);
+        var hits = new List<(Entity, Entity, int)>();
+        world.Combat.Hit += (attacker, victim, damage) => hits.Add((attacker, victim, damage));
+
+        input.Hold(Microsoft.Xna.Framework.Input.Keys.Space);
+        for (int i = 0; i < 5; i++) Step(world, 0.05);
+
+        Assert.Equal(80 - Player.Sword.Damage, npc.Health.Current);
+        Assert.Equal((world.player, npc, Player.Sword.Damage), Assert.Single(hits));
+        Assert.True(npc.Position.Y > feet.Y + 0.05f);   // knocked back, down and away
+    }
+
+    [Fact]
+    public void Swinging_at_nothing_hurts_nobody()
+    {
+        var input = new FakeInput();
+        AshenveilGame.Input = input;
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = new TestNpc(feet.X - 0.5f, feet.Y - 2f);   // behind the player, out of reach
+        world.AddNpc(npc);
+        npc.SetHealth(80);
+
+        input.Hold(Microsoft.Xna.Framework.Input.Keys.Space);
+        for (int i = 0; i < 10; i++) Step(world, 0.05);
+
+        Assert.Equal(80, npc.Health.Current);
+    }
+
+    // ------------------------------------------------------------------ fighting back
+
+    // An NPC with a KnightBrain (it stands still when not busy), some health and an attack.
+    private static TestNpc Fighter(World world, float x, float y, int id)
+    {
+        var npc = new TestNpc(x, y, id, $"Fighter{id}", new Ashenveil.Core.Entities.brains.KnightBrain(new Random(1)));
+        npc.SetHealth(80);
+        npc.Speed = 1;
+        npc.TestAttacks = new[] { new Ashenveil.Core.Combat.AttackData(5, 0.6f, 0.8f, 0.1f, 0.1f, 0.1f, 0.2f, "attack") };
+        world.AddNpc(npc);
+        return npc;
+    }
+
+    [Fact]
+    public void Hitting_an_NPC_makes_it_fight_back()
+    {
+        var input = new FakeInput();
+        AshenveilGame.Input = input;
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = Fighter(world, feet.X - 0.5f, feet.Y + 0.05f, 7);
+
+        input.Hold(Microsoft.Xna.Framework.Input.Keys.Space);
+        for (int i = 0; i < 5; i++) Step(world, 0.05);
+
+        Assert.Equal(NpcBrain.NPCState.Fighting, npc.State);
+        Assert.Same(world.player, npc.FightingWith);
+    }
+
+    [Fact]
+    public void An_NPC_that_fights_the_player_hurts_them()
+    {
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = Fighter(world, feet.X - 0.5f, feet.Y + 0.05f, 7);
+        npc.StartFighting(world.player);
+
+        for (int i = 0; i < 20; i++) Step(world, 0.05);
+
+        Assert.True(world.player.Health.Current < Player.MaxHealth);
+    }
+
+    [Fact]
+    public void An_NPC_mid_fight_cant_be_talked_to()
+    {
+        var world = NewWorld();
+        var (npc, _) = NpcBeside(world);
+        var other = new TestNpc(0, 0, 9);
+        other.SetHealth(10);
+        world.AddNpc(other);
+        npc.StartFighting(other);
+
+        Assert.Null(world.Interact());
+    }
+
+    [Fact]
+    public void Two_NPCs_fight_with_no_player_involved()
+    {
+        var world = NewWorld();
+        var a = Fighter(world, 0.2f, 0.2f, 7);
+        var b = Fighter(world, 1.2f, 0.2f, 8);
+
+        a.StartFighting(b);
+        for (int i = 0; i < 10; i++) Step(world, 0.05);
+
+        Assert.True(b.Health.Current < 80);
+        Assert.Same(a, b.FightingWith);   // hit, so it fights back
+    }
+
+    [Fact]
+    public void An_NPC_gives_up_when_the_player_dies_and_goes_back_to_its_errand()
+    {
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = Fighter(world, feet.X - 0.5f, feet.Y + 0.05f, 7);
+        npc.GiveJob(new Ashenveil.Core.Entities.brains.Jobs.WaitJob(100));
+        npc.StartFighting(world.player);
+
+        world.player.Health.Kill();
+        Step(world, 0.05);
+
+        Assert.Equal(NpcBrain.NPCState.Working, npc.State);
+    }
 }

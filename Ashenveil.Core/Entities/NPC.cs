@@ -36,10 +36,40 @@ namespace Ashenveil.Core.Entities
 
         public override void Update(GameTime gameTime)
         {
-            // TODO: NPC AI logic. Subclasses register at least "idle" and "walk".
-            Play(Direction == Vector2.Zero ? "idle" : "walk");
+            // Subclasses register at least "idle" and "walk", and "death" and "hurt" if they can be
+            // hurt. A missing clip is skipped (Play ignores it), so the last one keeps playing.
+            // A fighter on the move runs, if it has a "run" clip.
+            bool running = State == NpcBrain.NPCState.Fighting && Animations.ContainsKey("run");
+            Play(IsDead ? "death"
+                : IsFlinching ? "hurt"
+                : Swing != null ? Swing.Data.Animation
+                : IsGuarding ? "defend"
+                : Direction == Vector2.Zero ? "idle"
+                : running ? "run" : "walk");
             Brain.Update(gameTime);
             base.Update(gameTime);
+        }
+
+        /// <summary>
+        /// The swings this NPC can throw, used in turn (the knight's three make a combo). None:
+        /// it can be hurt and will chase, but never swings back.
+        /// </summary>
+        public virtual IReadOnlyList<Combat.AttackData> Attacks => Array.Empty<Combat.AttackData>();
+
+        /// <summary>Who this NPC is fighting; null when it isn't.</summary>
+        public Entity FightingWith => Brain.target;
+
+        /// <summary>Fight <paramref name="who"/> (the console's `aggro`, or being hit). See NpcBrain.StartFighting.</summary>
+        public void StartFighting(Entity who) => Brain.StartFighting(who);
+        public void StopFighting() => Brain.StopFighting();
+
+        /// <summary>
+        /// <paramref name="attacker"/> just swung at this NPC (hit or blocked): fight back, unless
+        /// already in a fight - it finishes that one first.
+        /// </summary>
+        public void Provoke(Entity attacker)
+        {
+            if (State != NpcBrain.NPCState.Fighting) Brain.StartFighting(attacker);
         }
 
         // Read-only views of the brain, for whoever needs to look in (the dev console). Changes
@@ -49,10 +79,11 @@ namespace Ashenveil.Core.Entities
         public brains.Opinions Opinions => Brain.Opinions;
         // The job queue, front first. For saving; new jobs still go in through GiveJob.
         public IReadOnlyCollection<brains.Jobs.IJob> Jobs => Brain.JobQueue;
-        // Where the current job's route still goes, in cells; empty when the NPC isn't walking
-        // a route. For the `nav` debug drawing.
+        // Where the current job's route (or a fight's chase) still goes, in cells; empty when the
+        // NPC isn't walking one. For the `nav` debug drawing.
         public IReadOnlyList<Vector2> CurrentPath =>
-            State == NpcBrain.NPCState.Working && Brain.JobQueue.TryPeek(out var job) && job is brains.Jobs.IRoutedJob routed
+            State == NpcBrain.NPCState.Fighting ? Brain.ChasePath
+            : State == NpcBrain.NPCState.Working && Brain.JobQueue.TryPeek(out var job) && job is brains.Jobs.IRoutedJob routed
                 ? routed.RemainingWaypoints
                 : Array.Empty<Vector2>();
 
@@ -102,12 +133,21 @@ namespace Ashenveil.Core.Entities
         public void StartTalking() => Brain.StartTalking();
         public void StopTalking() => Brain.StopTalking();
 
+        protected override void OnDied()
+        {
+            base.OnDied();
+            Brain.Die();
+        }
+
+        protected override void OnRevived() => Brain.Revive();
+
         /// <summary>
         /// Push out of another entity, then let the brain decide how to react (a
         /// wanderer bounces away).
         /// </summary>
         public override void CheckEntityCollision(IEntity other)
         {
+            if (IsDead) return;   // a body on the ground doesn't push or get pushed
             Collision.RectF me = Bounds;
             Collision.RectF them = other.Bounds;
             if (!me.Intersects(them)) return;

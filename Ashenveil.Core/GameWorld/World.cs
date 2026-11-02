@@ -34,6 +34,8 @@ namespace Ashenveil.Core.GameWorld
         public ReflectionSystem Reflections { get; }
         /// <summary>The factions and their default views of each other. Read-only data.</summary>
         public FactionTable Factions { get; }
+        /// <summary>Resolves hits each frame, after movement and collision. Raises Hit and Died.</summary>
+        public Combat.CombatSystem Combat { get; } = new Combat.CombatSystem();
 
         /// <summary>The NPCs in the level being played.</summary>
         public IReadOnlyList<NPC> NPCs => Roster.In(location.Name);
@@ -84,6 +86,10 @@ namespace Ashenveil.Core.GameWorld
             Reflections.Events = Events;
             Reflections.FindPerson = FindPerson;
             Clock.DayStarted += day => Reflections.DayStarted(day, Roster.All);
+            // Swing at an NPC, hit or blocked, and it fights back. (Posting fights to the event
+            // log is step 4 of docs/combat-plan.md.)
+            Combat.Hit += (attacker, victim, _) => (victim as NPC)?.Provoke(attacker);
+            Combat.Blocked += (attacker, defender) => (defender as NPC)?.Provoke(attacker);
             // Id 0 is this save's owner, not "the player": other players would take ids from
             // the roster like NPCs do, so ask `is Player`, never `Id == 0`.
             this.player = new Player(Vector2.Zero, 0);   // Init stands them on the spawn point
@@ -173,6 +179,8 @@ namespace Ashenveil.Core.GameWorld
         /// </summary>
         public Conversation Interact()
         {
+            if (player.IsDead) return null;
+
             var exit = location.ExitTouching(player.Bounds);
             if (exit != null)
             {
@@ -180,7 +188,9 @@ namespace Ashenveil.Core.GameWorld
                 return null;
             }
 
-            var npc = player.GetNearestEntityInRange(NPCs, TalkRange) as NPC;
+            // The dead can't be talked to, and nor can anyone mid-fight.
+            var npc = player.GetNearestEntityInRange(
+                NPCs.Where(n => !n.IsDead && n.State != NpcBrain.NPCState.Fighting), TalkRange) as NPC;
             return npc != null ? StartConversation(player, npc) : null;
         }
 
@@ -237,11 +247,12 @@ namespace Ashenveil.Core.GameWorld
         /// whatever they say first. Opening with the NPC's <paramref name="reason"/>, and NPCs
         /// talking among themselves, come with A1 (docs/npc-memory-next-plan.md) - an NPC-only
         /// conversation has nobody to end it yet. False if it can't happen: another NPC, the
-        /// player in another level, or the player already in a conversation.
+        /// player in another level, either of them dead, or the player already in a conversation.
         /// </summary>
         public bool NpcStartsConversation(NPC npc, Entity target, string reason)
         {
             if (target != player || npc.Location?.Name != location.Name) return false;
+            if (npc.IsDead || player.IsDead) return false;
             if (Conversations.Active.Any(c => !c.IsFinished && c.Participants.Contains(player))) return false;
             StartConversation(player, npc);
             return true;
@@ -256,7 +267,7 @@ namespace Ashenveil.Core.GameWorld
 
         private float _untilGossip = Gossip.IntervalSeconds;
 
-        /// <summary>One step of the game: time, conversations, decisions, reflections, movement, collision.</summary>
+        /// <summary>One step of the game: time, conversations, decisions, reflections, movement, collision, hits.</summary>
         public void Update(GameTime gameTime)
         {
             HasUnsavedPlay = true;
@@ -274,13 +285,18 @@ namespace Ashenveil.Core.GameWorld
             foreach (var npc in NPCs)
             {
                 npc.Update(gameTime);
-                npc.CheckEntityCollision(player);
-                player.CheckEntityCollision(npc);
                 Bounds.Clamp(npc);
+                // A body on the ground is walked over: nobody pushes against the dead.
+                if (npc.IsDead) continue;
+                if (!player.IsDead)
+                {
+                    npc.CheckEntityCollision(player);
+                    player.CheckEntityCollision(npc);
+                }
 
                 foreach (var other in NPCs)
                 {
-                    if (npc != other)
+                    if (npc != other && !other.IsDead)
                         npc.CheckEntityCollision(other);
                 }
             }
@@ -292,6 +308,11 @@ namespace Ashenveil.Core.GameWorld
                 foreach (var npc in NPCs)
                     npc.ResolveCollision(obj.Boxes);
             }
+
+            // Last, so every hitbox is where its attacker actually ended up this frame.
+            var combatants = new List<Entity>(NPCs.Count + 1) { player };
+            combatants.AddRange(NPCs);
+            Combat.Update(combatants);
         }
         public Entity FindPersonNear(NPC asker, int id)
         {

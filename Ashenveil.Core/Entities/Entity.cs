@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Ashenveil.Core.Collision;
+using Ashenveil.Core.Combat;
 using Ashenveil.Core.Utility;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -72,6 +73,123 @@ namespace Ashenveil.Core.Entities
         // Sheets are drawn facing right; this flips them. Side-only art flips by the last
         // left/right; Player, which has up and down sheets, flips only when facing right.
         protected virtual bool FlipSprite => FacedLeft;
+
+        /// <summary>How much more this can take; null for something that can't be hurt.</summary>
+        public Health Health { get; private set; }
+        public bool IsDead => Health?.IsDead == true;
+
+        /// <summary>
+        /// Gives this entity a full health of <paramref name="max"/>, and hooks its death and revival
+        /// up to <see cref="OnDied"/> and <see cref="OnRevived"/>. Subclasses call it from their
+        /// constructor; public so tests (and later, things the level spawns) can too.
+        /// </summary>
+        public void SetHealth(int max)
+        {
+            if (Health != null) { Health.Died -= OnDied; Health.Revived -= OnRevived; }
+            Health = new Health(max);
+            Health.Died += OnDied;
+            Health.Revived += OnRevived;
+        }
+
+        /// <summary>Health reached 0. The subclass stops whatever it was doing and plays its death clip.</summary>
+        protected virtual void OnDied()
+        {
+            Direction = Vector2.Zero;
+            Swing = null;   // the dead don't finish their swing
+            Guard = 0;
+        }
+        /// <summary>Healed back from 0.</summary>
+        protected virtual void OnRevived() { }
+
+        // ------------------------------------------------------------------ combat
+
+        /// <summary>The attack in progress, if any. Ticked by Update; CombatSystem resolves its hits.</summary>
+        public Swing Swing { get; private set; }
+
+        /// <summary>
+        /// Starts <paramref name="attack"/> in the way this entity faces. False (and nothing starts)
+        /// if it's dead or already swinging. It can't move until the swing is done.
+        /// </summary>
+        public bool StartSwing(AttackData attack)
+        {
+            if (IsDead || Swing != null) return false;
+            Swing = new Swing(attack, this, Facing);
+            return true;
+        }
+
+        /// <summary>Seconds left of guarding: rooted, and blocking hits from in front (see <see cref="Blocks"/>).</summary>
+        public float Guard { get; private set; }
+        public bool IsGuarding => Guard > 0;
+
+        /// <summary>Guards for <paramref name="seconds"/>, facing the way it faces now. False if dead or swinging.</summary>
+        public bool StartGuard(float seconds)
+        {
+            if (IsDead || Swing != null || seconds <= 0) return false;
+            Guard = seconds;
+            return true;
+        }
+
+        /// <summary>
+        /// Whether a guard stops <paramref name="swing"/>: guarding, and the swing comes at the
+        /// front (thrown the opposite way to this entity's facing). From behind or the side it lands.
+        /// </summary>
+        public bool Blocks(Swing swing) => IsGuarding && swing.Facing.ToVector() == -Facing.ToVector();
+
+        /// <summary>
+        /// Turns to face <paramref name="point"/>, along whichever axis it's further away on,
+        /// without moving. A fighter aims its swing at someone this way.
+        /// </summary>
+        public void FaceTowards(Vector2 point)
+        {
+            Vector2 away = point - Bounds.Center;
+            if (away == Vector2.Zero) return;
+            Facing = FacingOf(away);
+            if (away.X != 0) FacedLeft = away.X < 0;
+        }
+
+        /// <summary>The facing along whichever axis <paramref name="d"/> is longer on; sideways on a tie.</summary>
+        public static Facing FacingOf(Vector2 d) =>
+            Math.Abs(d.Y) > Math.Abs(d.X) ? (d.Y < 0 ? Facing.Up : Facing.Down)
+                                          : (d.X < 0 ? Facing.Left : Facing.Right);
+
+        /// <summary>How long the red flash and the hurt clip last after a hit lands, in seconds.</summary>
+        public const float FlinchSeconds = 0.25f;
+        /// <summary>Seconds left of flinching from the last hit.</summary>
+        public float Flinch { get; private set; }
+        public bool IsFlinching => Flinch > 0;
+        public void StartFlinch() => Flinch = FlinchSeconds;
+        // What a flinching sprite is multiplied by: a red flash that still shows the sprite.
+        private static readonly Color HitTint = new(255, 90, 90);
+
+        /// <summary>How long a knockback takes, in seconds. It starts fast and eases to a stop.</summary>
+        public const float KnockbackSeconds = 0.15f;
+        private Vector2 _knockDirection;
+        private float _knockDistance, _knockTime = KnockbackSeconds;
+
+        /// <summary>
+        /// Pushes this entity <paramref name="distance"/> cells along <paramref name="direction"/>
+        /// over <see cref="KnockbackSeconds"/>. Collision and the map edge still apply, since the
+        /// World resolves them after each Update, so nobody is knocked into a wall.
+        /// </summary>
+        public void Knock(Vector2 direction, float distance)
+        {
+            if (direction == Vector2.Zero || distance <= 0) return;
+            _knockDirection = Vector2.Normalize(direction);
+            _knockDistance = distance;
+            _knockTime = 0;
+        }
+
+        // Moves by however much of the knockback this step covers. Eased (1 - (1 - t)^2), and
+        // worked out from where it was and where it is, so the total is exact at any frame rate.
+        private void ApplyKnock(float dt)
+        {
+            if (_knockTime >= KnockbackSeconds) return;
+            static float Covered(float t) { float left = 1 - t / KnockbackSeconds; return 1 - left * left; }
+
+            float before = Covered(_knockTime);
+            _knockTime = Math.Min(KnockbackSeconds, _knockTime + dt);
+            Position += _knockDirection * _knockDistance * (Covered(_knockTime) - before);
+        }
 
         protected Entity(Vector2 position, int id)
         {
@@ -190,9 +308,26 @@ namespace Ashenveil.Core.Entities
 
         public virtual void Update(GameTime gameTime)
         {
-            Vector2 before = Position;
-            Move(gameTime);
-            Face(Position - before);
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            Health?.Update(dt);
+            Flinch = Math.Max(0f, Flinch - dt);
+            Guard = Math.Max(0f, Guard - dt);
+
+            // A swing roots its attacker to the spot from windup to the end of recovery.
+            Swing?.Update(dt);
+            if (Swing?.IsDone == true) Swing = null;
+
+            // The dead lie still; only their (one-shot) death clip plays on. Guarding roots too.
+            if (!IsDead && Swing == null && !IsGuarding)
+            {
+                Vector2 before = Position;
+                Move(gameTime);
+                Face(Position - before);
+            }
+
+            // After facing, so being shoved backwards doesn't turn anyone round. Dead or not:
+            // a killing blow still knocks the body back.
+            ApplyKnock(dt);
 
             if (Animations.TryGetValue(CurrentAnim, out var anim))
                 anim.Update(gameTime);
@@ -257,8 +392,11 @@ namespace Ashenveil.Core.Entities
                 // The one place an entity turns into pixels.
                 var dest = Layout.ToScreen(new RectF(Position.X, Position.Y, Width, Height));
                 var fx = FlipSprite ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
-                anim.Draw(spriteBatch, dest, fx);
+                anim.Draw(spriteBatch, dest, fx, IsFlinching ? HitTint : Color.White);
             }
+
+            // Debug: the live hitbox in red (only with Debug.SHOWBOUNDS).
+            if (Swing?.IsLive == true) Debug.DrawRect(spriteBatch, Layout.ToScreen(Swing.Hitbox), Color.Red);
 
             // Debug: outline the collision body (only shows with Debug.SHOWBOUNDS).
             Debug.DrawRect(spriteBatch, Layout.ToScreen(Bounds), Color.Black);

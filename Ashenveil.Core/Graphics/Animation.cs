@@ -53,9 +53,13 @@ namespace Ashenveil.Core.Graphics
 
         public Rectangle CurrentFrame => new Rectangle(_currentFrame * FrameWidth, 0, FrameWidth, FrameHeight);
 
-        public void Draw(SpriteBatch spriteBatch, Rectangle destination, SpriteEffects effects = SpriteEffects.None)
+        public void Draw(SpriteBatch spriteBatch, Rectangle destination, SpriteEffects effects = SpriteEffects.None) =>
+            Draw(spriteBatch, destination, effects, Color.White);
+
+        // Tinted: the sprite's colours are multiplied by tint (a hit flashes red).
+        public void Draw(SpriteBatch spriteBatch, Rectangle destination, SpriteEffects effects, Color tint)
         {
-            spriteBatch.Draw(_texture, destination, CurrentFrame, Color.White, 0f, Vector2.Zero, effects, 0f);
+            spriteBatch.Draw(_texture, destination, CurrentFrame, tint, 0f, Vector2.Zero, effects, 0f);
         }
     }
 }

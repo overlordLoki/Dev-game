@@ -28,6 +28,9 @@ public class TestEntity : Entity
 
     // Overlap is protected; this is the door in for the tests.
     public static (float pushX, float pushY) OverlapOf(RectF me, RectF other) => Overlap(me, other);
+
+    // Facing is set by movement; this turns it directly, for aiming a swing in a test.
+    public void Turn(Facing facing) => Facing = facing;
 }
 
 /// <summary>
@@ -72,6 +75,10 @@ public class TestNpc : NPC
 
     protected override float SizeInCells => 1f;
     protected override string BoundsKey => nameof(TestEntity);
+
+    // No attacks unless a test gives it some (fighting tests).
+    public IReadOnlyList<Ashenveil.Core.Combat.AttackData> TestAttacks { get; set; } = Array.Empty<Ashenveil.Core.Combat.AttackData>();
+    public override IReadOnlyList<Ashenveil.Core.Combat.AttackData> Attacks => TestAttacks;
 }
 
 /// <summary>
