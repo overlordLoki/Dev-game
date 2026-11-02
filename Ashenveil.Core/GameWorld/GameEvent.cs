@@ -2,7 +2,7 @@ using Microsoft.Xna.Framework;
 
 namespace Ashenveil.Core.GameWorld
 {
-    /// <summary>What kind of thing happened. Grows as the game does (Attacked, Killed, Joined...).</summary>
+    /// <summary>What kind of thing happened. Grows as the game does. Saved by name, so new ones go anywhere.</summary>
     public enum EventType
     {
         EnteredLevel,
@@ -10,9 +10,10 @@ namespace Ashenveil.Core.GameWorld
         TaskDone,
         TaskFailed,
         Talked,
-        Attacked,       // actor attacked target. Combat posts these; until then, the console's `event attack`
+        Attacked,       // actor attacked target: one per fight (FightRecorder), or the console's `event attack`
         Joined,         // actor joined a faction (target: who let them in, if anyone)
         Left,           // actor left a faction
+        Killed,         // actor killed target: a fight that ended in a death (FightRecorder)
     }
 
     /// <summary>

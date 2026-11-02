@@ -1,6 +1,7 @@
 using Ashenveil.Core;
 using Ashenveil.Core.Entities;
 using Ashenveil.Core.Entities.brains.Dialogue;
+using Ashenveil.Core.Entities.brains.Memorys;
 using Ashenveil.Core.GameWorld;
 using Ashenveil.Core.Graphics;
 using Ashenveil.Core.Utility.Input;
@@ -522,6 +523,61 @@ public class WorldTests : IDisposable
 
         Assert.Equal(NpcBrain.NPCState.Fighting, npc.State);
         Assert.Same(world.player, npc.FightingWith);
+    }
+
+    // ------------------------------------------------------------------ fights become events
+
+    [Fact]
+    public void A_fight_is_one_event_and_one_hot_memory_once_it_goes_quiet()
+    {
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = Fighter(world, feet.X - 0.5f, feet.Y + 0.05f, 7);
+        var hits = 0;
+        world.Combat.Hit += (_, _, _) => hits++;
+        npc.StartFighting(world.player);
+
+        for (int i = 0; i < 40; i++) Step(world, 0.05);
+        Assert.True(hits > 1);
+        Assert.DoesNotContain(world.Events.All, e => e.Type == EventType.Attacked);   // still going
+
+        npc.StopFighting();
+        for (int i = 0; i < 110; i++) Step(world, 0.1);   // past FightRecorder.QuietSeconds
+
+        var fight = Assert.Single(world.Events.All, e => e.Type == EventType.Attacked);
+        Assert.Equal(npc.Id, fight.ActorId);
+        Assert.Equal(world.player.Id, fight.TargetId);
+        Assert.Single(npc.Journal.Memories, m => m.Kind == MemoryKind.Event && m.SourceId == fight.Id);
+    }
+
+    [Fact]
+    public void Saving_mid_fight_posts_the_fight_first()
+    {
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = Fighter(world, feet.X - 0.5f, feet.Y + 0.05f, 7);
+        npc.StartFighting(world.player);
+        for (int i = 0; i < 20; i++) Step(world, 0.05);
+
+        world.Fights.EndAll();   // what SaveLibrary does before it saves
+
+        Assert.Single(world.Events.All, e => e.Type == EventType.Attacked);
+        Assert.Empty(world.Fights.Open);
+    }
+
+    [Fact]
+    public void Only_the_victim_of_a_fight_holds_a_grudge()
+    {
+        var world = NewWorld();
+        var a = Fighter(world, 0.2f, 0.2f, 7);
+        var b = Fighter(world, 1.2f, 0.2f, 8);
+        world.Fights.Landed(a, b, 5);
+        world.Fights.Landed(b, a, 5);
+
+        world.Fights.EndAll();
+
+        Assert.Equal(Attitude.Hostile, Relations.AttitudeTo(b, a, world.Events, world.Clock.TotalDays));
+        Assert.NotEqual(Attitude.Hostile, Relations.AttitudeTo(a, b, world.Events, world.Clock.TotalDays));
     }
 
     [Fact]

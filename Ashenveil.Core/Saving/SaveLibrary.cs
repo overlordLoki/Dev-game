@@ -123,6 +123,8 @@ namespace Ashenveil.Core.Saving
                 // SaveStore won't write into a file that isn't a save of this version (it could
                 // be someone else's, or a newer game's) - but the player chose to overwrite it.
                 if (replaceUnreadable && File.Exists(path)) File.Delete(path);
+                // Fights in progress aren't saved: post them now, so the attack is in the save.
+                world.Fights.EndAll();
                 new SaveStore(path).Save(SaveMapper.ToSave(world, DateTime.UtcNow));
             }
             catch (Exception e) when (e is SqliteException or IOException or UnauthorizedAccessException or InvalidDataException)

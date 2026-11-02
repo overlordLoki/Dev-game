@@ -36,6 +36,8 @@ namespace Ashenveil.Core.GameWorld
         public FactionTable Factions { get; }
         /// <summary>Resolves hits each frame, after movement and collision. Raises Hit and Died.</summary>
         public Combat.CombatSystem Combat { get; } = new Combat.CombatSystem();
+        /// <summary>Tallies hits into fights, and posts each fight as one event once it's over.</summary>
+        public Combat.FightRecorder Fights { get; }
 
         /// <summary>The NPCs in the level being played.</summary>
         public IReadOnlyList<NPC> NPCs => Roster.In(location.Name);
@@ -86,10 +88,12 @@ namespace Ashenveil.Core.GameWorld
             Reflections.Events = Events;
             Reflections.FindPerson = FindPerson;
             Clock.DayStarted += day => Reflections.DayStarted(day, Roster.All);
-            // Swing at an NPC, hit or blocked, and it fights back. (Posting fights to the event
-            // log is step 4 of docs/combat-plan.md.)
+            // Swing at an NPC, hit or blocked, and it fights back. The whole fight becomes one
+            // event when it's over, not one per hit.
             Combat.Hit += (attacker, victim, _) => (victim as NPC)?.Provoke(attacker);
             Combat.Blocked += (attacker, defender) => (defender as NPC)?.Provoke(attacker);
+            Fights = new Combat.FightRecorder(LevelOf, e => Events.Post(e));
+            Fights.Watch(Combat);
             // Id 0 is this save's owner, not "the player": other players would take ids from
             // the roster like NPCs do, so ask `is Player`, never `Id == 0`.
             this.player = new Player(Vector2.Zero, 0);   // Init stands them on the spawn point
@@ -313,7 +317,11 @@ namespace Ashenveil.Core.GameWorld
             var combatants = new List<Entity>(NPCs.Count + 1) { player };
             combatants.AddRange(NPCs);
             Combat.Update(combatants);
+            Fights.Update((float)gameTime.ElapsedGameTime.TotalSeconds);
         }
+
+        // The level someone is in: the player's is the one being played.
+        private string LevelOf(Entity who) => who is NPC npc ? Roster.LevelOf(npc) : location.Name;
         public Entity FindPersonNear(NPC asker, int id)
         {
             Entity who = FindPerson(id);

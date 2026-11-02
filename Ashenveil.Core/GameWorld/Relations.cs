@@ -10,14 +10,15 @@ namespace Ashenveil.Core.GameWorld
     /// Opinions only change at day end, when reflection writes them. Without grudges, an NPC you
     /// attacked an hour ago would greet you as normal until midnight. So anyone who attacked
     /// this NPC since its last reflection (today, or yesterday if that isn't reflected yet) is
-    /// treated as hostile until reflection has written the lasting change.
+    /// treated as hostile until reflection has written the lasting change. Being killed counts
+    /// (healed back from 0, they remember who did it).
     /// </summary>
     public static class Relations
     {
         /// <summary>The ids of everyone with an attack on <paramref name="npc"/> it hasn't reflected on yet.</summary>
         public static HashSet<int> Grudges(EventLog log, NPC npc, int today) =>
             (log?.All ?? (IReadOnlyList<GameEvent>)new List<GameEvent>())
-                .Where(e => e.Type == EventType.Attacked && e.TargetId == npc.Id && e.ActorId is int
+                .Where(e => e.Type is EventType.Attacked or EventType.Killed && e.TargetId == npc.Id && e.ActorId is int
                             && e.Day > npc.Journal.LastReflectedDay && e.Day >= today - 1)
                 .Select(e => e.ActorId.Value)
                 .ToHashSet();

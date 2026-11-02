@@ -329,6 +329,18 @@ As built:
 
   This is the payoff step, and combat writes no memory code of its own.
 
+  **Built (2026-11-03): one event per fight, not per hit.** `Combat/FightRecorder` listens to
+  `Combat.Hit` and `Blocked` and keeps a tally per pair of people (blows, damage, blocks each
+  way). It posts once, when the fight is over: someone died (straight away), no hit or block
+  for `QuietSeconds` (10 s), or they're in different levels. `SaveLibrary` calls `EndAll()`
+  before saving, since open fights aren't saved.
+  - It's `Attacked` with the one who threw the first blow as actor, whoever did more damage,
+    so only the victim holds a grudge. Ending in a death makes it `Killed` (actor the killer);
+    `Relations.Grudges` and the attack floor count both. The text tells the story: "Loki
+    attacked Sir Lancelot, who fought back. Loki landed 3 blows, Sir Lancelot 2."
+  - `Where` is the first blow's spot; witnesses are whoever is near it when it's posted.
+  - Still to do here: player death and respawn, NPC death or knockout.
+
 ### Step 5 — Picking fights: opinions and enemies
 
 - **Brains choose targets from opinions.** A few times a second, an NPC looks at the people it
