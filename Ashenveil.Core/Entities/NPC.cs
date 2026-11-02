@@ -49,11 +49,11 @@ namespace Ashenveil.Core.Entities
         public brains.Opinions Opinions => Brain.Opinions;
         // The job queue, front first. For saving; new jobs still go in through GiveJob.
         public IReadOnlyCollection<brains.Jobs.IJob> Jobs => Brain.JobQueue;
-        // Where the current go-to job is still heading, in cells; empty when the NPC isn't
-        // walking to anything. For the `nav` debug drawing.
+        // Where the current job's route still goes, in cells; empty when the NPC isn't walking
+        // a route. For the `nav` debug drawing.
         public IReadOnlyList<Vector2> CurrentPath =>
-            State == NpcBrain.NPCState.Working && Brain.JobQueue.TryPeek(out var job) && job is brains.Jobs.GoToJob go
-                ? go.RemainingWaypoints
+            State == NpcBrain.NPCState.Working && Brain.JobQueue.TryPeek(out var job) && job is brains.Jobs.IRoutedJob routed
+                ? routed.RemainingWaypoints
                 : Array.Empty<Vector2>();
 
         /// <summary>

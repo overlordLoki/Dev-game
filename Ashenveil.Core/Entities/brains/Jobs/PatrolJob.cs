@@ -10,7 +10,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
     /// it (see <see cref="NpcBrain.Enqueue"/>). A stop it can't reach is skipped; it fails only
     /// when it can't reach any of them, one after another.
     /// </summary>
-    public class PatrolJob : IEndlessJob
+    public class PatrolJob : IEndlessJob, IRoutedJob
     {
         public JobState State { get; set; } = JobState.Inactive;
         private readonly List<Vector2> _stops;       // in cells, in walking order

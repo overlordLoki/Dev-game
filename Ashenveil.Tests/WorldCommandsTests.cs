@@ -252,6 +252,32 @@ public class WorldCommandsTests : IDisposable
     }
 
     [Fact]
+    public void An_NPC_on_patrol_shows_its_path_to_the_next_stop()
+    {
+        var (npc, brain) = AddNpc();
+        npc.StandAt(new Vector2(0.5f, 0.5f));
+        var stop = new Vector2(4.5f, 4.9f);
+        npc.GiveJob(new PatrolJob(new[] { stop, new Vector2(0.5f, 0.5f) }));
+
+        brain.Update(new GameTime());
+
+        Assert.Equal(stop, npc.CurrentPath[^1]);
+    }
+
+    [Fact]
+    public void An_NPC_following_someone_shows_its_path_to_them()
+    {
+        var (npc, brain) = AddNpc();
+        npc.StandAt(new Vector2(0.5f, 0.5f));
+        _world.player.StandAt(new Vector2(4.5f, 4.9f));
+        npc.GiveJob(new FollowJob(_world.player.Id));
+
+        brain.Update(new GameTime());
+
+        Assert.Equal(_world.player.Feet, npc.CurrentPath[^1]);
+    }
+
+    [Fact]
     public void An_NPC_with_nothing_to_do_has_no_path()
     {
         var (npc, _) = AddNpc();

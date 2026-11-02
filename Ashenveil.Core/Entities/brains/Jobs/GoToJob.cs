@@ -10,7 +10,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
     /// (tests, or a level with no grid) it heads straight at the target. Fails if there's
     /// no way through, or if it keeps getting stuck.
     /// </summary>
-    public class GoToJob : IJob
+    public class GoToJob : IRoutedJob
     {
         public JobState State { get; set; } = JobState.Inactive;
         private readonly Vector2 _target;            // in cells

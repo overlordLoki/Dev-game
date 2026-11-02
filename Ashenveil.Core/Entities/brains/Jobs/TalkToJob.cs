@@ -10,7 +10,7 @@ namespace Ashenveil.Core.Entities.brains.Jobs
     /// the conversation has started. Fails if the target can't be found in the NPC's level,
     /// can't be reached, or the conversation can't start (they're busy, say).
     /// </summary>
-    public class TalkToJob : IJob
+    public class TalkToJob : IRoutedJob
     {
         // Stop this close, in cells, feet to feet: well inside the range the player can talk from.
         private const float TalkDistance = 1f;

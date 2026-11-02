@@ -21,6 +21,18 @@ namespace Ashenveil.Core.Entities.brains.Jobs
     /// or something replaces it. NpcBrain.Enqueue keeps one always last in the queue.
     /// </summary>
     public interface IEndlessJob : IJob { }
+    /// <summary>
+    /// A job that walks a planned route (going somewhere, following, walking up to talk,
+    /// patrolling), so the `nav` debug drawing can show where it's headed.
+    /// </summary>
+    public interface IRoutedJob : IJob
+    {
+        /// <summary>
+        /// The waypoints still to walk, in cells, starting with the one being headed for.
+        /// Empty when there's no route right now (not planned yet, or standing still).
+        /// </summary>
+        IReadOnlyList<Microsoft.Xna.Framework.Vector2> RemainingWaypoints { get; }
+    }
     public sealed class Blackboard
     {
         private readonly Dictionary<string, object?> _data = new();
