@@ -59,8 +59,10 @@ facing → health → the player's attack → NPCs fight back → death → enem
   - It already has an unused `target` field ("for later AI, like following the player or
     attacking them").
   - It has a parked `// TODO (separate feature): combat` comment, which this plan replaces.
-- **Pathfinding is done** (`NavGrid`, `Pathfinder`, `GoToJob` replanning), so chasing is
-  mostly solved.
+- **Pathfinding is done** (`NavGrid`, `Pathfinder`, `Navigation.Route`), and so is
+  chasing: `Navigation.Chase` replans towards a moving target, and `FollowJob` and
+  `TalkToJob` already use it. `JobContext.FindPerson` finds someone only in the NPC's own
+  level.
 - **`World.Update`** steps the clock, conversations, then movement and collision for everyone.
   `ConversationSystem` is a good model for a `CombatSystem`: the needed pieces are handed in,
   and it's testable on its own.
@@ -70,8 +72,8 @@ facing → health → the player's attack → NPCs fight back → death → enem
   `npcs` and `journal`, built from `CommandRegistry`.
 - **Input keys used:** E interact, P pause, \` / Oem8 console.
 - **Saving is built** ([Completed/save-system-plan.md](Completed/save-system-plan.md), with
-  slots in [Completed/save-slots-plan.md](Completed/save-slots-plan.md)). Schema v1 has
-  shipped, so anything combat adds to a save is a migration.
+  slots in [Completed/save-slots-plan.md](Completed/save-slots-plan.md)). It's at schema v7,
+  so anything combat adds to a save is the v8 migration.
 
 ---
 
@@ -256,9 +258,9 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - `NPCState.Fighting` with `target` (the field that's already there). Entered when hit (aggro),
   or by a console command `aggro <npc>`. It pauses the task queue like Talking.
 - `UpdateFighting` in the brain, virtual so each brain can differ:
-  - **Chase:** steer toward the target's `Feet`, replanning with `Pathfinder` every ~0.5 s
-    (the same approach as the planned `follow` task, A2 in
-    [npc-memory-next-plan.md](npc-memory-next-plan.md)).
+  - **Chase:** a `Navigation.Chase` towards the target, the one `FollowJob` uses (A2 in
+    [npc-memory-next-plan.md](npc-memory-next-plan.md), done). `FindPerson` going null means
+    they left the level.
   - **Attack:** when the target is in reach, face it and swing (the knight cycles
     `attack1/2/3`), then a cooldown.
   - **Give up:** the target dead, out of range for N seconds, or in another level, then
@@ -298,7 +300,7 @@ Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onwar
 - Health for players and NPCs; dead / knocked-out state (and knock-out time left).
 - Fights in progress aren't saved, like conversations: you can only save from the pause menu,
   so the World isn't running. Health persists; who you were fighting doesn't.
-- The save is at schema v4 (factions and its gossip fix), so this is the v5 migration (add the
+- The save is at schema v7 (factions, then the A2 jobs), so this is the v8 migration (add the
   `hp` columns).
 
 ### Later (not planned in detail)
@@ -359,9 +361,9 @@ Like the rest of the game, everything is tested in cells and seconds with no win
   - the event log and reflection (NPC plan, Part B; done), needed by step 4;
   - [factions-plan.md](factions-plan.md) (done), needed by step 5.
 
-  Steps 0–3 need neither. Step 3's chase is cleaner once A2's `follow` task exists.
+  Steps 0–3 need neither. Step 3's chase reuses `Navigation.Chase` from A2 (done).
 - **Feeds into:**
-  - [npc-memory-next-plan.md](npc-memory-next-plan.md): A2 `follow` (same chase code), and
+  - [npc-memory-next-plan.md](npc-memory-next-plan.md): A2 `follow` (shares the chase code), and
     Part B (fights are the most important events it gets).
   - [draw-layers-plan.md](draw-layers-plan.md): health bars over heads and hitbox debug
     drawing are overlay-layer drawing.

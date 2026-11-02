@@ -14,9 +14,9 @@ remembers facts and past conversations. This plan is what comes next, in two par
 
 **Part B is built** (2026-10-28), and so is [factions](factions-plan.md), which builds on it
 (opinions are written by the day-end reflection). [Combat](combat-plan.md) is next: fights are
-stored as events, and their lasting after-effects go through the same reflection. Part A stays
-open, so this plan stays out of `Completed/`. A2 (`follow`, `talk_to`) is worth doing before
-combat step 3, and A1 after combat.
+stored as events, and their lasting after-effects go through the same reflection. **A2 is
+built** too (2026-11-02: `follow`, `talk_to`, `patrol`). The rest of Part A stays open, so this
+plan stays out of `Completed/`. A1 comes after combat.
 
 The ground rule from the first plan still holds. The LLM *proposes* at a few controlled
 points; the engine *validates and disposes*; there's no LLM in the per-frame loop.
@@ -25,7 +25,9 @@ points; the engine *validates and disposes*; there's no LLM in the per-frame loo
 
 ## Where things are now
 
-*(For the details, see the completed plan. Refreshed 2026-10-28, after saving was built.)*
+*(For the details, see the completed plan. Written 2026-10-28, after saving was built and
+before Part B; jobs and saving refreshed 2026-11-02. Part B's and factions' own status boxes
+cover what they changed.)*
 
 - **Conversations** live in `GameWorld/ConversationSystem.cs`:
   - `Start` builds the request, with each NPC's memories and past conversations with that
@@ -44,10 +46,12 @@ points; the engine *validates and disposes*; there's no LLM in the per-frame loo
   - `MemoryKind` already has `Event`, but nothing creates one.
   - **Memories have no day.** Transcripts do; facts don't.
   - `RecentMemories(5)` takes the last five facts of any kind.
-- **Tasks:** `GoToJob` (walks the **feet** to a POI's `StandingSpot()`, pathfinding round
-  objects) and `WaitJob`. `NpcBrain.ApplyDecision` turns `go_to` / `wait` specs into tasks.
-  A task that can't get there **fails** (`JobState.Failed`) and is dropped; there's a TODO in
-  `NpcBrain.TickTasks` waiting for the event log.
+- **Jobs** (the queue the LLM's `tasks` turn into, in `brains/Jobs`):
+  - `GoToJob` (walks the **feet** to a POI's `StandingSpot()`, pathfinding round objects) and
+    `WaitJob`;
+  - `FollowJob`, `TalkToJob` and `PatrolJob` (A2, below).
+  - `NpcBrain.ApplyDecision` turns the specs into jobs. A job that can't get there **fails**
+    (`JobState.Failed`) and is dropped, and `TickJobs` posts `TaskDone` / `TaskFailed`.
 - **No fixed greeting:** whoever starts a conversation speaks first. A player-started chat
   opens with only a grey game note.
 - **Time:** `GameClock` (10 real minutes a day) raises `DayStarted` with the new day number.
@@ -55,8 +59,8 @@ points; the engine *validates and disposes*; there's no LLM in the per-frame loo
 - **Saving is built** ([Completed/save-system-plan.md](Completed/save-system-plan.md), slots in
   [Completed/save-slots-plan.md](Completed/save-slots-plan.md)):
   - `SaveMapper` (game ↔ save classes) and `SaveStore` (save classes ↔ SQLite);
-  - schema v1 has shipped. `SaveStore.Migrations` is empty and waiting for v2: anything this
-    plan adds to a save is the first real migration;
+  - the schema is at **v7** (v2 Part B, v3â€“v4 factions, v5â€“v7 the A2 jobs), so the next
+    thing saved is the v8 migration;
   - decisions waiting on the LLM aren't saved; they're lost, by design.
 - **The dev console** has `where`, `tp`, `tpxy`, `npcs`, `journal <npc>`, `nav`, `server`,
   `health`, `saves`, `save` and `load`. `LineKind.Event` exists for lines the game reports by
@@ -72,14 +76,33 @@ points; the engine *validates and disposes*; there's no LLM in the per-frame loo
 A player-started chat opens empty, and the LLM's first line answers the player. When an
 NPC walks up to the player, it should open with something it **has in mind**, and that
 comes from whatever sent it over:
-1. The decision LLM queues a `talk_to { target, reason }` task (needs A2).
-2. On arrival, the task starts the conversation with the reason.
+1. The decision LLM queues a `talk_to { target, reason }` task. **Done in A2.**
+2. On arrival, the task starts the conversation with the reason. **Half done:** `TalkToJob`
+   starts it through `JobContext.StartConversation`, but only with the player (who must be
+   free), and the reason isn't used yet. A1 adds opening with it, and NPC-to-NPC talk.
 3. The conversation asks the LLM for the opening line straight away: "You approached the
    Traveller to: warn them about the wolves. Open the conversation."
 4. Python side: an empty history plus a reason means *open*, not *reply*.
 5. `ConversationSystem.Start` already has the shape for it: it knows who started.
 
 ### A2. More task types
+
+> **Status (2026-11-02): built**, with these departures from the text below:
+> - Walking a route moved out of `GoToJob` into `Navigation.Route`, and chasing a moving
+>   target into `Navigation.Chase`, which `FollowJob` and `TalkToJob` share (and the combat
+>   chase can use).
+> - Jobs find people through `JobContext.FindPerson`, which only sees people in the NPC's own
+>   level, so someone leaving looks like null and the job fails.
+> - `follow` stops a cell short and never completes; `patrol` loops for ever, skips a stop it
+>   can't reach, and fails only when it can reach none. Both are `IEndlessJob`, which
+>   `NpcBrain.Enqueue` keeps last: anything queued after one replaces it.
+> - `talk_to` completes once the conversation starts; see A1 for what's left.
+> - The LLM names people, and the decision resolves the name to an id through the transcript.
+>   `patrol` takes places only, 2â€“8 of them, with an optional pause at each.
+> - `IRoutedJob` (go-to, follow, talk-to, patrol) gives the `nav` debug drawing the route of
+>   whatever job is running.
+> - Saved: v5 `tasks.target_id`, v6 `tasks.reason`, v7 the `task_stops` table.
+
 `patrol`, `talk_to`, `follow`. Each is one enum value in the decision schema (`main.py`) plus
 one `switch` arm in `NpcBrain.ApplyDecision`, plus its `IJob` class (`FollowJob`, ...). Pathfinding is done, so
 the walking ones can reuse it:
@@ -114,8 +137,8 @@ summary. Only matters once NPCs chat in groups.
   Keep it off for live dialogue, where it's just latency.
 - **`JobContext` as a struct**, if NPC crowds appear (avoids a heap allocation per tick).
 - **Persistence** is done ([Completed/save-system-plan.md](Completed/save-system-plan.md)):
-  journals and tasks are saved per NPC, under saved int ids that stay stable across loads.
-  Part B's new data is the first schema migration (v2).
+  journals and jobs are saved per NPC, under saved int ids that stay stable across loads.
+  It's at schema v7 now.
 
 ---
 
