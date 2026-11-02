@@ -6,10 +6,23 @@ namespace Ashenveil.Core
     public record SpriteSheetInfo(string Path, int FrameCount, int FrameWidth, int FrameHeight);
     public static class Assets
     {
-        // Idle: 4 frames, 32x32 each
-        public static readonly SpriteSheetInfo PLAYERIDLE = new("Sprites/Player/D_Idle", 4, 32, 32);
-        // Walk: 6, 32x32 each
-        public static readonly SpriteSheetInfo PlayerWalk = new("Sprites/Player/D_Walk", 6, 32, 32);
+        //Player. 32x32 frames, one sheet per action and facing: D_ down, U_ up, S_ side
+        // (drawn facing left, flipped for right). Idle down goes first, for the editor's preview.
+        public static readonly SpriteSheetInfo PlayerIdleDown   = new("Sprites/Player/D_Idle", 4, 32, 32);
+        public static readonly SpriteSheetInfo PlayerIdleUp     = new("Sprites/Player/U_Idle", 4, 32, 32);
+        public static readonly SpriteSheetInfo PlayerIdleSide   = new("Sprites/Player/S_Idle", 4, 32, 32);
+        public static readonly SpriteSheetInfo PlayerWalkDown   = new("Sprites/Player/D_Walk", 6, 32, 32);
+        public static readonly SpriteSheetInfo PlayerWalkUp     = new("Sprites/Player/U_Walk", 6, 32, 32);
+        public static readonly SpriteSheetInfo PlayerWalkSide   = new("Sprites/Player/S_Walk", 6, 32, 32);
+        public static readonly SpriteSheetInfo PlayerAttackDown = new("Sprites/Player/D_Attack", 4, 32, 32);
+        public static readonly SpriteSheetInfo PlayerAttackUp   = new("Sprites/Player/U_Attack", 4, 32, 32);
+        public static readonly SpriteSheetInfo PlayerAttackSide = new("Sprites/Player/S_Attack", 4, 32, 32);
+        public static readonly SpriteSheetInfo PlayerHurtDown   = new("Sprites/Player/D_Hurt", 2, 32, 32);
+        public static readonly SpriteSheetInfo PlayerHurtUp     = new("Sprites/Player/U_Hurt", 2, 32, 32);
+        public static readonly SpriteSheetInfo PlayerHurtSide   = new("Sprites/Player/S_Hurt", 2, 32, 32);
+        public static readonly SpriteSheetInfo PlayerDeathDown  = new("Sprites/Player/D_Death", 8, 32, 32);
+        public static readonly SpriteSheetInfo PlayerDeathUp    = new("Sprites/Player/U_Death", 8, 32, 32);
+        public static readonly SpriteSheetInfo PlayerDeathSide  = new("Sprites/Player/S_Death", 8, 32, 32);
 
         //Knight. Every sheet is 96x84 frames, facing right.
         // Idle goes first: the editor previews an entity with the first sheet whose name

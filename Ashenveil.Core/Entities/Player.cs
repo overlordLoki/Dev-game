@@ -85,19 +85,66 @@ namespace Ashenveil.Core.Entities
         {
             Name = name;
             Speed = 1.4f;   // cells per second (was 200px/s at 720p's 144px cells)
-            AddAnimation("idle", Assets.PLAYERIDLE, 0.15);
+
+            // One clip per action and facing, named "<action>_<down|up|side>" (see Clip).
+            // Attack, hurt and death are one-shots, loaded now for combat's later steps.
+            AddAnimation("idle_down",   Assets.PlayerIdleDown,   0.15);
+            AddAnimation("idle_up",     Assets.PlayerIdleUp,     0.15);
+            AddAnimation("idle_side",   Assets.PlayerIdleSide,   0.15);
+            AddAnimation("walk_down",   Assets.PlayerWalkDown,   0.10);
+            AddAnimation("walk_up",     Assets.PlayerWalkUp,     0.10);
+            AddAnimation("walk_side",   Assets.PlayerWalkSide,   0.10);
+            AddAnimation("attack_down", Assets.PlayerAttackDown, 0.08, loop: false);
+            AddAnimation("attack_up",   Assets.PlayerAttackUp,   0.08, loop: false);
+            AddAnimation("attack_side", Assets.PlayerAttackSide, 0.08, loop: false);
+            AddAnimation("hurt_down",   Assets.PlayerHurtDown,   0.10, loop: false);
+            AddAnimation("hurt_up",     Assets.PlayerHurtUp,     0.10, loop: false);
+            AddAnimation("hurt_side",   Assets.PlayerHurtSide,   0.10, loop: false);
+            AddAnimation("death_down",  Assets.PlayerDeathDown,  0.12, loop: false);
+            AddAnimation("death_up",    Assets.PlayerDeathUp,    0.12, loop: false);
+            AddAnimation("death_side",  Assets.PlayerDeathSide,  0.12, loop: false);
+            Play(Clip("idle", Facing));
         }
 
-        // Keyboard-driven instead of following Direction.
+        /// <summary>The clip for an action in a facing: ("walk", Up) is "walk_up", Left and Right are "_side".</summary>
+        public static string Clip(string action, Facing facing) => facing switch
+        {
+            Facing.Up   => action + "_up",
+            Facing.Down => action + "_down",
+            _           => action + "_side",
+        };
+
+        // The player's side sheets are drawn facing left (unlike the knight's), so they flip
+        // for right; the up and down sheets are never flipped.
+        protected override bool FlipSprite => Facing == Facing.Right;
+
+        public override void Update(GameTime gameTime)
+        {
+            Vector2 before = Position;
+            base.Update(gameTime);
+
+            // Walking is moving this frame. Talking is set from outside and left alone.
+            if (State != PlayerState.Talking)
+                State = Position != before ? PlayerState.Walking : PlayerState.Idle;
+            Play(Clip(State == PlayerState.Walking ? "walk" : "idle", Facing));
+        }
+
+        // Keyboard-driven instead of following Direction. The held arrows make a direction
+        // that's normalised, so a diagonal is as fast as a straight line rather than ~1.4x.
         protected override void Move(GameTime gameTime)
         {
             float delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
             var kb = AshenveilGame.Input.Keyboard;
 
-            if (kb.IsKeyDown(Keys.Right)) Position = new Vector2(Position.X + Speed * delta, Position.Y);
-            if (kb.IsKeyDown(Keys.Left))  Position = new Vector2(Position.X - Speed * delta, Position.Y);
-            if (kb.IsKeyDown(Keys.Up))    Position = new Vector2(Position.X, Position.Y - Speed * delta);
-            if (kb.IsKeyDown(Keys.Down))  Position = new Vector2(Position.X, Position.Y + Speed * delta);
+            var dir = Vector2.Zero;
+            if (kb.IsKeyDown(Keys.Right)) dir.X += 1;
+            if (kb.IsKeyDown(Keys.Left))  dir.X -= 1;
+            if (kb.IsKeyDown(Keys.Up))    dir.Y -= 1;
+            if (kb.IsKeyDown(Keys.Down))  dir.Y += 1;
+            if (dir == Vector2.Zero) return;
+
+            dir.Normalize();
+            Position += dir * Speed * delta;
         }
     }
 }

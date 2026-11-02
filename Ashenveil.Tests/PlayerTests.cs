@@ -77,15 +77,26 @@ public class PlayerTests : IDisposable
     }
 
     [Fact]
-    public void Two_keys_move_on_both_axes_at_full_speed_each()
+    public void A_diagonal_is_as_fast_as_a_straight_line()
     {
-        // Not normalised: a diagonal covers 0.7 cells on X AND on Y, so ~0.99 overall.
-        // If diagonals are ever slowed to match straight lines, this is the test to change.
+        // Normalised: 0.7 cells overall, split evenly, not 0.7 on each axis (~0.99 overall).
         _input.Hold(Keys.Right, Keys.Down);
 
         Step(0.5);
 
-        Near.Equal(new Vector2(5.7f, 5.7f), _player.Position);
+        float each = 0.7f / MathF.Sqrt(2);
+        Near.Equal(new Vector2(5 + each, 5 + each), _player.Position);
+        Assert.Equal(0.7f, Vector2.Distance(new Vector2(5, 5), _player.Position), 4);
+    }
+
+    [Fact]
+    public void Three_keys_with_two_opposite_move_straight_at_full_speed()
+    {
+        _input.Hold(Keys.Left, Keys.Right, Keys.Up);
+
+        Step(0.5);
+
+        Near.Equal(new Vector2(5, 4.3f), _player.Position);
     }
 
     [Fact]

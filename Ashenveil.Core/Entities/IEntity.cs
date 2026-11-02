@@ -6,6 +6,17 @@ using Ashenveil.Core.Graphics;
 namespace Ashenveil.Core.Entities
 {
     /// <summary>
+    /// Which way an entity looks. Picks the player's D_ / U_ / S_ sheet (Left and Right share
+    /// the side sheet, flipped), and later aims attacks.
+    /// </summary>
+    public enum Facing
+    {
+        Down,
+        Up,
+        Left,
+        Right,
+    }
+    /// <summary>
     /// What the world needs from anything that moves around in it. Contract only - the
     /// shared behaviour (movement, collision, animated drawing) lives in the Entity base
     /// class, where subclasses can override it properly instead of hiding a default

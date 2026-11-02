@@ -59,10 +59,19 @@ namespace Ashenveil.Core.Entities
         }
 
         protected Dictionary<string, Animation> Animations { get; } = new();
-        protected string CurrentAnim { get; private set; } = "idle";
+        /// <summary>The name of the animation playing now ("idle", "walk_up"...).</summary>
+        public string CurrentAnim { get; private set; } = "idle";
 
-        // Sheets are drawn facing right; this flips them when moving left.
-        protected bool FacingLeft { get; set; }
+        /// <summary>Which way this entity looks: whichever axis it last moved further along.</summary>
+        public Facing Facing { get; protected set; } = Facing.Down;
+
+        // The last way it faced along X. Side-only art (the knight) keeps showing this while
+        // walking straight up or down, instead of snapping back to the right.
+        protected bool FacedLeft { get; private set; }
+
+        // Sheets are drawn facing right; this flips them. Side-only art flips by the last
+        // left/right; Player, which has up and down sheets, flips only when facing right.
+        protected virtual bool FlipSprite => FacedLeft;
 
         protected Entity(Vector2 position, int id)
         {
@@ -181,15 +190,33 @@ namespace Ashenveil.Core.Entities
 
         public virtual void Update(GameTime gameTime)
         {
-            float oldX = Position.X;
+            Vector2 before = Position;
             Move(gameTime);
-
-            // Face whichever way we actually moved; standing still keeps the last facing.
-            if (Position.X < oldX) FacingLeft = true;
-            else if (Position.X > oldX) FacingLeft = false;
+            Face(Position - before);
 
             if (Animations.TryGetValue(CurrentAnim, out var anim))
                 anim.Update(gameTime);
+        }
+
+        /// <summary>
+        /// Faces whichever axis <paramref name="moved"/> goes further along; standing still keeps
+        /// the last facing. An exact diagonal keeps the current facing if it's one of the two
+        /// ways being walked (so holding Right then adding Down doesn't turn the player), and
+        /// otherwise faces sideways.
+        /// </summary>
+        protected void Face(Vector2 moved)
+        {
+            if (moved == Vector2.Zero) return;
+
+            float ax = Math.Abs(moved.X), ay = Math.Abs(moved.Y);
+            Facing side = moved.X < 0 ? Facing.Left : Facing.Right;
+            Facing vertical = moved.Y < 0 ? Facing.Up : Facing.Down;
+
+            if (ax > ay) Facing = side;
+            else if (ay > ax) Facing = vertical;
+            else if (Facing != side && Facing != vertical) Facing = side;
+
+            if (moved.X != 0) FacedLeft = moved.X < 0;
         }
 
         // Default movement: straight along Direction at Speed.
@@ -229,7 +256,7 @@ namespace Ashenveil.Core.Entities
             {
                 // The one place an entity turns into pixels.
                 var dest = Layout.ToScreen(new RectF(Position.X, Position.Y, Width, Height));
-                var fx = FacingLeft ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                var fx = FlipSprite ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                 anim.Draw(spriteBatch, dest, fx);
             }
 

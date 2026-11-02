@@ -35,13 +35,15 @@ facing → health → the player's attack → NPCs fight back → death → enem
 
 - **No health anywhere.** `Entity` has position, speed, `Direction`, collision boxes, `Feet`
   and animations; nothing can be hurt.
-- **Facing is left/right only:** `Entity.FacingLeft`, set in `Entity.Update` from the change in
-  X. Moving straight up or down keeps the last facing.
-- **The player** moves by reading the arrow keys directly in `Player.Move` (diagonals are
-  faster than straight lines: the two axes aren't normalised). `PlayerState` is
-  `Idle / Walking / Talking`. Only `D_Idle` is loaded.
-- **Player art is ready for this:** `Content/Sprites/Player` has `D_` (down), `S_` (side, flip
-  for left) and `U_` (up) sheets, 32x32 frames, for each action:
+- **Facing is four-way** (step 0, done): `Entity.Facing` (`Down / Up / Left / Right`), set in
+  `Entity.Face` from whichever axis moved further. An exact diagonal keeps a facing it's already
+  walking. Side-only art (the knight) flips by `FacedLeft`, the last left/right.
+- **The player** moves by reading the arrow keys in `Player.Move`, normalised so diagonals are
+  as fast as straight lines. `PlayerState` is `Idle / Walking / Talking`; `Player.Update` sets
+  Idle/Walking from movement and plays `Player.Clip(action, Facing)` (`"walk_up"`, `"idle_side"`).
+- **Player art is all loaded:** `Content/Sprites/Player` has `D_` (down), `S_` (side, drawn
+  facing left, flipped for right) and `U_` (up) sheets, 32x32 frames, for each action, registered as
+  `idle_* / walk_* / attack_* / hurt_* / death_*` (the last three as one-shots):
 
   | Sheet | Frames |
   |---|---|
@@ -133,7 +135,7 @@ deep and `Width` wide. It only exists during the active phase.
 ### 3. `Facing`: four directions
 
 `Facing { Down, Up, Left, Right }` on `Entity`, set from the actual movement (whichever axis
-moved more), replacing `FacingLeft`. It picks the player's `D_ / U_ / S_` sheet and aims the
+moved more), replacing `FacingLeft` (built in step 0). It picks the player's `D_ / U_ / S_` sheet and aims the
 hitbox. The knight only has side art, so up and down fall back to his last left/right.
 
 ### 4. `CombatSystem`: resolves hits
@@ -211,7 +213,7 @@ It's given the list of combatants rather than the whole `World`, so tests can bu
 
 Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onward can wait.
 
-### Step 0 — Four-way facing and the player's animation set
+### Step 0 — Four-way facing and the player's animation set (**done**)
 
 - `Facing` enum on `Entity`, set from movement. `FacingLeft` becomes `Facing == Left` (the
   draw flip still applies to side sheets).

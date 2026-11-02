@@ -85,7 +85,7 @@ namespace Ashenveil.Editor.Core
         private static readonly Regex AnyAsset = new(
             @"Assets\.(\w+)", RegexOptions.Compiled);
 
-        // public static readonly SpriteSheetInfo PLAYERIDLE = new("Sprites/Player/D_Idle", 4, 32, 32);
+        // public static readonly SpriteSheetInfo PlayerIdleDown = new("Sprites/Player/D_Idle", 4, 32, 32);
         // (frame width, frame height). The height is optional so an older square
         // (Path, count, size) declaration still reads.
         private static readonly Regex SheetDecl = new(
