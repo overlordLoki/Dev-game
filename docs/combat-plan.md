@@ -19,9 +19,8 @@ facing → health → the player's attack → NPCs fight back → death → enem
 *reads* opinions to decide who to fight. It owns neither:
 1. The **event log and day-end reflection** ([npc-memory-next-plan.md](npc-memory-next-plan.md)
    Part B, **done**). Fights are stored as events: hot memories that same day, and lasting
-   after-effects at day end. `EventType.Attacked` already exists (factions added it, and the
-   console's `event attack` posts it); combat posts real ones with `EventLog.Post`, and adds
-   `Killed`.
+   after-effects at day end. `FightRecorder` posts each fight as one `Attacked` (or `Killed`)
+   event once it's over (step 4); the console's `event attack` still posts one by hand.
 2. **Factions and opinions** ([factions-plan.md](factions-plan.md), **done**). Who is hostile
    to whom, for any NPC against any other NPC or the player. Combat asks
    `Relations.AttitudeTo(npc, who, log, today)`, which already treats today's attackers as
@@ -315,7 +314,7 @@ As built:
 - Console: `aggro <npc> [who]` (default the player) and `calm <npc>`.
 - The `nav` drawing shows a fighter's chase path.
 
-### Step 4 — Death and consequences
+### Step 4 — Death and consequences (**fight events done**; deaths still to do)
 
 - **Player death:** the death animation, then respawn (open question 1).
 - **NPC death or knockout:** per open question 2.
