@@ -98,7 +98,8 @@ namespace Ashenveil.Core.DevConsole
         private static string Describe(Entity entity, Health health)
         {
             string name = entity is Player ? $"{Conversation.NameOf(entity)} (you)" : $"{Conversation.NameOf(entity)} (#{entity.Id})";
-            string notes = (health.IsDead ? ", dead" : "") + (health.God ? ", god mode" : "");
+            string notes = (entity is NPC { IsKnockedOut: true } npc ? $", knocked out ({npc.KnockedOut:0}s left)"
+                            : health.IsDead ? ", dead" : "") + (health.God ? ", god mode" : "");
             return $"{name}: {health.Current}/{health.Max}{notes}";
         }
 

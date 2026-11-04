@@ -37,8 +37,11 @@ facing → health → the player's attack → NPCs fight back → death → enem
   Player 100, knight 80; null for anything that can't be hurt.
   - Reaching 0 sets `PlayerState.Dead` / `NPCState.Dead` and plays the death clip. The dead
     don't move, run jobs, collide, talk or gossip. An NPC keeps its job queue while dead.
-  - Healing from 0 revives (for the console now, knock-outs later): the NPC resumes its queue
-    or wanders, like after a conversation. There's no respawn yet (step 4).
+  - Healing from 0 revives: the NPC resumes its queue or wanders, like after a conversation.
+  - **Nobody dies for good yet** (step 4, done): the player respawns on `Player_spawn` after
+    `World.RespawnSeconds`, and named NPCs are knocked out for `NPC.KnockoutSeconds`, then get
+    up. `Entity.DiesForGood` (true by default, false for `Player` and `NPC`) is the switch
+    enemies will flip.
 - **Facing is four-way** (step 0, done): `Entity.Facing` (`Down / Up / Left / Right`), set in
   `Entity.Face` from whichever axis moved further. An exact diagonal keeps a facing it's already
   walking. Side-only art (the knight) flips by `FacedLeft`, the last left/right.
@@ -197,6 +200,7 @@ It's given the list of combatants rather than the whole `World`, so tests can bu
 1. **When the player dies:** respawn at `Player_spawn` with full health (simple), or a
    "You died" screen offering Load (fits "only save on Save button"; it needs the save system
    finished)? *Recommendation: respawn for now, the Load screen once saving lands.*
+   **Built: respawn** (step 4). A Load option on death can still come later.
 2. **When a named NPC dies:** do they stay dead? Losing Sir Lancelot and everything he
    remembers is a big deal in a memory game.
    - **(a)** Permanent death.
@@ -204,7 +208,8 @@ It's given the list of combatants rather than the whole `World`, so tests can bu
    - **(c)** Named NPCs can't die; only enemies can.
 
    *Recommendation: (b) for named NPCs and real death for enemies. It keeps the memory payoff
-   without losing your only LLM character to a misclick.*
+   without losing your only LLM character to a misclick.* **Built: (b)** (step 4); enemies
+   (step 5) override `DiesForGood` to die for real.
 3. **Enemy art:** there are no enemy sprites yet. Options: a recoloured knight as a "bandit",
    or a free asset pack (wolves fit the knight's warning about "wolves, bandits, and worse").
    The early phases don't need it; the knight is the first sparring partner.
@@ -314,7 +319,7 @@ As built:
 - Console: `aggro <npc> [who]` (default the player) and `calm <npc>`.
 - The `nav` drawing shows a fighter's chase path.
 
-### Step 4 — Death and consequences (**fight events done**; deaths still to do)
+### Step 4 — Death and consequences (**done**)
 
 - **Player death:** the death animation, then respawn (open question 1).
 - **NPC death or knockout:** per open question 2.
@@ -338,7 +343,23 @@ As built:
     `Relations.Grudges` and the attack floor count both. The text tells the story: "Loki
     attacked Sir Lancelot, who fought back. Loki landed 3 blows, Sir Lancelot 2."
   - `Where` is the first blow's spot; witnesses are whoever is near it when it's posted.
-  - Still to do here: player death and respawn, NPC death or knockout.
+
+  **Built (2026-11-04): respawn and knock-outs.**
+  - **Player:** the death clip plays and "You died" shows across the middle of the HUD
+    (`GameplayScreen`, given the HUD font). After `World.RespawnSeconds` (3 s,
+    `World.PlayerDeadFor` counts it) `World.RespawnPlayer` heals them to full and stands them
+    on the current level's `Player_spawn` (its default point if it has none), and raises
+    `PlayerRespawned`. Healed by the console first, they get up where they lie.
+  - **Named NPCs are knocked out:** `NPC.DiesForGood` is false, so reaching 0 starts
+    `NPC.KnockedOut` at `KnockoutSeconds` (20 s). They're `NPCState.Dead` while down (no
+    talking, collision or jobs), then heal to `GetUpHealth` (half) and resume their queue.
+    Healing them earlier gets them up early. Only NPCs in the level being played update, so the
+    count pauses for one left behind in another level.
+  - **The event says so:** a fight ending with someone who gets up again (an NPC or the
+    player) is `EventType.KnockedOut` ("Sir Lancelot was knocked out."), not `Killed`.
+    `Relations.Grudges` and the reflection's attack floor count it like the other two.
+  - The console's `hp` shows "knocked out (12s left)".
+  - Not saved yet: a save made while an NPC is down loads them at full health (step 6).
 
 ### Step 5 — Picking fights: opinions and enemies
 
@@ -355,7 +376,7 @@ As built:
 
 ### Step 6 — Saving it
 
-- Health for players and NPCs; dead / knocked-out state (and knock-out time left).
+- Health for players and NPCs; dead / knocked-out state (`NPC.KnockedOut`, the time left).
 - Fights in progress aren't saved, like conversations: you can only save from the pause menu,
   so the World isn't running. Health persists; who you were fighting doesn't.
 - The save is at schema v7 (factions, then the A2 jobs), so this is the v8 migration (add the

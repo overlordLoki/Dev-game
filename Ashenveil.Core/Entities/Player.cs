@@ -155,6 +155,9 @@ namespace Ashenveil.Core.Entities
             else Play(Clip(State == PlayerState.Walking ? "walk" : "idle", Facing));
         }
 
+        // Dying isn't the end: the World stands them back up on the spawn point (World.RespawnSeconds).
+        public override bool DiesForGood => false;
+
         protected override void OnDied()
         {
             base.OnDied();

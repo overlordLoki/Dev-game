@@ -199,7 +199,8 @@ namespace Ashenveil.Core
                 // Built fresh each time, from the window as it is now, so the box fits after a resize.
                 convo => _screenManager.Push(new ChatScreen(_font, convo,
                     () => _screenManager.Pop(),
-                    ScreenWidth, ScreenHeight)));
+                    ScreenWidth, ScreenHeight)),
+                _font);
             // Cell size before the first frame.
             _gameplayScreen.UpdateLayout(ScreenWidth, ScreenHeight);
             _screenManager.Push(_gameplayScreen);

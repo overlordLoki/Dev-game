@@ -241,7 +241,7 @@ namespace Ashenveil.Core.GameWorld
             var attacks = reflected
                 .Where(m => m.Kind == MemoryKind.Event && m.SourceId is int)
                 .Select(m => Events?.Find(m.SourceId.Value))
-                .Where(e => e?.Type is EventType.Attacked or EventType.Killed && e.TargetId == npc.Id && e.ActorId is int);
+                .Where(e => e?.Type is EventType.Attacked or EventType.Killed or EventType.KnockedOut && e.TargetId == npc.Id && e.ActorId is int);
 
             foreach (var e in attacks)
             {

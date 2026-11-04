@@ -24,6 +24,9 @@ namespace Ashenveil.Core.Screens
 
         // The player's health, top left. Placed by UpdateLayout, filled every frame.
         private readonly ProgressBar _healthBar = new(Rectangle.Empty, "red");
+        // "You died", across the middle while the player is down, until they respawn.
+        private readonly Label _deathLabel = new(Rectangle.Empty, "You died", Color.DarkRed) { Visible = false };
+        private readonly SpriteFont _font;
 
         // The small bar over a hurt NPC: how wide and tall, and how far above the feet it sits,
         // in cells. Both characters stand about half a cell tall on screen, whatever their frame.
@@ -39,12 +42,15 @@ namespace Ashenveil.Core.Screens
 
         /// <param name="onPause">Opens the pause menu (P).</param>
         /// <param name="onTalk">Opens the chat box for a conversation the player is in.</param>
-        public GameplayScreen(World world, Action onPause, Action<Conversation> onTalk)
+        /// <param name="font">For HUD text ("You died"). Null (tests): text widgets aren't drawn.</param>
+        public GameplayScreen(World world, Action onPause, Action<Conversation> onTalk, SpriteFont font = null)
         {
             World = world;
             _onPause = onPause;
+            _font = font;
             World.PlayerConversationStarted += convo => onTalk(convo);
             Widgets.Add(_healthBar);
+            if (font != null) Widgets.Add(_deathLabel);
         }
 
         // Recompute cell size from the window, and remember the window size so the camera
@@ -58,6 +64,7 @@ namespace Ashenveil.Core.Screens
             // Sized from the window, like the chat box, so it stays in proportion after a resize.
             int margin = viewportHeight / 40;
             _healthBar.Place(new Rectangle(margin, margin, viewportHeight / 3, Math.Max(28, viewportHeight / 24)));
+            _deathLabel.Place(new Rectangle(0, viewportHeight / 3, viewportWidth, viewportHeight / 6));
         }
 
         public void Update(GameTime gameTime)
@@ -113,9 +120,10 @@ namespace Ashenveil.Core.Screens
             var health = World.player.Health;
             _healthBar.Visible = health != null;
             if (health != null) _healthBar.Value = health.Fraction;
+            _deathLabel.Visible = World.player.IsDead;
             spriteBatch.End();
             spriteBatch.Begin();
-            foreach (var widget in Widgets) widget.Draw(spriteBatch, null);
+            foreach (var widget in Widgets) widget.Draw(spriteBatch, _font);
         }
 
         // Only once they've been hurt, and not once they're dead: a full bar over everyone is noise.

@@ -328,7 +328,7 @@ public class WorldCommandsTests : IDisposable
     {
         var npc = HurtableNpc();
 
-        Assert.Equal("Test (#7): 0/80, dead", RunOne("kill 7").Text);
+        Assert.Equal("Test (#7): 0/80, knocked out (20s left)", RunOne("kill 7").Text);
         Assert.Equal(NpcBrain.NPCState.Dead, npc.State);
 
         Assert.Equal("Test (#7): 80/80", RunOne("heal 7").Text);

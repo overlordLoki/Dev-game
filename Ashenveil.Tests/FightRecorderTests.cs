@@ -128,6 +128,7 @@ public class FightRecorderTests
     [Fact]
     public void A_killing_blow_ends_the_fight_straight_away_as_a_killing()
     {
+        _lancelot.Mortal = true;
         _fights.Landed(_loki, _lancelot, 8);
         _lancelot.Health.Kill();
 
@@ -143,6 +144,7 @@ public class FightRecorderTests
     [Fact]
     public void Killing_whoever_started_it_names_the_defender_as_the_killer()
     {
+        _loki.Mortal = true;
         _fights.Landed(_loki, _lancelot, 8);
         _fights.Landed(_lancelot, _loki, 8);
         _loki.Health.Kill();
@@ -154,6 +156,36 @@ public class FightRecorderTests
         Assert.Equal(_lancelot.Id, e.ActorId);
         Assert.Equal(_loki.Id, e.TargetId);
         Assert.StartsWith("Loki attacked Sir Lancelot", e.Text);   // who began it is still in the words
+    }
+
+    [Fact]
+    public void Downing_a_named_NPC_is_a_knock_out_not_a_killing()
+    {
+        _fights.Landed(_loki, _lancelot, 8);
+        _lancelot.Health.Kill();
+
+        _fights.Update(0.01f);
+
+        var e = PostedOne();
+        Assert.Equal(EventType.KnockedOut, e.Type);
+        Assert.Equal(_loki.Id, e.ActorId);
+        Assert.Equal(_lancelot.Id, e.TargetId);
+        Assert.EndsWith("Sir Lancelot was knocked out.", e.Text);
+    }
+
+    [Fact]
+    public void Downing_the_player_is_a_knock_out_too_since_they_respawn()
+    {
+        var player = new Player(Microsoft.Xna.Framework.Vector2.Zero, 0, "Loki");
+        _fights.Landed(_lancelot, player, 8);
+        player.Health.Kill();
+
+        _fights.Update(0.01f);
+
+        var e = PostedOne();
+        Assert.Equal(EventType.KnockedOut, e.Type);
+        Assert.Equal(_lancelot.Id, e.ActorId);
+        Assert.EndsWith("Loki was knocked out.", e.Text);
     }
 
     [Fact]

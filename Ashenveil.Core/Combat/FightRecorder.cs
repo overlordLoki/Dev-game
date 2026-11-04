@@ -10,7 +10,7 @@ namespace Ashenveil.Core.Combat
 {
     /// <summary>
     /// Turns a fight into one event, not one per hit. It listens to <see cref="CombatSystem"/>'s
-    /// Hit and Blocked, keeps a tally per pair of people, and posts a single Attacked (or Killed)
+    /// Hit and Blocked, keeps a tally per pair of people, and posts a single Attacked (Killed, KnockedOut)
     /// event when the fight is over: someone died, they've gone quiet for
     /// <see cref="QuietSeconds"/>, or they're no longer in the same level.
     ///
@@ -141,19 +141,23 @@ namespace Ashenveil.Core.Combat
             public Side Count(Entity who) => who == Started ? ByStarter : ByOther;
 
             /// <summary>
-            /// The fight as one event. A death makes it Killed (actor the killer, target the
-            /// dead); otherwise Attacked, with the starter as actor whoever did more damage, so a
-            /// grudge is held against whoever began it, never against someone defending themselves.
+            /// The fight as one event. Someone going down makes it Killed, or KnockedOut if they
+            /// get up again (<see cref="Entity.DiesForGood"/>), with the one left standing as actor;
+            /// otherwise Attacked, with the starter as actor whoever did more damage, so a grudge
+            /// is held against whoever began it, never against someone defending themselves.
             /// </summary>
             public GameEvent ToEvent()
             {
                 string text = Describe();
-                if (Other.IsDead && !Started.IsDead)
-                    return GameEvent.Of(EventType.Killed, Level, Where, Started.Id, Other.Id, text);
-                if (Started.IsDead && !Other.IsDead)
-                    return GameEvent.Of(EventType.Killed, Level, Where, Other.Id, Started.Id, text);
+                if (Other.IsDead && !Started.IsDead) return Downed(Started, Other, text);
+                if (Started.IsDead && !Other.IsDead) return Downed(Other, Started, text);
                 return GameEvent.Of(EventType.Attacked, Level, Where, Started.Id, Other.Id, text);
             }
+
+            private GameEvent Downed(Entity by, Entity who, string text) =>
+                GameEvent.Of(who.DiesForGood ? EventType.Killed : EventType.KnockedOut, Level, Where, by.Id, who.Id, text);
+
+            private static string Fell(Entity who) => who.DiesForGood ? "was killed" : "was knocked out";
 
             // "Loki attacked Sir Lancelot, who fought back. Loki landed 3 blows, Sir Lancelot 2.
             // Sir Lancelot was killed." Neutral, like every event's text.
@@ -174,8 +178,8 @@ namespace Ashenveil.Core.Combat
 
                 if (ByOther.Blocks > 0 && ByStarter.Blows > 0) parts.Add($"{b} blocked {ByOther.Blocks}.");
                 if (ByStarter.Blocks > 0) parts.Add($"{a} blocked {ByStarter.Blocks}.");
-                if (Other.IsDead) parts.Add($"{b} was killed.");
-                if (Started.IsDead) parts.Add($"{a} was killed.");
+                if (Other.IsDead) parts.Add($"{b} {Fell(Other)}.");
+                if (Started.IsDead) parts.Add($"{a} {Fell(Started)}.");
                 return string.Join(" ", parts);
             }
 

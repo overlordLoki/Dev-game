@@ -18,7 +18,7 @@ namespace Ashenveil.Core.GameWorld
         /// <summary>The ids of everyone with an attack on <paramref name="npc"/> it hasn't reflected on yet.</summary>
         public static HashSet<int> Grudges(EventLog log, NPC npc, int today) =>
             (log?.All ?? (IReadOnlyList<GameEvent>)new List<GameEvent>())
-                .Where(e => e.Type is EventType.Attacked or EventType.Killed && e.TargetId == npc.Id && e.ActorId is int
+                .Where(e => e.Type is EventType.Attacked or EventType.Killed or EventType.KnockedOut && e.TargetId == npc.Id && e.ActorId is int
                             && e.Day > npc.Journal.LastReflectedDay && e.Day >= today - 1)
                 .Select(e => e.ActorId.Value)
                 .ToHashSet();

@@ -34,8 +34,35 @@ namespace Ashenveil.Core.Entities
             Brain.Attach(this);
         }
 
+        // ------------------------------------------------------------------ knock-outs
+
+        /// <summary>
+        /// Named NPCs are knocked out, not killed (docs/combat-plan.md, open question 2): losing
+        /// one and everything they remember to a misclick is too big a loss. Enemies will
+        /// override this to die for good.
+        /// </summary>
+        public override bool DiesForGood => false;
+
+        /// <summary>How long a knocked-out NPC stays down, in seconds. A tuning number.</summary>
+        public const float KnockoutSeconds = 20f;
+        /// <summary>The share of full health a knocked-out NPC gets up with.</summary>
+        public const float GetUpHealth = 0.5f;
+
+        /// <summary>Seconds left until a knocked-out NPC gets up; 0 when it isn't down (or is dead for good).</summary>
+        public float KnockedOut { get; private set; }
+        public bool IsKnockedOut => IsDead && !DiesForGood;
+
+        // Counts a knock-out down, and gets up (healed, so the brain resumes) when it runs out.
+        private void UpdateKnockout(float dt)
+        {
+            if (!IsDead || KnockedOut <= 0) return;
+            KnockedOut = Math.Max(0f, KnockedOut - dt);
+            if (KnockedOut == 0) Health.Heal(Math.Max(1, (int)(Health.Max * GetUpHealth)));
+        }
+
         public override void Update(GameTime gameTime)
         {
+            UpdateKnockout((float)gameTime.ElapsedGameTime.TotalSeconds);
             // Subclasses register at least "idle" and "walk", and "death" and "hurt" if they can be
             // hurt. A missing clip is skipped (Play ignores it), so the last one keeps playing.
             // A fighter on the move runs, if it has a "run" clip.
@@ -137,9 +164,14 @@ namespace Ashenveil.Core.Entities
         {
             base.OnDied();
             Brain.Die();
+            if (!DiesForGood) KnockedOut = KnockoutSeconds;
         }
 
-        protected override void OnRevived() => Brain.Revive();
+        protected override void OnRevived()
+        {
+            KnockedOut = 0;   // healed early (the console's `heal`), or the knock-out ran out
+            Brain.Revive();
+        }
 
         /// <summary>
         /// Push out of another entity, then let the brain decide how to react (a

@@ -14,6 +14,7 @@ namespace Ashenveil.Core.GameWorld
         Joined,         // actor joined a faction (target: who let them in, if anyone)
         Left,           // actor left a faction
         Killed,         // actor killed target: a fight that ended in a death (FightRecorder)
+        KnockedOut,     // actor knocked target out: a fight ended by someone who gets up again (FightRecorder)
     }
 
     /// <summary>

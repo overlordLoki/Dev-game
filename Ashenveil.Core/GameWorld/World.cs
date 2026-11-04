@@ -271,6 +271,26 @@ namespace Ashenveil.Core.GameWorld
 
         private float _untilGossip = Gossip.IntervalSeconds;
 
+        /// <summary>How long a dead player lies there before getting up on the spawn point, in seconds.</summary>
+        public const float RespawnSeconds = 3f;
+        /// <summary>Seconds the player has been dead; 0 while alive. The screen shows "You died" while it counts.</summary>
+        public float PlayerDeadFor { get; private set; }
+        /// <summary>Raised when a dead player is stood back up (<see cref="RespawnPlayer"/>).</summary>
+        public event Action PlayerRespawned;
+
+        /// <summary>
+        /// Stands the player up at full health on this level's Player_spawn (its default point if
+        /// it has none). Called <see cref="RespawnSeconds"/> after they die; anyone fighting them
+        /// has already given up, since their target died.
+        /// </summary>
+        public void RespawnPlayer()
+        {
+            PlayerDeadFor = 0;
+            player.Health?.Heal(player.Health.Max);
+            location.PlaceAt(player, "Player_spawn");
+            PlayerRespawned?.Invoke();
+        }
+
         /// <summary>One step of the game: time, conversations, decisions, reflections, movement, collision, hits.</summary>
         public void Update(GameTime gameTime)
         {
@@ -285,6 +305,8 @@ namespace Ashenveil.Core.GameWorld
                 Gossip.Step(Roster.Levels, Clock.TotalDays);
             }
             player.Update(gameTime);
+            if (!player.IsDead) PlayerDeadFor = 0;
+            else if ((PlayerDeadFor += (float)gameTime.ElapsedGameTime.TotalSeconds) >= RespawnSeconds) RespawnPlayer();
             Bounds.Clamp(player);
             foreach (var npc in NPCs)
             {

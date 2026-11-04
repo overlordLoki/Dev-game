@@ -620,6 +620,68 @@ public class WorldTests : IDisposable
         Assert.Same(a, b.FightingWith);   // hit, so it fights back
     }
 
+    // ------------------------------------------------------------------ dying and getting up
+
+    [Fact]
+    public void A_dead_player_respawns_on_the_spawn_point_with_full_health()
+    {
+        var world = NewWorld();
+        var spawn = world.player.Feet;
+        bool respawned = false;
+        world.PlayerRespawned += () => respawned = true;
+        world.player.StandAt(spawn + new Vector2(1.5f, 1f));
+        world.player.Health.TakeDamage(30);
+        world.player.Health.Kill();
+
+        Step(world, World.RespawnSeconds - 0.5);
+        Assert.True(world.player.IsDead);
+        Assert.False(respawned);
+
+        Step(world, 1);
+        Assert.True(respawned);
+        Assert.False(world.player.IsDead);
+        Assert.Equal(world.player.Health.Max, world.player.Health.Current);
+        Assert.Equal(Player.PlayerState.Idle, world.player.State);
+        Near.Equal(spawn, world.player.Feet);
+        Assert.Equal(0, world.PlayerDeadFor);
+    }
+
+    [Fact]
+    public void A_player_healed_before_the_respawn_stays_where_they_are()
+    {
+        var world = NewWorld();
+        var spot = world.player.Feet + new Vector2(1f, 0);
+        world.player.StandAt(spot);
+        world.player.Health.Kill();
+        Step(world, 1);
+
+        world.player.Health.Heal(10);
+        Step(world, World.RespawnSeconds);
+
+        Near.Equal(spot, world.player.Feet);
+        Assert.Equal(10, world.player.Health.Current);
+    }
+
+    [Fact]
+    public void Knocking_out_an_NPC_posts_one_knock_out_it_remembers_and_it_gets_up_later()
+    {
+        var world = NewWorld();
+        var (npc, brain) = NpcBeside(world);
+        npc.SetHealth(10);
+        world.Fights.Landed(world.player, npc, 10);
+        npc.Health.Kill();
+
+        Step(world, 0.05);
+
+        var e = Assert.Single(world.Events.All, e => e.Type == EventType.KnockedOut);
+        Assert.Equal(world.player.Id, e.ActorId);
+        Assert.Contains(brain.Journal.EventsOn(world.Clock.TotalDays), m => m.SourceId == e.Id);
+        Assert.Contains(world.player.Id, Relations.Grudges(world.Events, npc, world.Clock.TotalDays));
+
+        for (int i = 0; i < 21; i++) Step(world, 1);
+        Assert.False(npc.IsDead);
+    }
+
     [Fact]
     public void An_NPC_gives_up_when_the_player_dies_and_goes_back_to_its_errand()
     {

@@ -79,6 +79,10 @@ public class TestNpc : NPC
     // No attacks unless a test gives it some (fighting tests).
     public IReadOnlyList<Ashenveil.Core.Combat.AttackData> TestAttacks { get; set; } = Array.Empty<Ashenveil.Core.Combat.AttackData>();
     public override IReadOnlyList<Ashenveil.Core.Combat.AttackData> Attacks => TestAttacks;
+
+    // Knocked out like any named NPC unless a test makes it die for good (an enemy, later).
+    public bool Mortal { get; set; }
+    public override bool DiesForGood => Mortal;
 }
 
 /// <summary>

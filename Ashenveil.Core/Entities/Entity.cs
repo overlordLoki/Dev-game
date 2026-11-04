@@ -79,6 +79,13 @@ namespace Ashenveil.Core.Entities
         public bool IsDead => Health?.IsDead == true;
 
         /// <summary>
+        /// Whether reaching 0 health is the end. True by default (a barrel, later an enemy); the
+        /// player respawns and named NPCs are only knocked out, so both say false. A fight that
+        /// ends with this false is posted as KnockedOut, not Killed.
+        /// </summary>
+        public virtual bool DiesForGood => true;
+
+        /// <summary>
         /// Gives this entity a full health of <paramref name="max"/>, and hooks its death and revival
         /// up to <see cref="OnDied"/> and <see cref="OnRevived"/>. Subclasses call it from their
         /// constructor; public so tests (and later, things the level spawns) can too.

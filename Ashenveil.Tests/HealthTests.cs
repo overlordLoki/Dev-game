@@ -222,6 +222,56 @@ public class HealthTests : IDisposable
         Assert.Equal("death", knight.CurrentAnim);
     }
 
+    // ------------------------------------------------------------------ knock-outs
+
+    [Fact]
+    public void A_named_NPC_is_knocked_out_and_gets_up_on_its_own_with_half_its_health()
+    {
+        var npc = new TestNpc(5, 5);
+        npc.SetHealth(80);
+        npc.GiveJob(new WaitJob(100));
+
+        npc.Health.Kill();
+        Assert.True(npc.IsKnockedOut);
+        Near.Equal(NPC.KnockoutSeconds, npc.KnockedOut);
+
+        Step(npc, NPC.KnockoutSeconds - 1);
+        Assert.Equal(NpcBrain.NPCState.Dead, npc.State);   // still down
+
+        Step(npc, 1.5);
+        Assert.False(npc.IsDead);
+        Assert.Equal(40, npc.Health.Current);
+        Assert.Equal(0, npc.KnockedOut);
+        Assert.Equal(NpcBrain.NPCState.Working, npc.State);   // back to its errand
+    }
+
+    [Fact]
+    public void Healing_a_knocked_out_NPC_gets_it_up_early()
+    {
+        var npc = new TestNpc(5, 5);
+        npc.SetHealth(80);
+        npc.Health.Kill();
+
+        npc.Health.Heal(80);
+
+        Assert.False(npc.IsKnockedOut);
+        Assert.Equal(0, npc.KnockedOut);
+    }
+
+    [Fact]
+    public void An_NPC_that_dies_for_good_stays_down()
+    {
+        var npc = new TestNpc(5, 5) { Mortal = true };
+        npc.SetHealth(80);
+
+        npc.Health.Kill();
+        Step(npc, NPC.KnockoutSeconds * 2);
+
+        Assert.True(npc.IsDead);
+        Assert.False(npc.IsKnockedOut);
+        Assert.Equal(NpcBrain.NPCState.Dead, npc.State);
+    }
+
     [Fact]
     public void A_dead_NPC_neither_pushes_nor_is_pushed()
     {
