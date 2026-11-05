@@ -187,6 +187,20 @@ public class SaveLibraryTests : IDisposable
     }
 
     [Fact]
+    public void Saving_while_the_player_is_down_is_refused_and_writes_nothing()
+    {
+        SaveAs("save-1.db", "Old", Day(1));
+        var world = NewGame("New");
+        world.player.Health.Kill();
+
+        Assert.False(_library.CanSave(world, out var why));
+        Assert.Contains("down", why);
+        Assert.False(_library.TrySaveNew(world, out _));
+
+        Assert.Equal("Old", Assert.Single(_library.List()).PlayerName);
+    }
+
+    [Fact]
     public void A_new_game_has_no_unsaved_play_until_it_runs()
     {
         var world = NewGame();

@@ -10,8 +10,8 @@ namespace Ashenveil.Core.Combat
 {
     /// <summary>
     /// Turns a fight into one event, not one per hit. It listens to <see cref="CombatSystem"/>'s
-    /// Hit and Blocked, keeps a tally per pair of people, and posts a single Attacked (Killed, KnockedOut)
-    /// event when the fight is over: someone died, they've gone quiet for
+    /// Hit and Blocked, keeps a tally per pair of people, and posts a single Attacked, Killed or
+    /// KnockedOut event when the fight is over: someone died, they've gone quiet for
     /// <see cref="QuietSeconds"/>, or they're no longer in the same level.
     ///
     /// Posted like any other event, so perception makes it a hot memory for whoever saw it, and
@@ -141,21 +141,20 @@ namespace Ashenveil.Core.Combat
             public Side Count(Entity who) => who == Started ? ByStarter : ByOther;
 
             /// <summary>
-            /// The fight as one event. Someone going down makes it Killed, or KnockedOut if they
-            /// get up again (<see cref="Entity.DiesForGood"/>), with the one left standing as actor;
-            /// otherwise Attacked, with the starter as actor whoever did more damage, so a grudge
-            /// is held against whoever began it, never against someone defending themselves.
+            /// The fight as one event. The actor is always whoever started it and the target the
+            /// other, whoever did more damage or went down, so a grudge is held against whoever
+            /// began it, never against someone defending themselves (who might get up again).
+            /// The starter putting the other down makes it Killed, or KnockedOut if they get up
+            /// again (<see cref="Entity.DiesForGood"/>); otherwise it's Attacked, and a starter
+            /// who went down themselves is only in the words.
             /// </summary>
             public GameEvent ToEvent()
             {
-                string text = Describe();
-                if (Other.IsDead && !Started.IsDead) return Downed(Started, Other, text);
-                if (Started.IsDead && !Other.IsDead) return Downed(Other, Started, text);
-                return GameEvent.Of(EventType.Attacked, Level, Where, Started.Id, Other.Id, text);
+                var type = Other.IsDead && !Started.IsDead
+                    ? (Other.DiesForGood ? EventType.Killed : EventType.KnockedOut)
+                    : EventType.Attacked;
+                return GameEvent.Of(type, Level, Where, Started.Id, Other.Id, Describe());
             }
-
-            private GameEvent Downed(Entity by, Entity who, string text) =>
-                GameEvent.Of(who.DiesForGood ? EventType.Killed : EventType.KnockedOut, Level, Where, by.Id, who.Id, text);
 
             private static string Fell(Entity who) => who.DiesForGood ? "was killed" : "was knocked out";
 

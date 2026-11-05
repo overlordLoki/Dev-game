@@ -581,6 +581,23 @@ public class WorldTests : IDisposable
     }
 
     [Fact]
+    public void An_NPC_that_knocks_out_the_player_who_attacked_it_still_holds_the_grudge()
+    {
+        var world = NewWorld();
+        var feet = world.player.Feet;
+        var npc = Fighter(world, feet.X - 0.5f, feet.Y + 0.05f, 7);
+        world.Fights.Landed(world.player, npc, 5);
+        world.Fights.Landed(npc, world.player, 5);
+        world.player.Health.Kill();
+
+        Step(world, 0.05);
+
+        var fight = Assert.Single(world.Events.All, e => e.Type == EventType.Attacked);
+        Assert.Equal(world.player.Id, fight.ActorId);
+        Assert.Equal(Attitude.Hostile, Relations.AttitudeTo(npc, world.player, world.Events, world.Clock.TotalDays));
+    }
+
+    [Fact]
     public void An_NPC_that_fights_the_player_hurts_them()
     {
         var world = NewWorld();

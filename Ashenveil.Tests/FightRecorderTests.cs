@@ -142,7 +142,7 @@ public class FightRecorderTests
     }
 
     [Fact]
-    public void Killing_whoever_started_it_names_the_defender_as_the_killer()
+    public void Killing_whoever_started_it_is_still_their_attack_with_the_death_in_the_words()
     {
         _loki.Mortal = true;
         _fights.Landed(_loki, _lancelot, 8);
@@ -151,11 +151,13 @@ public class FightRecorderTests
 
         _fights.Update(0.01f);
 
+        // Lancelot defended himself: the grudge is his, against Loki, not the other way round.
         var e = PostedOne();
-        Assert.Equal(EventType.Killed, e.Type);
-        Assert.Equal(_lancelot.Id, e.ActorId);
-        Assert.Equal(_loki.Id, e.TargetId);
-        Assert.StartsWith("Loki attacked Sir Lancelot", e.Text);   // who began it is still in the words
+        Assert.Equal(EventType.Attacked, e.Type);
+        Assert.Equal(_loki.Id, e.ActorId);
+        Assert.Equal(_lancelot.Id, e.TargetId);
+        Assert.StartsWith("Loki attacked Sir Lancelot", e.Text);
+        Assert.EndsWith("Loki was killed.", e.Text);
     }
 
     [Fact]
@@ -185,6 +187,23 @@ public class FightRecorderTests
         var e = PostedOne();
         Assert.Equal(EventType.KnockedOut, e.Type);
         Assert.Equal(_lancelot.Id, e.ActorId);
+        Assert.EndsWith("Loki was knocked out.", e.Text);
+    }
+
+    [Fact]
+    public void Knocking_out_whoever_started_it_leaves_them_as_the_attacker()
+    {
+        var player = new Player(Microsoft.Xna.Framework.Vector2.Zero, 0, "Loki");
+        _fights.Landed(player, _lancelot, 8);
+        _fights.Landed(_lancelot, player, 8);
+        player.Health.Kill();
+
+        _fights.Update(0.01f);
+
+        var e = PostedOne();
+        Assert.Equal(EventType.Attacked, e.Type);
+        Assert.Equal(player.Id, e.ActorId);
+        Assert.Equal(_lancelot.Id, e.TargetId);
         Assert.EndsWith("Loki was knocked out.", e.Text);
     }
 

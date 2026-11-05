@@ -339,7 +339,9 @@ As built:
   for `QuietSeconds` (10 s), or they're in different levels. `SaveLibrary` calls `EndAll()`
   before saving, since open fights aren't saved.
   - It's `Attacked` with the one who threw the first blow as actor, whoever did more damage,
-    so only the victim holds a grudge. Ending in a death makes it `Killed` (actor the killer);
+    so only the victim holds a grudge. The actor stays the starter even when the starter is
+    the one who goes down (that's only in the words): otherwise someone defending themselves
+    would be the one blamed. The starter putting the other down makes it `Killed`;
     `Relations.Grudges` and the attack floor count both. The text tells the story: "Loki
     attacked Sir Lancelot, who fought back. Loki landed 3 blows, Sir Lancelot 2."
   - `Where` is the first blow's spot; witnesses are whoever is near it when it's posted.
@@ -355,11 +357,12 @@ As built:
     talking, collision or jobs), then heal to `GetUpHealth` (half) and resume their queue.
     Healing them earlier gets them up early. Only NPCs in the level being played update, so the
     count pauses for one left behind in another level.
-  - **The event says so:** a fight ending with someone who gets up again (an NPC or the
-    player) is `EventType.KnockedOut` ("Sir Lancelot was knocked out."), not `Killed`.
+  - **The event says so:** the starter knocking down someone who gets up again (an NPC or
+    the player) is `EventType.KnockedOut` ("Sir Lancelot was knocked out."), not `Killed`.
     `Relations.Grudges` and the reflection's attack floor count it like the other two.
   - The console's `hp` shows "knocked out (12s left)".
   - Not saved yet: a save made while an NPC is down loads them at full health (step 6).
+    Saving while the player is down is refused (`SaveLibrary.CanSave`) until then.
 
 ### Step 5 — Picking fights: opinions and enemies
 

@@ -98,6 +98,13 @@ namespace Ashenveil.Core.Saving
                 message = "You can't save in the middle of a conversation.";
                 return false;
             }
+            // Health isn't saved yet (combat plan, step 6): a save made while dead would load
+            // alive, standing where they fell.
+            if (world.player.IsDead)
+            {
+                message = "You can't save while you're down.";
+                return false;
+            }
             message = null;
             return true;
         }
