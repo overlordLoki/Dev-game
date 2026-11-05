@@ -420,5 +420,29 @@
       "x": 5,
       "y": 9
     }
+  ],
+  "npcs": [
+    {
+      "type": "Knight",
+      "name": "Sir Lancelot",
+      "at": "Knight_spawn",
+      "factions": [
+        "guard"
+      ],
+      "tasks": [
+        {
+          "type": "go_to",
+          "target": "entry"
+        },
+        {
+          "type": "wait",
+          "seconds": 3
+        },
+        {
+          "type": "go_to",
+          "target": "Knight_spawn"
+        }
+      ]
+    }
   ]
 }

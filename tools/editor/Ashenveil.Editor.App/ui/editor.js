@@ -24,6 +24,9 @@ let exits = [];                 // { col, row, to, arriveAt, rotation } — door
                                 // rotation is which edge the bar is drawn on
 let selectedExitCell = null;    // { col, row } of the door the sidebar fields are editing
 let pois = [];                  // { name, x, y } — named cells the game looks up by name
+let npcs = [];                  // { type, name?, at, factions?, tasks? } — who the level starts
+                                // with, each standing on the point named `at`. The Points panel
+                                // edits type and name; any other fields are kept as they are.
 let selectedPoiCell = null;     // { x, y } of the point the name field is editing
 let extras = {};                // keys of the level file the editor doesn't edit,
                                 // kept verbatim so saving doesn't silently delete them
@@ -995,8 +998,11 @@ function placePoi(x, y) {
 
 function removePoi(x, y) {
   const before = pois.length;
+  const gone = poiAt(x, y);
   pois = pois.filter(p => !(p.x === x && p.y === y));
   if (pois.length === before) return;
+  // Nobody can stand on a point that isn't there (the game would put them on "default").
+  if (gone && !pois.some(p => p.name === gone.name)) npcs = npcs.filter(n => n.at !== gone.name);
 
   if (selectedPoiCell && selectedPoiCell.x === x && selectedPoiCell.y === y)
     selectedPoiCell = null;
@@ -1019,6 +1025,7 @@ function applyPoiName() {
     return;
   }
 
+  npcs.forEach(n => { if (n.at === p.name) n.at = name; });   // its spawn moves with it
   p.name = name;
   renderCell(p.x, p.y);
   updateJson();
@@ -1026,6 +1033,35 @@ function applyPoiName() {
   markDirty();
 }
 $("poiName").onchange = applyPoiName;
+
+/* What a point spawns: the first of the level's npcs standing on it. One per point here;
+   more on one point (written by hand) are kept, and only the first is shown. */
+function spawnAt(p) { return p && npcs.find(n => n.at === p.name); }
+
+/** The Spawns dropdown and name field changed: add, change or remove the selected point's NPC. */
+function applyPoiSpawn() {
+  const p = selectedPoi();
+  if (!p) return;
+
+  const type = $("poiSpawn").value;
+  const name = $("poiSpawnName").value.trim();
+  let spawn = spawnAt(p);
+
+  if (!type) {
+    if (spawn) npcs = npcs.filter(n => n !== spawn);
+  } else {
+    if (!spawn) { spawn = { type, at: p.name }; npcs.push(spawn); }
+    spawn.type = type;
+    if (name) spawn.name = name; else delete spawn.name;
+  }
+
+  renderCell(p.x, p.y);
+  updateJson();
+  updatePoiUi();
+  markDirty();
+}
+$("poiSpawn").onchange = applyPoiSpawn;
+$("poiSpawnName").onchange = applyPoiSpawn;
 
 function buildPoiList() {
   const list = $("poiList");
@@ -1055,7 +1091,8 @@ function buildPoiList() {
 
     const name = document.createElement("span");
     name.className = "exit-dest";
-    name.textContent = p.name;
+    const spawn = spawnAt(p);
+    name.textContent = spawn ? `${p.name} — ${spawn.name || spawn.type}${spawn.name ? ` (${spawn.type})` : ""}` : p.name;
 
     const del = document.createElement("button");
     del.className = "exit-del";
@@ -1073,6 +1110,12 @@ function updatePoiUi() {
   buildPoiList();
 
   const sel = selectedPoi();
+  const spawn = spawnAt(sel);
+  $("poiSpawn").disabled = !sel;
+  $("poiSpawnName").disabled = !sel || !spawn;
+  $("poiSpawn").value = spawn ? spawn.type : "";
+  $("poiSpawnName").value = spawn && spawn.name ? spawn.name : "";
+
   $("poiInfo").textContent = sel
     ? `Editing "${sel.name}" at ${sel.x},${sel.y} — change the name above.`
     : pois.length
@@ -1371,7 +1414,7 @@ window.addEventListener("keydown", e => {
 
 /* ------------------------------------------------------- the level file */
 
-const EDITED_KEYS = ["cols", "rows", "tiles", "rotations", "objects", "exits", "pois"];
+const EDITED_KEYS = ["cols", "rows", "tiles", "rotations", "objects", "exits", "pois", "npcs"];
 
 function buildMap() {
   // exits/pois are omitted when empty rather than written as [] — most levels have
@@ -1381,6 +1424,7 @@ function buildMap() {
     cols, rows, tiles, rotations: tileRot, objects,
     ...(exits.length ? { exits } : {}),
     ...(pois.length ? { pois } : {}),
+    ...(npcs.length ? { npcs } : {}),
   };
 }
 
@@ -1398,6 +1442,7 @@ function loadMap(map) {
   // door lands on "default" until a point is picked for it.
   exits = (map.exits || []).map(({ spawnCol, spawnRow, ...e }) => e);
   pois = map.pois || [];                               // ...nor with no points
+  npcs = map.npcs || [];                               // ...nor with nobody in them
   tileRot = map.rotations || newGrid(cols, rows, 0);   // older files have no rotations
   extras = Object.fromEntries(
     Object.entries(map).filter(([k]) => !EDITED_KEYS.includes(k)));
@@ -1419,6 +1464,7 @@ function blankMap() {
   objects = [];
   exits = [];
   pois = [];
+  npcs = [];
   extras = {};
   currentLevel = null;
   dirty = false;

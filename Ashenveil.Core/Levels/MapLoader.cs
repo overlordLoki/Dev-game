@@ -16,6 +16,7 @@ namespace Ashenveil.Core.Levels
         public List<IObject> Objects;
         public List<ExitData> Exits;
         public Dictionary<string, PointOfInterest> PointsOfInterest;
+        public List<NpcSpawnData> Npcs;
     }
 
     public static class MapLoader
@@ -68,7 +69,9 @@ namespace Ashenveil.Core.Levels
                 Objects = objects,
                 // exits: optional. A level with none is simply one you can't leave by a door.
                 Exits = data.exits ?? new List<ExitData>(),
-                PointsOfInterest = pointsOfInterest
+                PointsOfInterest = pointsOfInterest,
+                // npcs: optional. A level with none starts empty.
+                Npcs = data.npcs ?? new List<NpcSpawnData>(),
             };
         }
     }

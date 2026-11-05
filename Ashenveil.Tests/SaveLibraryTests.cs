@@ -187,17 +187,13 @@ public class SaveLibraryTests : IDisposable
     }
 
     [Fact]
-    public void Saving_while_the_player_is_down_is_refused_and_writes_nothing()
+    public void Saving_while_the_player_is_down_is_allowed_now_health_is_saved()
     {
-        SaveAs("save-1.db", "Old", Day(1));
         var world = NewGame("New");
         world.player.Health.Kill();
 
-        Assert.False(_library.CanSave(world, out var why));
-        Assert.Contains("down", why);
-        Assert.False(_library.TrySaveNew(world, out _));
-
-        Assert.Equal("Old", Assert.Single(_library.List()).PlayerName);
+        Assert.True(_library.CanSave(world, out _));
+        Assert.True(_library.TrySaveNew(world, out _));
     }
 
     [Fact]

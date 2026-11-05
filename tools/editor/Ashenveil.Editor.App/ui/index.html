@@ -146,6 +146,19 @@
       <input id="poiName" type="text" class="grow" placeholder="e.g. spawn, bently_start">
     </div>
     <div class="hint" id="poiInfo">Type a name, then left-click a cell to place it.</div>
+    <!-- Who the selected point spawns when the level is first entered (the level's "npcs"). -->
+    <div class="row">
+      <label>Spawns</label>
+      <select id="poiSpawn" class="grow" title="An NPC the game brings in on this point the first time the level is entered" disabled>
+        <option value="">(nobody)</option>
+        <option value="Knight">Knight</option>
+        <option value="Bandit">Bandit (enemy)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>NPC name</label>
+      <input id="poiSpawnName" type="text" class="grow" placeholder="blank: the type's own name" disabled>
+    </div>
     <div class="hint">Right-click removes one. Click a point to rename it.<br>
       Names must be unique in a level — the game looks a point up by its name
       (e.g. spawn an NPC at "bently_start").</div>

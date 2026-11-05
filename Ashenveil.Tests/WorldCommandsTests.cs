@@ -324,6 +324,25 @@ public class WorldCommandsTests : IDisposable
     }
 
     [Fact]
+    public void Spawn_brings_in_a_bandit_beside_the_player_with_its_faction()
+    {
+        var line = RunOne("spawn bandit Grim the Red").Text;
+
+        var bandit = Assert.IsType<Bandit>(Assert.Single(_world.NPCs));
+        Assert.Equal("Grim the Red", bandit.Name);
+        Assert.Equal(new[] { "bandit" }, bandit.Factions);
+        Assert.Contains("Grim the Red", line);
+        Assert.True(Vector2.Distance(_world.player.Feet, bandit.Feet) < 2);
+    }
+
+    [Fact]
+    public void Spawning_a_type_that_doesnt_exist_is_an_error()
+    {
+        Assert.Contains("Dragon", RunOne("spawn Dragon").Text);
+        Assert.Empty(_world.NPCs);
+    }
+
+    [Fact]
     public void Kill_kills_and_heal_brings_back_to_full()
     {
         var npc = HurtableNpc();

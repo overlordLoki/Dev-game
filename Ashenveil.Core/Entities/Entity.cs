@@ -167,6 +167,8 @@ namespace Ashenveil.Core.Entities
         public void StartFlinch() => Flinch = FlinchSeconds;
         // What a flinching sprite is multiplied by: a red flash that still shows the sprite.
         private static readonly Color HitTint = new(255, 90, 90);
+        // What the sprite is multiplied by the rest of the time. A bandit darkens the knight's art.
+        protected virtual Color Tint => Color.White;
 
         /// <summary>How long a knockback takes, in seconds. It starts fast and eases to a stop.</summary>
         public const float KnockbackSeconds = 0.15f;
@@ -399,7 +401,7 @@ namespace Ashenveil.Core.Entities
                 // The one place an entity turns into pixels.
                 var dest = Layout.ToScreen(new RectF(Position.X, Position.Y, Width, Height));
                 var fx = FlipSprite ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
-                anim.Draw(spriteBatch, dest, fx, IsFlinching ? HitTint : Color.White);
+                anim.Draw(spriteBatch, dest, fx, IsFlinching ? HitTint : Tint);
             }
 
             // Debug: the live hitbox in red (only with Debug.SHOWBOUNDS).

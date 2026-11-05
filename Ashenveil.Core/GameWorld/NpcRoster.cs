@@ -118,29 +118,61 @@ namespace Ashenveil.Core.GameWorld
             return list;
         }
 
-        // What NPCs each level starts with. Hardcoded per level for now; later this reads
-        // from the level's JSON the same way POIs and exits already do.
+        // What NPCs each level starts with: its file's "npcs" (Location.Spawns).
         private void SpawnStartingNpcs(Location level)
         {
-            switch (level.Name)
-            {
-                case "Medows":
-                    var knight = new Knight(Vector2.Zero, NextId(), "Sir Lancelot", new KnightBrain());
-                    knight.Factions.Add("guard");
-                    knight.Opinions.Seed(knight.Factions, Factions ?? FactionTable.Default);
-                    level.PlaceAt(knight, "Knight_spawn");
-                    Add(level, knight);
+            foreach (var spawn in level.Spawns) Spawn(level, spawn);
+        }
 
-                    // A short walk to the entry and back. Only if the level has both points:
-                    // a missing one would otherwise crash here with a null reference.
-                    PointOfInterest entry = level.Poi("entry"), home = level.Poi("Knight_spawn");
-                    if (entry != null && home != null)
-                    {
-                        knight.GiveJob(new GoToJob(entry.StandingSpot()));
-                        knight.GiveJob(new WaitJob(3f));
-                        knight.GiveJob(new GoToJob(home.StandingSpot()));
-                    }
-                    break;
+        /// <summary>
+        /// Brings in one NPC from a level's spawn list: its type, name and factions (the type's
+        /// defaults where it gives none), standing on its point, with its starting errands.
+        /// Null, and nothing spawned, for a type the game doesn't know.
+        /// </summary>
+        public NPC Spawn(Location level, Levels.NpcSpawnData spawn)
+        {
+            var at = (level.Poi(spawn.at) ?? level.Poi("default"))?.StandingSpot() ?? Vector2.Zero;
+            var npc = SpawnAt(level, spawn.type, spawn.name, at, spawn.factions);
+            if (npc == null) return null;
+
+            foreach (var task in spawn.tasks ?? new List<Levels.SpawnTaskData>())
+                if (JobFrom(task, level) is { } job) npc.GiveJob(job);
+            return npc;
+        }
+
+        /// <summary>
+        /// A new NPC of <paramref name="type"/> (any case) with its feet on <paramref name="feet"/>:
+        /// the level's spawns and the console's `spawn` both come here. A blank name or no
+        /// factions take the type's defaults. Null for a type the game doesn't know.
+        /// </summary>
+        public NPC SpawnAt(Location level, string type, string name, Vector2 feet, IEnumerable<string> factions = null)
+        {
+            type = NpcFactory.Canonical(type);
+            if (type == null) return null;
+
+            var npc = NpcFactory.Make(type, NextId(), string.IsNullOrWhiteSpace(name) ? NpcFactory.DefaultName(type) : name.Trim());
+            npc.Factions.AddRange(factions ?? NpcFactory.DefaultFactions(type));
+            npc.Opinions.Seed(npc.Factions, Factions ?? FactionTable.Default);
+            npc.StandAt(feet);
+            Add(level, npc);
+            return npc;
+        }
+
+        // A starting errand as a job; null for an unknown type or a point the level doesn't have.
+        private static IJob JobFrom(Levels.SpawnTaskData task, Location level)
+        {
+            switch (task.type)
+            {
+                case "go_to":
+                    return level.Poi(task.target) is { } poi ? new GoToJob(poi.StandingSpot()) : null;
+                case "wait":
+                    return task.seconds > 0 ? new WaitJob(task.seconds) : null;
+                case "patrol":
+                    var stops = (task.targets ?? new List<string>()).Select(level.Poi).Where(p => p != null)
+                                                                    .Select(p => p.StandingSpot()).ToList();
+                    return stops.Distinct().Count() >= 2 ? new PatrolJob(stops, Math.Max(0f, task.seconds)) : null;
+                default:
+                    return null;
             }
         }
     }

@@ -16,6 +16,34 @@ namespace Ashenveil.Core.Levels
         public List<ObjectData> objects { get; set; }
         public List<ExitData> exits { get; set; }     // optional; doorways to other levels
         public List<PoiData> pois { get; set; }       // optional; named spawn points (matches the editor's "pois")
+        public List<NpcSpawnData> npcs { get; set; }  // optional; who the level starts with, spawned on the first visit
+    }
+
+    /// <summary>
+    /// One NPC a level starts with, spawned the first time it's entered (NpcRoster.Populate).
+    /// Only <see cref="type"/> and <see cref="at"/> are needed; the rest fall back to the
+    /// type's defaults (NpcFactory).
+    /// </summary>
+    public class NpcSpawnData
+    {
+        public string type { get; set; }              // NpcFactory's type: "Knight", "Bandit"
+        public string name { get; set; }              // optional; the type's default name if missing
+        public string at { get; set; }                // the point it stands on ("default" if missing or unknown)
+        public List<string> factions { get; set; }    // optional; the type's default factions if missing
+        public List<SpawnTaskData> tasks { get; set; } // optional; its first errands, in order
+    }
+
+    /// <summary>
+    /// A starting errand, in the decision schema's words: go_to a point (target), wait
+    /// (seconds), or patrol points (targets, pausing seconds at each). A point the level
+    /// doesn't have is skipped, like a decision's.
+    /// </summary>
+    public class SpawnTaskData
+    {
+        public string type { get; set; }
+        public string target { get; set; }
+        public float seconds { get; set; }
+        public List<string> targets { get; set; }
     }
 
     /// <summary>

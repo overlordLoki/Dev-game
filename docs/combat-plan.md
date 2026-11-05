@@ -81,8 +81,8 @@ facing → health → the player's attack → NPCs fight back → death → enem
   `god` (`CombatCommands`).
 - **Input keys used:** E interact, P pause, \` / Oem8 console.
 - **Saving is built** ([Completed/save-system-plan.md](Completed/save-system-plan.md), with
-  slots in [Completed/save-slots-plan.md](Completed/save-slots-plan.md)). It's at schema v7,
-  so anything combat adds to a save is the v8 migration.
+  slots in [Completed/save-slots-plan.md](Completed/save-slots-plan.md)). Combat's health and
+  knock-outs are the v8 migration (step 6, done).
 
 ---
 
@@ -213,6 +213,8 @@ It's given the list of combatants rather than the whole `World`, so tests can bu
 3. **Enemy art:** there are no enemy sprites yet. Options: a recoloured knight as a "bandit",
    or a free asset pack (wolves fit the knight's warning about "wolves, bandits, and worse").
    The early phases don't need it; the knight is the first sparring partner.
+   **Built: the recoloured knight** (step 5). `Bandit` is the knight's sheets with a dark
+   `Tint`; real art or wolves can replace it later.
 4. **Numbers:** HP values, damage, reach. The plan has starting values; they're for tuning,
    not decisions.
 
@@ -220,7 +222,7 @@ It's given the list of combatants rather than the whole `World`, so tests can bu
 
 ## Phases and steps
 
-Each step leaves the game working, with tests. Steps 0–4 are the core; 5 onward can wait.
+Each step leaves the game working, with tests. Steps 0–6 are built; what's left is under "Later".
 
 ### Step 0 — Four-way facing and the player's animation set (**done**)
 
@@ -377,13 +379,63 @@ As built:
 - Spawning from the level JSON instead of the hard-coded `NpcRoster.SpawnStartingNpcs` switch
   (that was always the plan), and an "Enemy" option in the editor's spawn dropdown.
 
-### Step 6 — Saving it
+**Built (2026-11-05).**
+- **`Combat/Aggro`** does both halves, given the event log and the day, like
+  `CombatSystem`:
+  - **Picking fights:** every `LookSeconds` (0.25 s), each free NPC (not fighting, talking
+    or down) goes for the nearest person within its `AggroRange` that it `WouldAttack`. The
+    defaults are 4 cells and hostile only, both virtual on `NpcBrain`. So a guard goes for a
+    bandit (-80) with nobody telling him, leaves a traveller (0) alone, and goes for one
+    who attacked him today (a grudge).
+  - **Joining in:** on every `Combat.Hit`, each free NPC within `JoinRange` (perception's
+    6 cells) of the victim takes the side it likes more. It fights the attacker if it's
+    friendly to the victim or hostile to the attacker, and the victim the other way round. A
+    grudge counts as the lowest liking there is. Guards come to a guard's aid; a guard who
+    sees you hit a bandit goes for the bandit.
+  - **Grudges are cached** per NPC and redone only when the day, the log's length or the
+    NPC's last reflected day changes, so `Relations.Grudges` doesn't scan the log every look.
+  - Range only, through walls, like perception. Line of sight is still for later.
+- **`EnemyBrain`** (wander, aggro, fight, leash):
+  - It ambles within `WanderRadius` (1.5 cells) of `Home`, which is where it first stood.
+  - It attacks the wary too, not only the hostile, within 3.5 cells. Bandits see travellers
+    at -30, so a bandit goes for a new player.
+  - A chase more than `LeashDistance` (6 cells) from home is dropped: it walks home and
+    picks no new fights on the way. Hitting it still makes it fight back.
+- **`Bandit : Knight`:** 45 HP, speed 0.75, one slow heavy cut (9 damage, 0.35 s windup),
+  faction `bandit`, and `DiesForGood`. It has its own `Bandit` boxes in `bounds.json`
+  (copied from the knight's), so the editor can tune it separately.
+- **Spawning from the level file.** A level's `"npcs"` list holds `type` and `at` (a
+  point), plus an optional `name`, `factions` and starting `tasks` (`go_to` a `target`,
+  `wait` `seconds`, `patrol` `targets`). It's spawned on the first visit
+  (`NpcRoster.Spawn`). Missing fields fall back to the type's defaults (`NpcFactory`: name
+  and factions); an unknown type is skipped, and so is a task pointing at a point the level
+  doesn't have. Sir Lancelot and his walk to the entry and back now live in `Medows.json`;
+  the hard-coded switch is gone. Saves that already populated Medows are unaffected.
+- **Editor:** the Points panel has a **Spawns** dropdown (nobody / Knight / Bandit) and an
+  **NPC name** field for the selected point. Renaming a point keeps its spawn; removing it
+  removes the spawn. Other fields on a spawn (factions, tasks) are kept as written.
+- **Console:** `spawn <type> [name]` brings one in beside you (`spawn bandit Grim`).
+- No bandit is placed in any level yet. Add one with the editor, or `spawn bandit` to try one.
+
+### Step 6 — Saving it (**done**)
 
 - Health for players and NPCs; dead / knocked-out state (`NPC.KnockedOut`, the time left).
 - Fights in progress aren't saved, like conversations: you can only save from the pause menu,
   so the World isn't running. Health persists; who you were fighting doesn't.
 - The save is at schema v7 (factions, then the A2 jobs), so this is the v8 migration (add the
   `hp` columns).
+
+**Built (2026-11-05): schema v8.**
+- `players.hp`, `npcs.hp` and `npcs.knocked_out` (seconds left down). A NULL `hp` (a
+  version 7 file, or `PlayerSave.Hp` / `NpcSave.Hp` null) loads at full health.
+- On load, `SaveMapper.FillHealth` calls `Health.Restore`. A saved 0 is a `Kill()`, so
+  whoever it is lies down again. A knocked-out NPC gets the rest of its time back
+  (`NPC.RestoreKnockout`: a whole knock-out if the time is missing) and keeps its job queue
+  for when it gets up. A bandit saved dead stays dead.
+- Saving while the player is down is allowed again (`SaveLibrary.CanSave` no longer refuses
+  it). They load down where they fell and respawn `World.RespawnSeconds` later.
+- Not saved: an enemy's `Home` (it's wherever it loads) and fights in progress
+  (`FightRecorder.EndAll` posts them before a save).
 
 ### Later (not planned in detail)
 

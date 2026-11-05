@@ -100,6 +100,88 @@ public class WorldSaveTests : IDisposable
         Near.Equal(new Vector2(4.5f, 6.9f), loaded.player.Feet);
     }
 
+    // ------------------------------------------------------------------ health
+
+    [Fact]
+    public void Health_comes_back_for_the_player_and_the_knight()
+    {
+        var world = NewGame();
+        world.player.Health.TakeDamage(35);
+        Knight(world).Health.TakeDamage(20);
+
+        var loaded = Load(SaveMapper.ToSave(world, SavedAt));
+
+        Assert.Equal(65, loaded.player.Health.Current);
+        Assert.Equal(60, Knight(loaded).Health.Current);
+    }
+
+    [Fact]
+    public void A_knocked_out_knight_is_still_down_after_loading_and_gets_up_when_his_time_is_up()
+    {
+        var world = NewGame();
+        var knight = Knight(world);
+        knight.Health.Kill();
+        for (int i = 0; i < 5; i++) Step(world, 1);   // 15 of his 20 seconds left
+
+        var loaded = Load(SaveMapper.ToSave(world, SavedAt));
+        var down = Knight(loaded);
+
+        Assert.True(down.IsKnockedOut);
+        Assert.Equal(NpcBrain.NPCState.Dead, down.State);
+        Near.Equal(NPC.KnockoutSeconds - 5, down.KnockedOut);
+        Assert.NotEmpty(down.Jobs);   // his walk waits for him
+
+        for (int i = 0; i < 16; i++) Step(loaded, 1);
+        Assert.False(down.IsDead);
+    }
+
+    [Fact]
+    public void A_bandit_comes_back_a_bandit_and_a_dead_one_stays_dead()
+    {
+        var world = NewGame();
+        var grim = world.Roster.SpawnAt(world.location, "Bandit", "Grim", world.player.Feet + new Vector2(3, 0));
+        var dead = world.Roster.SpawnAt(world.location, "Bandit", "Rook", world.player.Feet + new Vector2(4, 0));
+        dead.Health.Kill();
+
+        var loaded = Load(SaveMapper.ToSave(world, SavedAt));
+
+        var back = Assert.IsType<Bandit>(loaded.Roster.Find(grim.Id));
+        Assert.Equal(new[] { "bandit" }, back.Factions);
+        var body = Assert.IsType<Bandit>(loaded.Roster.Find(dead.Id));
+        Assert.True(body.IsDead);
+        Assert.False(body.IsKnockedOut);
+    }
+
+    [Fact]
+    public void A_player_saved_while_down_loads_down_and_respawns()
+    {
+        var world = NewGame();
+        world.player.Health.Kill();
+
+        var loaded = Load(SaveMapper.ToSave(world, SavedAt));
+        Assert.True(loaded.player.IsDead);
+        Assert.Equal(Player.PlayerState.Dead, loaded.player.State);
+
+        Step(loaded, World.RespawnSeconds + 0.1);
+        Assert.False(loaded.player.IsDead);
+        Assert.Equal(loaded.player.Health.Max, loaded.player.Health.Current);
+    }
+
+    [Fact]
+    public void A_save_from_before_health_loads_everyone_at_full_health()
+    {
+        var world = NewGame();
+        world.player.Health.TakeDamage(35);
+        var save = SaveMapper.ToSave(world, SavedAt);
+        save.Players[0].Hp = null;
+        save.Npcs[0].Hp = null;
+
+        var loaded = Load(save);
+
+        Assert.Equal(loaded.player.Health.Max, loaded.player.Health.Current);
+        Assert.Equal(Knight(loaded).Health.Max, Knight(loaded).Health.Current);
+    }
+
     [Fact]
     public void The_clock_comes_back_on_the_same_day_and_time_of_day()
     {

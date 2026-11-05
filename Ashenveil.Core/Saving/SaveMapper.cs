@@ -57,7 +57,18 @@ namespace Ashenveil.Core.Saving
             // In key order, as SaveStore reads them back, so a save round-trips exactly.
             Standings = player.Standing.OrderBy(s => s.Key, StringComparer.Ordinal)
                               .Select(s => new StandingSave { Faction = s.Key, Score = s.Value }).ToList(),
+            Hp = player.Health?.Current,
         };
+
+        /// <summary>
+        /// Puts saved health back on someone freshly built (full health). Null, a save from
+        /// before health was saved, leaves them full. Saved at 0, they're down again: a player
+        /// gets up when the World respawns them, an NPC when its knock-out runs out.
+        /// </summary>
+        public static void FillHealth(Entity who, int? hp)
+        {
+            if (hp is int current) who.Health?.Restore(current);
+        }
 
         /// <summary>
         /// Puts a saved player's factions and standings back. A save from before factions has
@@ -91,6 +102,8 @@ namespace Ashenveil.Core.Saving
             KnownEvents = npc.Journal.KnownEvents.OrderBy(k => k.Key)
                                      .Select(k => new KnownEventSave { EventId = k.Key, Day = k.Value }).ToList(),
             Factions = npc.Factions.ToList(),
+            Hp = npc.Health?.Current,
+            KnockedOut = npc.KnockedOut,
             // People, then factions, each in key order, as SaveStore reads them back.
             Opinions = npc.Opinions.People
                 .Select(p => new OpinionSave { About = ReflectionSystem.PersonKey(p.Key), Score = p.Value.Score, Why = p.Value.Why })
@@ -187,6 +200,8 @@ namespace Ashenveil.Core.Saving
             npc.StandAt(new Vector2(saved.X, saved.Y));
             FillJournal(npc.Journal, saved, transcripts);
             FillFactions(npc, saved, table ?? FactionTable.Default);
+            FillHealth(npc, saved.Hp);
+            npc.RestoreKnockout(saved.KnockedOut);
             // GiveJob puts the NPC in the Working state, as it was when it was saved with work queued.
             foreach (var job in saved.Tasks.Select(FromSave).Where(t => t != null))
                 npc.GiveJob(job);

@@ -72,6 +72,18 @@ namespace Ashenveil.Core.Combat
             Died?.Invoke();
         }
 
+        /// <summary>
+        /// Puts back health a save had (a fresh Health, so it starts full): <paramref name="current"/>
+        /// clamped to Max, and 0 or less is <see cref="Kill"/>, so the owner lies down as it did.
+        /// </summary>
+        public void Restore(int current)
+        {
+            if (current <= 0) { Kill(); return; }
+            bool wasDead = IsDead;
+            Current = Math.Min(Max, current);
+            if (wasDead) Revived?.Invoke();
+        }
+
         /// <summary>Counts <see cref="Invulnerable"/> down.</summary>
         public void Update(float dt) => Invulnerable = Math.Max(0f, Invulnerable - dt);
     }

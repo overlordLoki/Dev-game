@@ -95,6 +95,18 @@ namespace Ashenveil.Core.Entities
 
         // ------------------------------------------------------------------ fighting
 
+        /// <summary>How close, feet to feet, someone this NPC would attack has to be for it to notice, in cells.</summary>
+        public const float DefaultAggroRange = 4f;
+        /// <summary>How close it notices someone to attack (Combat.Aggro). Virtual so a brain can see further or less far.</summary>
+        public virtual float AggroRange => DefaultAggroRange;
+        /// <summary>
+        /// Whether it attacks someone it feels this way about, unprovoked (Combat.Aggro). Base:
+        /// only the hostile; an enemy goes for the wary too.
+        /// </summary>
+        public virtual bool WouldAttack(Attitude attitude) => attitude == Attitude.Hostile;
+        /// <summary>Whether it takes a side in a fight it sees (Combat.Aggro.JoinIn).</summary>
+        public virtual bool JoinsFights => true;
+
         /// <summary>Further than this from the target, feet to feet, in cells, counts as out of range.</summary>
         public const float GiveUpDistance = 8f;
         /// <summary>Out of range (or unreachable) this long, in seconds, and the NPC gives up.</summary>

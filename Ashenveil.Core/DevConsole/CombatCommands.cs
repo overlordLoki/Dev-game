@@ -30,6 +30,8 @@ namespace Ashenveil.Core.DevConsole
                 args => Aggro(world(), args[0], args.Length > 1 ? args[1] : "player"), minArgs: 1, maxArgs: 2);
             commands.Register("calm", "<npc>", "Ends an NPC's fight; it goes back to what it was doing.",
                 args => Calm(world(), args[0]), minArgs: 1, maxArgs: 1);
+            commands.Register("spawn", "<type> [name]", $"Brings in a new NPC beside you ({string.Join(", ", NpcFactory.Types)}).",
+                args => Spawn(world(), args[0], args.Length > 1 ? string.Join(" ", args[1..]) : null), minArgs: 1, maxArgs: 8);
         }
 
         private static IEnumerable<string> Aggro(World world, string who, string whom)
@@ -46,6 +48,16 @@ namespace Ashenveil.Core.DevConsole
             if (npc.FightingWith != target)
                 throw new CommandException($"{npc.Name} can't fight right now ({npc.State}).");
             yield return $"{npc.Name} (#{npc.Id}) is fighting {Conversation.NameOf(target)}.";
+        }
+
+        // A cell and a half to the right of the player, so it doesn't land on top of them.
+        private static IEnumerable<string> Spawn(World world, string type, string name)
+        {
+            var feet = world.player.Feet + new Microsoft.Xna.Framework.Vector2(1.5f, 0);
+            var npc = world.Roster.SpawnAt(world.location, type, name, feet)
+                ?? throw new CommandException($"There's no NPC type \"{type}\". Types: {string.Join(", ", NpcFactory.Types)}.");
+            world.Bounds.Clamp(npc);
+            yield return $"{npc.Name} (#{npc.Id}, {npc.GetType().Name}, {string.Join(", ", npc.Factions)}) is here.";
         }
 
         private static IEnumerable<string> Calm(World world, string who)

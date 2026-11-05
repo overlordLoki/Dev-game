@@ -25,6 +25,8 @@ namespace Ashenveil.Core.GameWorld.Locations
         public List<IObject> objects { get; }
         public List<ExitData> exits { get; }
         public Dictionary<string, PointOfInterest> pointsOfInterest { get; }
+        /// <summary>Who this level starts with, from its file. NpcRoster spawns them on the first visit.</summary>
+        public List<NpcSpawnData> Spawns { get; }
         // Which cells an NPC can walk on, for the Pathfinder. Built once here: boxes are in
         // cells, so it doesn't change when the window is resized.
         public NavGrid Nav { get; }
@@ -37,6 +39,7 @@ namespace Ashenveil.Core.GameWorld.Locations
             objects = loaded.Objects;
             exits = loaded.Exits;
             pointsOfInterest = loaded.PointsOfInterest;
+            Spawns = loaded.Npcs;
             //add a default spawn point for fallback
             PointOfInterest defaultSpawn = new PointOfInterest("default", 1, 1);
             pointsOfInterest["default"] = defaultSpawn;

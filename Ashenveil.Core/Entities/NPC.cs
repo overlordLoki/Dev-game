@@ -52,6 +52,17 @@ namespace Ashenveil.Core.Entities
         public float KnockedOut { get; private set; }
         public bool IsKnockedOut => IsDead && !DiesForGood;
 
+        /// <summary>
+        /// A loaded NPC that was down when saved (its health already restored to 0): how long
+        /// it still has to lie there. A missing or bad time is a whole knock-out, so nobody is
+        /// left down for ever. Does nothing for one that isn't knocked out.
+        /// </summary>
+        public void RestoreKnockout(float secondsLeft)
+        {
+            if (!IsKnockedOut) return;
+            KnockedOut = secondsLeft > 0 ? Math.Min(secondsLeft, KnockoutSeconds) : KnockoutSeconds;
+        }
+
         // Counts a knock-out down, and gets up (healed, so the brain resumes) when it runs out.
         private void UpdateKnockout(float dt)
         {
@@ -85,6 +96,13 @@ namespace Ashenveil.Core.Entities
 
         /// <summary>Who this NPC is fighting; null when it isn't.</summary>
         public Entity FightingWith => Brain.target;
+
+        /// <summary>How close someone it would attack has to be for it to notice, in cells (the brain's).</summary>
+        public float AggroRange => Brain.AggroRange;
+        /// <summary>Whether it attacks someone it feels this way about, unprovoked (the brain's).</summary>
+        public bool WouldAttack(GameWorld.Attitude attitude) => Brain.WouldAttack(attitude);
+        /// <summary>Whether it takes a side in fights it sees (the brain's).</summary>
+        public bool JoinsFights => Brain.JoinsFights;
 
         /// <summary>Fight <paramref name="who"/> (the console's `aggro`, or being hit). See NpcBrain.StartFighting.</summary>
         public void StartFighting(Entity who) => Brain.StartFighting(who);

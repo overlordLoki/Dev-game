@@ -41,6 +41,7 @@ namespace Ashenveil.Core.Saving
         public float Y { get; set; }
         public List<string> Factions { get; set; } = new();          // joined, in order
         public List<StandingSave> Standings { get; set; } = new();   // one per faction
+        public int? Hp { get; set; }                     // Health.Current; null (a save from before health) is full
     }
 
     public class StandingSave
@@ -76,6 +77,8 @@ namespace Ashenveil.Core.Saving
         public List<string> Factions { get; set; } = new();        // NPC.Factions, in order
         public List<OpinionSave> Opinions { get; set; } = new();   // people first, then factions
         public List<KnownEventSave> KnownEvents { get; set; } = new(); // Journal.KnownEvents, by event id
+        public int? Hp { get; set; }                     // Health.Current; null (a save from before health) is full
+        public float KnockedOut { get; set; }            // NPC.KnockedOut: seconds left lying down; 0 if up
     }
 
     public class KnownEventSave

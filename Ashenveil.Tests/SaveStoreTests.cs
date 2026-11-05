@@ -41,6 +41,7 @@ public class SaveStoreTests : IDisposable
                 Id = 0, Name = "Loki", Level = "Medows", X = 2.5f, Y = 2.9f,
                 Factions = { "traveller", "guard" },
                 Standings = { new StandingSave { Faction = "bandit", Score = -50 }, new StandingSave { Faction = "guard", Score = 30 } },
+                Hp = 64,
             },
         },
         PopulatedLevels = { "Castle", "Medows" },
@@ -76,6 +77,7 @@ public class SaveStoreTests : IDisposable
                 LastReflectedDay = 11,
                 KnownEvents = { new KnownEventSave { EventId = 1, Day = 12 }, new KnownEventSave { EventId = 2, Day = 11 } },
                 Factions = { "guard", "village" },
+                Hp = 0, KnockedOut = 12.5f,
                 Opinions =
                 {
                     new OpinionSave { About = "person:0", Score = -35, Why = "he shoved me" },
@@ -334,6 +336,28 @@ public class SaveStoreTests : IDisposable
                                     (1, 1, 'An old note.', 'Event', NULL);
         INSERT INTO tasks VALUES (1, 0, 'wait', NULL, NULL, 2.0);
         """);
+
+    [Fact]
+    public void A_version_7_save_loads_everyone_at_full_health_and_nobody_knocked_out()
+    {
+        WriteVersion1Save();
+        Load();   // upgrades it all the way...
+        // ...so wind the health columns back out by hand: what a version 7 file looked like.
+        Sql("""
+            ALTER TABLE players DROP COLUMN hp;
+            ALTER TABLE npcs DROP COLUMN hp;
+            ALTER TABLE npcs DROP COLUMN knocked_out;
+            PRAGMA user_version = 7;
+            """);
+
+        var save = Load();
+
+        Assert.Equal(SaveStore.SchemaVersion, Scalar("PRAGMA user_version"));
+        Assert.Null(save.Players.Single().Hp);
+        var knight = save.Npcs.Single();
+        Assert.Null(knight.Hp);
+        Assert.Equal(0, knight.KnockedOut);
+    }
 
     [Fact]
     public void A_version_1_save_is_upgraded_as_it_is_opened()

@@ -222,6 +222,27 @@ public class HealthTests : IDisposable
         Assert.Equal("death", knight.CurrentAnim);
     }
 
+    [Fact]
+    public void Restore_puts_saved_health_back_and_zero_is_down()
+    {
+        var health = new Health(80);
+        int died = 0;
+        health.Died += () => died++;
+
+        health.Restore(30);
+        Assert.Equal(30, health.Current);
+
+        var other = new Health(80);
+        other.Died += () => died++;
+        other.Restore(0);
+        Assert.True(other.IsDead);
+        Assert.Equal(1, died);
+
+        var capped = new Health(80);
+        capped.Restore(500);
+        Assert.Equal(80, capped.Current);
+    }
+
     // ------------------------------------------------------------------ knock-outs
 
     [Fact]

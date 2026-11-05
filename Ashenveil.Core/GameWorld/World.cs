@@ -38,6 +38,8 @@ namespace Ashenveil.Core.GameWorld
         public Combat.CombatSystem Combat { get; } = new Combat.CombatSystem();
         /// <summary>Tallies hits into fights, and posts each fight as one event once it's over.</summary>
         public Combat.FightRecorder Fights { get; }
+        /// <summary>Who starts fights from their opinions, and who joins one they see.</summary>
+        public Combat.Aggro Aggro { get; }
 
         /// <summary>The NPCs in the level being played.</summary>
         public IReadOnlyList<NPC> NPCs => Roster.In(location.Name);
@@ -92,6 +94,9 @@ namespace Ashenveil.Core.GameWorld
             // event when it's over, not one per hit.
             Combat.Hit += (attacker, victim, _) => (victim as NPC)?.Provoke(attacker);
             Combat.Blocked += (attacker, defender) => (defender as NPC)?.Provoke(attacker);
+            // Anyone nearby who cares takes a side (after the victim's own reaction).
+            Aggro = new Combat.Aggro(Events, () => Clock.TotalDays);
+            Combat.Hit += (attacker, victim, _) => Aggro.JoinIn(attacker, victim, NPCs);
             Fights = new Combat.FightRecorder(LevelOf, e => Events.Post(e));
             Fights.Watch(Combat);
             // Id 0 is this save's owner, not "the player": other players would take ids from
@@ -135,6 +140,7 @@ namespace Ashenveil.Core.GameWorld
             world.player = new Player(Vector2.Zero, owner.Id, owner.Name);
             world.player.StandAt(new Vector2(owner.X, owner.Y));
             SaveMapper.FillFactions(world.player, owner, world.Factions);
+            SaveMapper.FillHealth(world.player, owner.Hp);   // down when saved: respawns RespawnSeconds later
 
             world.Clock.Restore(save.TotalDays, save.SecondsIntoDay);
             world.Roster.Restore(save.NextPersonId, save.PopulatedLevels);
@@ -340,6 +346,8 @@ namespace Ashenveil.Core.GameWorld
             combatants.AddRange(NPCs);
             Combat.Update(combatants);
             Fights.Update((float)gameTime.ElapsedGameTime.TotalSeconds);
+            // Then who starts a fight next frame, from where everyone ended up.
+            Aggro.Update((float)gameTime.ElapsedGameTime.TotalSeconds, NPCs, combatants);
         }
 
         // The level someone is in: the player's is the one being played.
