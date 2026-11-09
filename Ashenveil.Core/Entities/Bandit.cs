@@ -26,6 +26,17 @@ namespace Ashenveil.Core.Entities
             // Animations and Art
             Portrait = Assets.BanditPortrait;
             AddAnimation("idle",    Assets.KnightIdle,    0.12);
+            AddAnimation("walk",    Assets.KnightWalk,    0.10);
+            AddAnimation("run",     Assets.KnightRun,     0.08);
+            AddAnimation("jump",    Assets.KnightJump,    0.10, loop: false);
+            AddAnimation("attack1", Assets.KnightAttack1, 0.08, loop: false);
+            AddAnimation("attack2", Assets.KnightAttack2, 0.08, loop: false);
+            AddAnimation("attack3", Assets.KnightAttack3, 0.08, loop: false);
+            // 6 frames in about NpcBrain.DefendSeconds, so the clip lasts as long as the guard.
+            AddAnimation("defend",  Assets.KnightDefend,  0.08, loop: false);
+            // 4 frames in about Entity.FlinchSeconds, so the whole flinch shows before he recovers.
+            AddAnimation("hurt",    Assets.KnightHurt,    0.06, loop: false);
+            AddAnimation("death",   Assets.KnightDeath,   0.10, loop: false);
         }
 
         public override bool DiesForGood => true;
