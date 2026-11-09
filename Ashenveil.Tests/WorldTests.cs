@@ -93,7 +93,7 @@ public class WorldTests : IDisposable
     {
         var world = NewWorld();
         var (npc, _) = NpcBeside(world);
-        Conversation shown = null;
+        Conversation? shown = null;
         world.PlayerConversationStarted += c => shown = c;
 
         var convo = world.Interact();
@@ -323,7 +323,7 @@ public class WorldTests : IDisposable
     {
         var world = NewWorld();
         var (npc, _) = NpcBeside(world);
-        Conversation shown = null;
+        Conversation? shown = null;
         world.PlayerConversationStarted += c => shown = c;
 
         bool started = npc.StartConversation(world.player, "warn them about the wolves");

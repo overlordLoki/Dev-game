@@ -123,7 +123,7 @@ public class NpcRosterTests
     private sealed class ProbeJob : IJob
     {
         public JobState State { get; set; }
-        public JobContext Seen { get; private set; }
+        public JobContext Seen { get; private set; } = null!;
         public void Execute(JobContext context) => Seen = context;
     }
 

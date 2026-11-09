@@ -30,7 +30,7 @@ public class AggroTests : IDisposable
     public void Dispose() => AshenveilGame.Input = new LiveInput();
 
     // An NPC of some factions, with its faction opinions seeded as a spawned one's are.
-    private static TestNpc Member(float x, float y, int id, string faction, NpcBrain brain = null)
+    private static TestNpc Member(float x, float y, int id, string faction, NpcBrain? brain = null)
     {
         var npc = new TestNpc(x, y, id, $"{faction}{id}", brain ?? new KnightBrain(new Random(1)));
         npc.SetHealth(50);

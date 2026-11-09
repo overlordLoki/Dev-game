@@ -185,9 +185,9 @@ public class ConsoleScreenTests : IDisposable
     }
 
     [Fact]
-    public void A_line_written_later_from_another_thread_shows_at_the_next_update()
+    public async Task A_line_written_later_from_another_thread_shows_at_the_next_update()
     {
-        Task.Run(() => _console.WriteLater(new ConsoleLine("Connected.", LineKind.Output))).Wait();
+        await Task.Run(() => _console.WriteLater(new ConsoleLine("Connected.", LineKind.Output)));
         Assert.Empty(AfterWelcome);   // not yet: only the game's thread touches the output
 
         _console.Update(new Microsoft.Xna.Framework.GameTime());

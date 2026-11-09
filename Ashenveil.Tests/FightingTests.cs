@@ -22,7 +22,7 @@ public class FightingTests
 
     public FightingTests() => NullContentManager.Install();
 
-    private static TestNpc Fighter(float x = 2, float y = 2, KnightBrain brain = null)
+    private static TestNpc Fighter(float x = 2, float y = 2, KnightBrain? brain = null)
     {
         var npc = new TestNpc(x, y, 1, "Fighter", brain ?? new KnightBrain(new Never()));
         npc.SetHealth(50);

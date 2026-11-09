@@ -27,8 +27,8 @@ public class NpcRecallTests
     private const int PlayerId = 0;
 
     // A conversation between the NPC ("Test") and someone, by default the player.
-    private static Transcript Talk(int day, string summary, int withId = PlayerId, string withName = "Traveller",
-                                   string location = "Medows")
+    private static Transcript Talk(int day, string? summary, int withId = PlayerId, string withName = "Traveller",
+                                   string? location = "Medows")
     {
         var t = new Transcript(day, day, location, new[] { new Participant(withId, withName), new Participant(1, "Test") },
                                new[] { $"{withName}: hi" });

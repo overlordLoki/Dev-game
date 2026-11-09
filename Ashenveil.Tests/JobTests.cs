@@ -94,7 +94,7 @@ public class GoToJobTests
     // Ticks the task until it completes, stepping the NPC 0.05 cells along Direction each
     // tick. There's no collision here, so only the route keeps the feet out of blocked
     // cells. Returns every cell the feet were in along the way.
-    private static List<Point> Walk(TestNpc npc, GoToJob task, NavGrid nav)
+    private static List<Point> Walk(TestNpc npc, GoToJob task, NavGrid? nav)
     {
         var cells = new List<Point> { NavGrid.CellAt(npc.Feet) };
         for (int tick = 0; tick < 1000 && task.State != JobState.Completed; tick++)
