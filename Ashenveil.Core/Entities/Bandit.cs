@@ -22,6 +22,10 @@ namespace Ashenveil.Core.Entities
             SetHealth(45);   // tuning numbers (docs/combat-plan.md)
             Persona = "A ragged bandit who preys on travellers on the meadow roads. Rough, greedy and quick " +
                       "to threaten; respects only strength, and hates the knights who hunt his kind.";
+
+            // Animations and Art
+            Portrait = Assets.BanditPortrait;
+            AddAnimation("idle",    Assets.KnightIdle,    0.12);
         }
 
         public override bool DiesForGood => true;

@@ -379,3 +379,9 @@
 /processorParam:TextureFormat=Color
 /build:Sprites/Portrait/soldier.png
 
+#begin Sprites/Portrait/Bandit.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:TextureFormat=Color
+/build:Sprites/Portrait/Bandit.png

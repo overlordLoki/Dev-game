@@ -61,7 +61,7 @@ namespace Ashenveil.Core
 
         //Portraits
         public const string KnightPortrait = "Sprites/Portrait/soldier";
-
+        public const string BanditPortrait = "Sprites/Portrait/bandit";
         //UI
         public const string UiAtlas = "Sprites/UI/spritesheet-default.xml";
 
