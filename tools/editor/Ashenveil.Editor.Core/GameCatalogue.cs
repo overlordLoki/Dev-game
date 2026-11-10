@@ -35,10 +35,20 @@ namespace Ashenveil.Editor.Core
         public List<VarietyEntry> Varieties { get; set; } = new();
     }
 
+    /// <summary>An NPC type the game can spawn ("Knight"), for a point's Spawns list.</summary>
+    public class NpcEntry
+    {
+        /// <summary>The type written into the level's "npcs" (NpcFactory's key, the class name).</summary>
+        public string Type { get; set; } = "";
+        /// <summary>Whether it comes with an EnemyBrain: attacks on sight, so worth flagging.</summary>
+        public bool Enemy { get; set; }
+    }
+
     public class Catalogue
     {
         public List<TileEntry> Tiles { get; set; } = new();
         public List<ObjectEntry> Objects { get; set; } = new();
+        public List<NpcEntry> Npcs { get; set; } = new();
         /// <summary>Anything that didn't line up, surfaced in the UI rather than swallowed.</summary>
         public List<string> Warnings { get; set; } = new();
     }
@@ -52,6 +62,8 @@ namespace Ashenveil.Editor.Core
     ///   MapLoader.ParseTile   "grass"          -> TileType.Grass
     ///   TileMap._assetNames   TileType.Grass   -> Assets.Grass
     ///   Assets.cs             Assets.Grass     -> "Sprites/Tiles/grass"
+    ///
+    /// NPC types come from NpcFactory's makers, the same list the game spawns and loads from.
     ///
     /// This is regex over source, not a compiler. It is deliberately forgiving: a
     /// line it cannot read is reported as a warning and skipped, never thrown. If
@@ -67,6 +79,7 @@ namespace Ashenveil.Editor.Core
             var assets = ParseAssets(project, catalogue.Warnings);
             BuildTiles(project, assets, catalogue);
             BuildObjects(project, assets, catalogue);
+            BuildNpcs(project, catalogue);
 
             return catalogue;
         }
@@ -233,6 +246,25 @@ namespace Ashenveil.Editor.Core
                     Url       = SpriteUrl(project, asset.Path, catalogue.Warnings),
                 });
             }
+        }
+
+        // -------------------------------------------------------------------- npcs
+
+        // [nameof(Knight)] = (id, name) => new Knight(Vector2.Zero, id, name, new KnightBrain()),
+        private static readonly Regex NpcMaker = new(
+            @"\[nameof\((\w+)\)\]\s*=\s*\(\s*id\s*,\s*name\s*\)\s*=>\s*new\s+\w+\s*\([^;]*?new\s+(\w+)\s*\(",
+            RegexOptions.Compiled);
+
+        /// <summary>
+        /// Reads NpcFactory's makers: every type there can be spawned from a level, and nothing
+        /// else can (MapLoader asks the same factory), so a new NPC type shows up here by itself.
+        /// The brain it's made with says whether it's an enemy.
+        /// </summary>
+        private static void BuildNpcs(GameProject project, Catalogue catalogue)
+        {
+            foreach (var (type, brain) in ReadPairs(project.NpcFactoryPath, NpcMaker, catalogue.Warnings, "NpcFactory.cs"))
+                if (!catalogue.Npcs.Any(n => n.Type == type))
+                    catalogue.Npcs.Add(new NpcEntry { Type = type, Enemy = brain == "EnemyBrain" });
         }
 
         // ------------------------------------------------------------------ shared

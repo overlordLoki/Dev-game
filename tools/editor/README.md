@@ -117,6 +117,10 @@ tree.
 So **adding a tile to the game makes it appear in the editor**, with its real
 art, with no editor change at all.
 
+NPC types work the same way. A point's **Spawns** list (Points mode) is read from
+`NpcFactory`'s makers, the list the game itself spawns from, so a type added there
+shows up in the editor by itself. One made with an `EnemyBrain` is labelled "(enemy)".
+
 The catch: this is regex over source, not a compiler. It's written to be
 forgiving — anything it can't line up becomes a warning in the sidebar rather
 than an exception — but if you reformat `Assets.cs` heavily (e.g. rename the

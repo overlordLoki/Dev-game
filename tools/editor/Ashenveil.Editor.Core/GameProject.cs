@@ -44,6 +44,7 @@ namespace Ashenveil.Editor.Core
         public string TileCatalogPath => Path.Combine(CoreDir, "Tiles", "TileCatalog.cs");
         public string TileTypePath    => Path.Combine(CoreDir, "Tiles", "ITile.cs");
         public string TileMapPath   => Path.Combine(CoreDir, "Tiles", "TileMap.cs");
+        public string NpcFactoryPath => Path.Combine(CoreDir, "Entities", "NpcFactory.cs");
 
         /// <summary>
         /// Finds the core project inside a repo root: the immediate subfolder that has

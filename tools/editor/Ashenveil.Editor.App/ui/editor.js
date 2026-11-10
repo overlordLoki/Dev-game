@@ -11,7 +11,7 @@ const $ = id => document.getElementById(id);
 
 /* ---------------------------------------------------------------- state */
 
-let catalogue = { tiles: [], objects: [], warnings: [] };
+let catalogue = { tiles: [], objects: [], npcs: [], warnings: [] };
 let tileById = {};
 let objById = {};
 
@@ -1106,11 +1106,34 @@ function buildPoiList() {
   });
 }
 
+/* The Spawns dropdown: nobody, then every NPC type the game's NpcFactory can make. */
+function buildSpawnOptions() {
+  const sel = $("poiSpawn");
+  sel.innerHTML = "";
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "(nobody)";
+  sel.appendChild(none);
+  (catalogue.npcs || []).forEach(n => {
+    const opt = document.createElement("option");
+    opt.value = n.type;
+    opt.textContent = n.enemy ? `${n.type} (enemy)` : n.type;
+    sel.appendChild(opt);
+  });
+}
+
 function updatePoiUi() {
   buildPoiList();
 
   const sel = selectedPoi();
   const spawn = spawnAt(sel);
+  // A level can name a type the game no longer has; show it rather than quietly losing it.
+  if (spawn && !Array.from($("poiSpawn").options).some(o => o.value === spawn.type)) {
+    const opt = document.createElement("option");
+    opt.value = spawn.type;
+    opt.textContent = `${spawn.type} (unknown type)`;
+    $("poiSpawn").appendChild(opt);
+  }
   $("poiSpawn").disabled = !sel;
   $("poiSpawnName").disabled = !sel || !spawn;
   $("poiSpawn").value = spawn ? spawn.type : "";
@@ -1267,6 +1290,7 @@ function applyCatalogue(next) {
   buildTilePalette();
   buildObjectPalette();
   buildVariety();
+  buildSpawnOptions();
 
   // Anything the backend couldn't line up is shown rather than silently dropped.
   const list = $("warningList");
